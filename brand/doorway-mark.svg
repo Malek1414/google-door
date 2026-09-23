@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192" role="img" aria-label="Doorway">
+  <title>Doorway</title>
+  <!-- Doorway's mark.
+       Built from Google's four brand colours the way the Maps pin is: structurally,
+       each colour doing a job, never decoration.
+
+         BLUE   the frame — the door itself, and Material 3's primary
+         GREEN  the way through, read as "you can get in"
+         YELLOW the threshold, drawn flat and unbroken because step-free is the point
+         RED    the Maps pin, standing in the opening: the destination is the door
+
+       The aperture is the Maps pin silhouette rotated upright, so the mark reads as
+       a door and as a map pin at the same time. -->
+
+  <!-- the way through -->
+  <path d="M52 40 a44 44 0 0 1 88 0 v112 H52 Z" fill="#34a853"/>
+
+  <!-- the door frame, three sides, left open at the base so it reads as passable -->
+  <path d="M40 152 V40 a56 56 0 0 1 112 0 v112 h-20 V40 a36 36 0 0 0-72 0 v112 Z" fill="#4285f4"/>
+
+  <!-- the destination, standing in the opening -->
+  <path d="M96 58 a26 26 0 0 0-26 26 c0 19 26 44 26 44 s26-25 26-44 a26 26 0 0 0-26-26 z" fill="#ea4335"/>
+  <circle cx="96" cy="84" r="9.5" fill="#34a853"/>
+
+  <!-- the threshold: flat, continuous, no step -->
+  <rect x="30" y="152" width="132" height="14" rx="7" fill="#fbbc04"/>
+</svg>

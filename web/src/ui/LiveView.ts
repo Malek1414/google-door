@@ -14,8 +14,9 @@ import type { ArrowTarget } from '../core/target'
 import { BeaconAudio, playApproachChime } from '../audio'
 import { postLook } from '../data'
 import { announce, session, speak, vibrate } from '../session'
-import { t } from '../strings'
+import { lang, t } from '../strings'
 import { glyphPaths, h, mount, s } from './dom'
+import './arrival.css'
 
 export interface Fix {
   lat: number
@@ -38,6 +39,64 @@ const HAPTIC_EVERY_MS = 3000
 const SPEAK_EVERY_MS = 4000
 // 10 m is covered by the one-off approach line (core/beacon.ts APPROACH_M).
 const DISTANCE_CALLOUTS = [50, 30, 20]
+
+/** Jitter-tolerant arrival: two still fixes within this radius count as arrived. */
+export const ARRIVE_JITTER_M = 4
+/** Below this speed (m/s) between the last two fixes the user counts as standing. */
+export const STILL_MPS = 0.5
+/** Walking this far away again while the arrival card shows resumes guidance. */
+export const LEAVE_M = 8
+export const ARRIVAL_CARD_DELAY_MS = 1500
+export const ARRIVAL_EXIT_S = 20
+
+export interface TimedFix {
+  lat: number
+  lon: number
+  /** Milliseconds, any monotonic clock. */
+  t: number
+}
+
+/**
+ * Pure. Arrived when the newest fix is inside ARRIVE_M, or when the last two fixes are both
+ * within ARRIVE_JITTER_M and the user is standing still between them (GPS jitter at the door).
+ */
+export function isArrived(history: readonly TimedFix[], target: { lat: number; lon: number }): boolean {
+  const n = history.length
+  if (n === 0) return false
+  const b = history[n - 1]
+  const db = haversineM(b, target)
+  if (!Number.isFinite(db)) return false
+  if (db <= ARRIVE_M) return true
+  if (n < 2) return false
+  const a = history[n - 2]
+  if (haversineM(a, target) > ARRIVE_JITTER_M || db > ARRIVE_JITTER_M) return false
+  const moved = haversineM(a, b)
+  const dt = (b.t - a.t) / 1000
+  if (!(dt > 0)) return moved === 0
+  return moved / dt <= STILL_MPS
+}
+
+/** Arrival card strings; kept local so strings.ts stays untouched. */
+const ARR = {
+  de: {
+    title: 'Angekommen',
+    stay: 'Hier bleiben',
+    toMap: 'Zur Karte',
+    backIn: (s: number) => `Zurück zur Karte in ${s} Sekunden.`,
+    staying: 'Du bleibst hier. Zur Karte kommst du mit dem Knopf unten.',
+    resumed: 'Du entfernst dich vom Eingang. Die Führung läuft weiter.',
+    face: (dir: string) => `Zum Hineingehen nach ${dir} schauen.`,
+  },
+  en: {
+    title: 'Arrived',
+    stay: 'Stay here',
+    toMap: 'Back to map',
+    backIn: (s: number) => `Back to the map in ${s} seconds.`,
+    staying: 'You stay here. The button below takes you back to the map.',
+    resumed: 'You are moving away from the entrance. Guidance continues.',
+    face: (dir: string) => `To enter, face ${dir}.`,
+  },
+}[lang === 'de' ? 'de' : 'en']
 
 export function realSensors(): Sensors {
   return {
@@ -221,6 +280,102 @@ export function LiveView(opts: {
   const beacon = cfg.beacon && session.audio ? new BeaconAudio(session.audio) : null
   let beaconOn = false
 
+  let history: TimedFix[] = []
+  const timers: number[] = []
+  let countdown = 0
+  let cardEl: HTMLElement | null = null
+
+  const clearTimers = () => {
+    timers.splice(0).forEach((id) => clearTimeout(id))
+    if (countdown) clearInterval(countdown)
+    countdown = 0
+  }
+
+  function arrive() {
+    arrived = true
+    if (cfg.haptics || cfg.beacon) vibrate(HAPTIC_ARRIVED) // one long cue; iOS gets the sound
+    beacon?.stop()
+    beaconOn = false
+    dirEl.textContent = t.arrived
+    turnIcon.textContent = 'where_to_vote'
+    arrowG.style.visibility = 'hidden'
+    coneG.replaceChildren()
+    destG.setAttribute('visibility', 'hidden')
+    if (!spokeArrival && cfg.speak) speak(t.arrived, { interrupt: true })
+    spokeArrival = true
+    announce(t.arrived)
+    timers.push(window.setTimeout(showArrivalCard, ARRIVAL_CARD_DELAY_MS))
+  }
+
+  function showArrivalCard() {
+    const lines: string[] = []
+    const doorType = e.door ? t.door[e.door] ?? null : null
+    const face = e.approachBearing !== null ? ARR.face(compassWord(e.approachBearing)) : null
+    const warns = e.warnings.map((w) => t.warning[w] ?? w)
+    const secsEl = h('p', { class: 'arrival-count' }, ARR.backIn(ARRIVAL_EXIT_S))
+    const stayBtn = h('button', { class: 'gm-pill gm-pill-primary', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'pan_tool'), ARR.stay)
+    const mapBtn = h('button', { class: 'gm-pill', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'map'), ARR.toMap)
+    cardEl = h(
+      'div',
+      { class: 'arrival', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'arrival-title' },
+      h(
+        'div',
+        { class: 'arrival-head' },
+        h('span', { class: 'ms', 'aria-hidden': 'true' }, 'where_to_vote'),
+        h('h2', { id: 'arrival-title' }, ARR.title),
+        h('p', { class: 'arrival-name' }, name),
+      ),
+      h(
+        'div',
+        { class: 'arrival-body' },
+        doorType ? h('p', { class: 'arrival-door' }, doorType) : null,
+        ...warns.map((w) => h('p', { class: 'arrival-warn', role: 'note' }, h('strong', {}, `${t.warningPrefix}: `), w)),
+        face ? h('p', { class: 'arrival-face' }, face) : null,
+        secsEl,
+        h('div', { class: 'nav-row' }, mapBtn, stayBtn),
+      ),
+    )
+    root.classList.add('is-arrived') // camera and overlay leave the screen
+    root.append(cardEl)
+    stayBtn.focus({ preventScroll: true })
+
+    lines.push(`${ARR.title}. ${name}.`)
+    if (doorType) lines.push(`${doorType}.`)
+    for (const w of warns) lines.push(`${t.warningPrefix}. ${w}`)
+    if (face) lines.push(face)
+    if (cfg.speak) speak(lines.join(' '))
+    announce(ARR.backIn(ARRIVAL_EXIT_S)) // once, not every second
+
+    let left = ARRIVAL_EXIT_S
+    countdown = window.setInterval(() => {
+      left--
+      secsEl.textContent = ARR.backIn(Math.max(0, left))
+      if (left <= 0) exit()
+    }, 1000)
+    stayBtn.addEventListener('click', () => {
+      if (countdown) clearInterval(countdown)
+      countdown = 0
+      secsEl.textContent = ARR.staying
+      announce(ARR.staying)
+      stayBtn.remove()
+    })
+    mapBtn.addEventListener('click', exit)
+  }
+
+  function cancelArrival() {
+    clearTimers()
+    arrived = false
+    spokeArrival = false
+    history = history.slice(-1)
+    cardEl?.remove()
+    cardEl = null
+    root.classList.remove('is-arrived')
+    lastWord = ''
+    lastSpoken = 0
+    if (cfg.speak) speak(ARR.resumed, { interrupt: true })
+    announce(ARR.resumed)
+  }
+
   function update() {
     if (!fix) return
     // CONTRACT v1 has no footway graph: snapToGraph passes the fix through (see core/match.ts).
@@ -232,24 +387,20 @@ export function LiveView(opts: {
     rel = hasHeading ? relativeBearing(toDoor, smoothedDeg) : 0
     const cone = heading?.source === 'gps-course' || (fix.accuracy ?? 0) > CONE_ACCURACY_M
     const now = performance.now()
+    if (dist > LEAVE_M) spokeArrival = false
 
     distEl.textContent = t.metres(dist)
     accEl.textContent = fix.accuracy !== null ? t.accuracy(fix.accuracy) : ''
 
-    if (!arrived && dist <= ARRIVE_M) {
-      arrived = true
-      if (cfg.haptics) vibrate(HAPTIC_ARRIVED)
-      beacon?.stop()
-      beaconOn = false
-      dirEl.textContent = t.arrived
-      turnIcon.textContent = 'where_to_vote'
-      announce(t.arrived)
-      arrowG.style.visibility = 'hidden'
-      coneG.replaceChildren()
-      destG.setAttribute('visibility', 'hidden')
+    if (arrived) {
+      // Walked away again before leaving: cancel arrival and guide on.
+      if (dist > LEAVE_M) cancelArrival()
+      else return
+    }
+    if (isArrived(history, target)) {
+      arrive()
       return
     }
-    if (arrived) return
 
     if (!hasHeading) {
       dirEl.textContent = t.noCompass
@@ -346,6 +497,8 @@ export function LiveView(opts: {
   const stopSensors = opts.sensors.start(
     (f) => {
       fix = f
+      history.push({ lat: f.lat, lon: f.lon, t: performance.now() })
+      if (history.length > 5) history = history.slice(-5)
       update()
     },
     (hd) => {
@@ -386,7 +539,13 @@ export function LiveView(opts: {
     }
   })
 
+  function exit() {
+    teardown()
+    opts.onExit()
+  }
+
   function teardown() {
+    clearTimers()
     cancelAnimationFrame(raf)
     stopSensors()
     beacon?.stop()
@@ -396,9 +555,6 @@ export function LiveView(opts: {
       /* ignored */
     }
   }
-  stopBtn.addEventListener('click', () => {
-    teardown()
-    opts.onExit()
-  })
+  stopBtn.addEventListener('click', exit)
   return teardown
 }

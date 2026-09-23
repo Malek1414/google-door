@@ -1,0 +1,24 @@
+/* Beitragen tab. Reuses gm-* tokens from style.css (.gm scope). */
+.ct-tiles { list-style: none; display: flex; justify-content: space-around; gap: 8px; margin: 8px 0 18px; padding: 0; }
+.ct-tile { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 88px; min-height: 44px; padding: 4px; border: 0; background: none; color: var(--fg); cursor: pointer; }
+.ct-tile-icon { width: 56px; height: 56px; border-radius: 50%; background: var(--tonal); color: var(--teal); display: grid; place-items: center; }
+.ct-tile-icon .ms { font-size: 26px; }
+.ct-tile-label { font-size: 14px; font-weight: 500; text-align: center; line-height: 1.2; }
+.ct-tile:focus-visible, .ct .gm-row:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
+
+.ct-section { margin-top: 18px; }
+.ct-h { margin: 0; font: 500 18px/1.3 'Google Sans Flex', Roboto, sans-serif; color: #fff; }
+.ct .gm-row { color: inherit; text-align: left; cursor: pointer; background: none; }
+.ct .gm-row > .ms:last-child { color: var(--fg2); }
+.ct-mine-row { cursor: default; }
+.ct-q { width: 40px; height: 40px; flex: none; border-radius: 50%; background: var(--circle); color: var(--teal); display: grid; place-items: center; }
+.ct-q .ms { font-size: 22px; }
+
+.ct-level { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 8px 12px; margin: 10px 0 4px; padding: 14px 16px; border-radius: 16px; background: var(--tips); }
+.ct-level-badge { display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 10px; border-radius: 16px; background: var(--tonal); color: var(--tonal-ink); font-size: 14px; font-weight: 500; }
+.ct-level-badge .ms { font-size: 18px; color: var(--teal); }
+.ct-level-text { color: var(--fg2); font-size: 15px; }
+.ct-level-text strong { color: #fff; font-weight: 500; }
+.ct-bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.ct-bar > span { display: block; height: 100%; background: var(--teal); border-radius: 3px; }
+.ct-level-next { grid-column: 1 / -1; color: var(--fg2); font-size: 13px; }

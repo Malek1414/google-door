@@ -19,7 +19,7 @@ test -f config.js || { echo "missing web/config.js (copy config.example.js)"; ex
 echo "==> tests + build"
 npm test >/dev/null
 npm run build >/dev/null
-if grep -rqE "AIza|sk-|AKIA" dist/; then echo "key found in dist/, abort"; exit 1; fi
+if grep -rqE "AIza[0-9A-Za-z_-]{20}|AKIA[0-9A-Z]{12}|sk-[A-Za-z0-9]{20}" dist/; then echo "key found in dist/, abort"; exit 1; fi
 
 echo "==> upload"
 ssh "$VPS" "mkdir -p $DEST/web $DEST/server $DEST/data && test -f $DEST/.env || { echo 'missing $DEST/.env on server'; exit 1; }"

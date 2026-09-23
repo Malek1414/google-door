@@ -11,6 +11,22 @@ import { LiveView, realSensors, applyContrast } from './ui/LiveView'
 import { MapView } from './ui/MapView'
 import { Onboard } from './ui/Onboard'
 import { Start } from './ui/Start'
+// Pixel fixes measured against the Maps recording; loaded last so they win.
+import './ui/fix-search.css'
+import './ui/fix-sheet.css'
+import './ui/fix-card.css'
+import './ui/fix-buttons.css'
+import './ui/fix-live.css'
+
+// Fail-safe: an error in one feature must never leave a blank screen on stage.
+// Log it and show a short note; the current screen stays usable.
+function softFail(err: unknown) {
+  console.error('[doorway]', err)
+  const el = document.getElementById('live')
+  if (el) el.textContent = String((err as Error)?.message ?? err).slice(0, 140)
+}
+window.addEventListener('error', (ev) => softFail(ev.error ?? ev.message))
+window.addEventListener('unhandledrejection', (ev) => softFail(ev.reason))
 
 const params = readParams()
 session.profile = loadProfile()
@@ -66,5 +82,10 @@ if (params.record) {
 } else if (params.sim) {
   Start({ sim: true, onDone: () => withProfile((p) => void startSim(p).catch((e) => fatal(String(e)))) })
 } else {
-  showMap(session.profile ?? DEFAULT_PROFILE)
+  try {
+    showMap(session.profile ?? DEFAULT_PROFILE)
+  } catch (err) {
+    softFail(err)
+    fatal(String((err as Error)?.message ?? err))
+  }
 }

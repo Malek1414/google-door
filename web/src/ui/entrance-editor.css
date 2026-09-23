@@ -1,0 +1,26 @@
+/* Entrance editor, Google Maps edit-form look inside the dark sheet (.gm tokens). */
+.ee { display: flex; flex-direction: column; gap: 14px; padding-bottom: 16px; }
+.ee-hint { margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--tonal, #063c40); color: var(--tonal-ink, #cdeef0); font-weight: 500; }
+.ee-hint-live { background: #FFD60A; color: #000; }
+.ee-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ee-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ee-label { font-size: 14px; font-weight: 500; color: var(--fg2, #c9c5ca); }
+.ee-input { box-sizing: border-box; width: 100%; min-height: 48px; padding: 10px 14px; border: 1px solid #8e918f; border-radius: 8px;
+  background: transparent; color: var(--fg, #e6e1e5); font: inherit; }
+.ee-input:focus { outline: none; border-color: var(--teal, #62c4cb); box-shadow: 0 0 0 1px var(--teal, #62c4cb); }
+.ee select.ee-input { appearance: none; -webkit-appearance: none; background-color: var(--sheet, #151316); }
+.ee-textarea { min-height: 88px; resize: vertical; }
+.ee-seg { display: flex; border: 1px solid #8e918f; border-radius: 22px; overflow: hidden; }
+.ee-seg-btn { flex: 1; min-height: 44px; border: 0; border-left: 1px solid #8e918f; background: transparent; color: var(--fg, #e6e1e5); font-size: 15px; font-weight: 500; cursor: pointer; }
+.ee-seg-btn:first-child { border-left: 0; }
+.ee-seg-btn[aria-pressed='true'] { background: var(--tonal, #063c40); color: var(--tonal-ink, #cdeef0); }
+.ee-check { display: flex; align-items: center; gap: 14px; min-height: 44px; cursor: pointer; }
+.ee-check-input { width: 22px; height: 22px; margin: 0; accent-color: var(--teal, #62c4cb); flex: none; }
+.ee-file { min-height: 44px; color: var(--fg2, #c9c5ca); font: inherit; }
+.ee-file::file-selector-button { min-height: 44px; margin-right: 12px; padding: 0 16px; border: 1px solid #8e918f; border-radius: 22px; background: transparent; color: var(--teal, #62c4cb); font: inherit; font-weight: 500; }
+.ee-preview { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.ee-preview-img { max-width: 100%; max-height: 180px; border-radius: 12px; object-fit: cover; }
+.ee-error { margin: 0; color: #f2b8b5; min-height: 0; }
+.ee-error:empty { display: none; }
+.ee-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.ee-btn { min-height: 46px; }

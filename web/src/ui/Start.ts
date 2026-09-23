@@ -22,6 +22,18 @@ export interface UnlockResult {
 }
 
 export async function unlockAll(opts: { camera: boolean }): Promise<UnlockResult> {
+  // Sound first and synchronously: iOS only unlocks an AudioContext inside the tap, and
+  // after the first await below the gesture may be gone. No await happens before
+  // requestHeadingPermission(), so the compass prompt still sees the tap too.
+  try {
+    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (Ctx) {
+      session.audio ??= new Ctx()
+      unlockAudio(session.audio)
+    }
+  } catch {
+    /* no Web Audio */
+  }
   const compass = await requestHeadingPermission()
   session.headingGranted = compass
 

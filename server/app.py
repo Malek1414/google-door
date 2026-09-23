@@ -89,7 +89,15 @@ async def look(req: LookReq):
     body = {"contents": [{"parts": [
         {"text": prompt},
         {"inline_data": {"mime_type": "image/jpeg", "data": req.frame}}]}],
-        "generationConfig": {"temperature": 0.0, "maxOutputTokens": 60}}
+        "generationConfig": {
+            "temperature": 0.0,
+            # Gemini 3.x reasons by default and thinking tokens are charged against
+            # maxOutputTokens, so a small cap silently truncates the sentence
+            # ("I can'" instead of "I can't make out the entrance from here").
+            # This call wants speed, not reasoning: budget 0, and enough room to speak.
+            "thinkingConfig": {"thinkingBudget": 0},
+            "maxOutputTokens": 256,
+        }}
     async with httpx.AsyncClient(timeout=20) as c:
         r = await c.post(f"{GEMINI_URL}/{MODEL_LOOK}:generateContent",
                          json=body, headers={"x-goog-api-key": GEMINI_KEY})

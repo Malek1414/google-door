@@ -10,9 +10,11 @@
    13.425
   ],
   "counts": {
-   "buildings": 0,
+   "buildings": 106,
    "entrances": 3061,
-   "tier1": 296
+   "tier1": 296,
+   "described": 272,
+   "withBearing": 147
   }
  },
  "buildings": [
@@ -108,7 +110,7 @@
    "id": "way/107306710",
    "name": null,
    "placeId": null,
-   "addr": "Lehrter Stra\u00dfe",
+   "addr": "Lehrter Straße",
    "centroid": [
     52.526223,
     13.362766
@@ -130,7 +132,7 @@
    "id": "way/1083473931",
    "name": null,
    "placeId": null,
-   "addr": "Schumannstra\u00dfe 13a",
+   "addr": "Schumannstraße 13a",
    "centroid": [
     52.524454,
     13.382321
@@ -174,7 +176,7 @@
    "id": "way/112149784",
    "name": null,
    "placeId": null,
-   "addr": "Charlottenstra\u00dfe 87",
+   "addr": "Charlottenstraße 87",
    "centroid": [
     52.505988,
     13.392131
@@ -196,7 +198,7 @@
    "id": "way/112149798",
    "name": null,
    "placeId": null,
-   "addr": "Friedrichstra\u00dfe 39",
+   "addr": "Friedrichstraße 39",
    "centroid": [
     52.505923,
     13.391223
@@ -262,7 +264,7 @@
    "id": "way/1157288903",
    "name": "The Social Hub",
    "placeId": null,
-   "addr": "Alexanderstra\u00dfe 40",
+   "addr": "Alexanderstraße 40",
    "centroid": [
     52.516814,
     13.417553
@@ -284,7 +286,7 @@
    "id": "way/124257901",
    "name": null,
    "placeId": null,
-   "addr": "Philippstra\u00dfe",
+   "addr": "Philippstraße",
    "centroid": [
     52.526259,
     13.382885
@@ -372,7 +374,7 @@
    "id": "way/184111101",
    "name": "A&O Berlin Hauptbahnhof",
    "placeId": null,
-   "addr": "Lehrter Stra\u00dfe 12",
+   "addr": "Lehrter Straße 12",
    "centroid": [
     52.529218,
     13.36394
@@ -394,7 +396,7 @@
    "id": "way/184551712",
    "name": "DAV Kletterhalle",
    "placeId": null,
-   "addr": "Seydlitzstra\u00dfe 1H",
+   "addr": "Seydlitzstraße 1H",
    "centroid": [
     52.528559,
     13.362577
@@ -416,7 +418,7 @@
    "id": "way/18578139",
    "name": "Neues Museum",
    "placeId": null,
-   "addr": "Bodestra\u00dfe 1",
+   "addr": "Bodestraße 1",
    "centroid": [
     52.520176,
     13.397788
@@ -458,7 +460,7 @@
   },
   {
    "id": "way/192797743",
-   "name": "Institut f\u00fcr Pathologie \u2013 Museumsgeb\u00e4ude",
+   "name": "Institut für Pathologie – Museumsgebäude",
    "placeId": null,
    "addr": null,
    "centroid": [
@@ -502,7 +504,7 @@
   },
   {
    "id": "way/20144739",
-   "name": "S Jannowitzbr\u00fccke",
+   "name": "S Jannowitzbrücke",
    "placeId": null,
    "addr": null,
    "centroid": [
@@ -570,7 +572,7 @@
    "id": "way/22989670",
    "name": "The Playce",
    "placeId": null,
-   "addr": "Alte Potsdamer Stra\u00dfe 7",
+   "addr": "Alte Potsdamer Straße 7",
    "centroid": [
     52.507394,
     13.3741
@@ -636,7 +638,7 @@
    "id": "way/23129534",
    "name": null,
    "placeId": null,
-   "addr": "Schumannstra\u00dfe 14a",
+   "addr": "Schumannstraße 14a",
    "centroid": [
     52.524282,
     13.381139
@@ -680,7 +682,7 @@
    "id": "way/234003244",
    "name": null,
    "placeId": null,
-   "addr": "Chausseestra\u00dfe 30",
+   "addr": "Chausseestraße 30",
    "centroid": [
     52.532474,
     13.381548
@@ -702,7 +704,7 @@
    "id": "way/234973637",
    "name": "Markthalle Alexanderplatz",
    "placeId": null,
-   "addr": "Karl-Liebknecht-Stra\u00dfe 13",
+   "addr": "Karl-Liebknecht-Straße 13",
    "centroid": [
     52.522438,
     13.40767
@@ -788,9 +790,9 @@
   },
   {
    "id": "way/23853100",
-   "name": "Theologische Fakult\u00e4t der Humboldt-Universit\u00e4t",
+   "name": "Theologische Fakultät der Humboldt-Universität",
    "placeId": null,
-   "addr": "Burgstra\u00dfe 26",
+   "addr": "Burgstraße 26",
    "centroid": [
     52.521073,
     13.401103
@@ -834,7 +836,7 @@
    "id": "way/23853422",
    "name": null,
    "placeId": null,
-   "addr": "Holzmarktstra\u00dfe 73",
+   "addr": "Holzmarktstraße 73",
    "centroid": [
     52.516814,
     13.419109
@@ -922,7 +924,7 @@
    "id": "way/26211974",
    "name": null,
    "placeId": null,
-   "addr": "Luisenstra\u00dfe 64",
+   "addr": "Luisenstraße 64",
    "centroid": [
     52.526622,
     13.379695
@@ -964,9 +966,9 @@
   },
   {
    "id": "way/27438560",
-   "name": "Centrum f\u00fcr Anatomie",
+   "name": "Centrum für Anatomie",
    "placeId": null,
-   "addr": "Luisenstra\u00dfe 57",
+   "addr": "Luisenstraße 57",
    "centroid": [
     52.525892,
     13.380847
@@ -1010,7 +1012,7 @@
    "id": "way/277926524",
    "name": null,
    "placeId": null,
-   "addr": "Dresdener Stra\u00dfe 95",
+   "addr": "Dresdener Straße 95",
    "centroid": [
     52.507098,
     13.412142
@@ -1142,7 +1144,7 @@
    "id": "way/293244349",
    "name": null,
    "placeId": null,
-   "addr": "Holzmarktstra\u00dfe",
+   "addr": "Holzmarktstraße",
    "centroid": [
     52.512693,
     13.424548
@@ -1164,7 +1166,7 @@
    "id": "way/293244354",
    "name": null,
    "placeId": null,
-   "addr": "An der Michaelbr\u00fccke",
+   "addr": "An der Michaelbrücke",
    "centroid": [
     52.512879,
     13.424036
@@ -1186,7 +1188,7 @@
    "id": "way/293412207",
    "name": null,
    "placeId": null,
-   "addr": "Lindenstra\u00dfe 74",
+   "addr": "Lindenstraße 74",
    "centroid": [
     52.505935,
     13.396108
@@ -1208,7 +1210,7 @@
    "id": "way/293412208",
    "name": null,
    "placeId": null,
-   "addr": "Lindenstra\u00dfe 75",
+   "addr": "Lindenstraße 75",
    "centroid": [
     52.506081,
     13.396222
@@ -1230,7 +1232,7 @@
    "id": "way/293412209",
    "name": null,
    "placeId": null,
-   "addr": "Lindenstra\u00dfe 75a",
+   "addr": "Lindenstraße 75a",
    "centroid": [
     52.506231,
     13.396426
@@ -1252,7 +1254,7 @@
    "id": "way/293412210",
    "name": null,
    "placeId": null,
-   "addr": "Lindenstra\u00dfe 75b",
+   "addr": "Lindenstraße 75b",
    "centroid": [
     52.506472,
     13.396506
@@ -1274,7 +1276,7 @@
    "id": "way/29386143",
    "name": "Netto Marken-Discount",
    "placeId": null,
-   "addr": "Schillingstra\u00dfe 1A",
+   "addr": "Schillingstraße 1A",
    "centroid": [
     52.516771,
     13.420359
@@ -1294,9 +1296,9 @@
   },
   {
    "id": "way/29387900",
-   "name": "Ambulatorium Schillingstra\u00dfe 12",
+   "name": "Ambulatorium Schillingstraße 12",
    "placeId": null,
-   "addr": "Schillingstra\u00dfe 12",
+   "addr": "Schillingstraße 12",
    "centroid": [
     52.518862,
     13.42199
@@ -1318,7 +1320,7 @@
    "id": "way/30349908",
    "name": "Haus 18",
    "placeId": null,
-   "addr": "Philippstra\u00dfe 13",
+   "addr": "Philippstraße 13",
    "centroid": [
     52.525132,
     13.383232
@@ -1340,7 +1342,7 @@
    "id": "way/305610344",
    "name": "rent24",
    "placeId": null,
-   "addr": "Oberwallstra\u00dfe 6",
+   "addr": "Oberwallstraße 6",
    "centroid": [
     52.513848,
     13.396771
@@ -1582,7 +1584,7 @@
    "id": "way/42162939",
    "name": "Trias",
    "placeId": null,
-   "addr": "Holzmarktstra\u00dfe 15-17",
+   "addr": "Holzmarktstraße 15-17",
    "centroid": [
     52.513312,
     13.422932
@@ -1604,7 +1606,7 @@
    "id": "way/422415726",
    "name": null,
    "placeId": null,
-   "addr": "Chausseestra\u00dfe 18",
+   "addr": "Chausseestraße 18",
    "centroid": [
     52.530165,
     13.384323
@@ -1646,7 +1648,7 @@
   },
   {
    "id": "way/43025055",
-   "name": "Institute f\u00fcr Pathologie u. Neuropathologie",
+   "name": "Institute für Pathologie u. Neuropathologie",
    "placeId": null,
    "addr": "Virchowweg 15",
    "centroid": [
@@ -1692,7 +1694,7 @@
    "id": "way/43025562",
    "name": "Salomon-Neumann-Haus",
    "placeId": null,
-   "addr": "Luisenstra\u00dfe 57",
+   "addr": "Luisenstraße 57",
    "centroid": [
     52.525605,
     13.379567
@@ -1714,7 +1716,7 @@
    "id": "way/43025579",
    "name": "Haus 1",
    "placeId": null,
-   "addr": "Luisenstra\u00dfe 56",
+   "addr": "Luisenstraße 56",
    "centroid": [
     52.525193,
     13.379588
@@ -1758,7 +1760,7 @@
    "id": "way/43041606",
    "name": "Haus 20",
    "placeId": null,
-   "addr": "Philippstra\u00dfe 13",
+   "addr": "Philippstraße 13",
    "centroid": [
     52.525246,
     13.382452
@@ -1778,9 +1780,9 @@
   },
   {
    "id": "way/43060663",
-   "name": "Department f\u00fcr Agrar\u00f6konomie",
+   "name": "Department für Agrarökonomie",
    "placeId": null,
-   "addr": "Philippstra\u00dfe 13",
+   "addr": "Philippstraße 13",
    "centroid": [
     52.526775,
     13.384596
@@ -1846,7 +1848,7 @@
    "id": "way/43174774",
    "name": "Jacob-und-Wilhelm-Grimm-Zentrum",
    "placeId": null,
-   "addr": "Geschwister-Scholl-Stra\u00dfe 1/3",
+   "addr": "Geschwister-Scholl-Straße 1/3",
    "centroid": [
     52.520549,
     13.390933
@@ -1868,7 +1870,7 @@
    "id": "way/43185522",
    "name": "SpreeDreieck",
    "placeId": null,
-   "addr": "Friedrichstra\u00dfe 140",
+   "addr": "Friedrichstraße 140",
    "centroid": [
     52.52104,
     13.387781
@@ -1888,9 +1890,9 @@
   },
   {
    "id": "way/448696070",
-   "name": "Rhoda-Erdmann-Haus - Institut f\u00fcr Biologie",
+   "name": "Rhoda-Erdmann-Haus - Institut für Biologie",
    "placeId": null,
-   "addr": "Philippstra\u00dfe 13",
+   "addr": "Philippstraße 13",
    "centroid": [
     52.526827,
     13.382261
@@ -2000,7 +2002,7 @@
    "id": "way/53256952",
    "name": null,
    "placeId": null,
-   "addr": "Gartenstra\u00dfe 87",
+   "addr": "Gartenstraße 87",
    "centroid": [
     52.53311,
     13.387752
@@ -2022,7 +2024,7 @@
    "id": "way/54672669",
    "name": null,
    "placeId": null,
-   "addr": "Philippstra\u00dfe 11",
+   "addr": "Philippstraße 11",
    "centroid": [
     52.526252,
     13.381053
@@ -2066,7 +2068,7 @@
    "id": "way/577202752",
    "name": "Oskar-Hertwig-Haus",
    "placeId": null,
-   "addr": "Philippstra\u00dfe 12",
+   "addr": "Philippstraße 12",
    "centroid": [
     52.526162,
     13.38045
@@ -2088,7 +2090,7 @@
    "id": "way/59273515",
    "name": null,
    "placeId": null,
-   "addr": "Chausseestra\u00dfe 126",
+   "addr": "Chausseestraße 126",
    "centroid": [
     52.528587,
     13.383806
@@ -2132,7 +2134,7 @@
    "id": "way/699704420",
    "name": "Axel-Springer-Neubau",
    "placeId": null,
-   "addr": "Zimmerstra\u00dfe 50",
+   "addr": "Zimmerstraße 50",
    "centroid": [
     52.508703,
     13.397888
@@ -2240,7 +2242,7 @@
   },
   {
    "id": "way/951268571",
-   "name": "Charit\u00e9 Campus-Klinik",
+   "name": "Charité Campus-Klinik",
    "placeId": null,
    "addr": "Rahel-Hirsch-Weg 5",
    "centroid": [
@@ -2472,7 +2474,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 115.9,
-   "description": null,
+   "description": "Mit Stufen, Personaleingang Richtung Südosten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-east"
@@ -2491,7 +2493,7 @@
    "door": "sliding",
    "automatic": false,
    "approachBearing": 116.9,
-   "description": null,
+   "description": "Stufenlos, Haupteingang mit Schiebetür Richtung Südosten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-east"
@@ -2510,7 +2512,7 @@
    "door": "sliding",
    "automatic": false,
    "approachBearing": 116.0,
-   "description": null,
+   "description": "Stufenlos, Haupteingang zu Netto Marken-Discount mit Schiebetür, Richtung Südosten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-east"
@@ -2691,7 +2693,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 298.2,
-   "description": null,
+   "description": "Mit Stufen, Treppenaufgang Richtung Nordwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-west"
@@ -2899,7 +2901,7 @@
    "buildingId": null,
    "lat": 52.5164242,
    "lon": 13.4178365,
-   "name": "Jannowitzbr\u00fccke",
+   "name": "Jannowitzbrücke",
    "kind": "yes",
    "level": 0,
    "stepFree": false,
@@ -2908,7 +2910,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Jannowitzbrücke.",
    "warnings": [],
    "source": "osm"
   },
@@ -4366,7 +4368,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenlos, Eingang auf Ebene 1.",
    "warnings": [],
    "source": "osm"
   },
@@ -5482,7 +5484,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 338.2,
-   "description": null,
+   "description": "Mit Stufen, Eingang zu The Social Hub Richtung Norden.",
    "warnings": [],
    "source": "osm",
    "facing": "north"
@@ -8795,7 +8797,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenlos, Nebeneingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -8813,7 +8815,7 @@
    "door": "yes",
    "automatic": false,
    "approachBearing": 84.0,
-   "description": null,
+   "description": "Mit Stufen, Eingang zu Haus Sommer Richtung Osten.",
    "warnings": [],
    "source": "osm",
    "facing": "east"
@@ -8832,7 +8834,7 @@
    "door": "yes",
    "automatic": false,
    "approachBearing": 263.8,
-   "description": null,
+   "description": "Stufenlos, Haupteingang zu Haus Sommer Richtung Westen.",
    "warnings": [],
    "source": "osm",
    "facing": "west"
@@ -8851,7 +8853,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 319.2,
-   "description": null,
+   "description": "Stufenlos, Eingang zum Berolinahaus Richtung Nordwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-west"
@@ -8870,7 +8872,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenlos, Eingang Oranienburger Tor.",
    "warnings": [],
    "source": "osm"
   },
@@ -8924,7 +8926,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 253.1,
-   "description": null,
+   "description": "Hat Stufen, Richtung Westen.",
    "warnings": [],
    "source": "osm",
    "facing": "west"
@@ -9069,7 +9071,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Als stufenlos erfasster Eingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -9647,7 +9649,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 207.4,
-   "description": null,
+   "description": "Hat Stufen: Haupteingang zum Verwalterhaus, Richtung Südwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -9666,7 +9668,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Hat Stufen, Notausgang.",
    "warnings": [],
    "source": "osm"
   },
@@ -9684,7 +9686,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 207.4,
-   "description": null,
+   "description": "Hat Stufen: Haupteingang zum Verwalterhaus, Richtung Südwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -9721,7 +9723,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Hat Stufen, Haupteingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -9847,7 +9849,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 55.2,
-   "description": null,
+   "description": "Stufenlos, Richtung Nordosten am Rhoda-Erdmann-Haus - Institut für Biologie.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -9866,7 +9868,7 @@
    "door": "yes",
    "automatic": false,
    "approachBearing": 126.8,
-   "description": null,
+   "description": "Hat Stufen, Hauseingang Richtung Südosten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-east"
@@ -9885,7 +9887,7 @@
    "door": "yes",
    "automatic": false,
    "approachBearing": 324.2,
-   "description": null,
+   "description": "Hat Stufen, Hauseingang Richtung Nordwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-west"
@@ -9922,7 +9924,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Als stufenlos erfasster Eingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -10070,7 +10072,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 35.0,
-   "description": null,
+   "description": "Stufenlos, Richtung Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -10107,7 +10109,7 @@
    "door": "yes",
    "automatic": false,
    "approachBearing": 173.5,
-   "description": null,
+   "description": "Hat Stufen, Eingang zu Haus 1 Richtung Süden.",
    "warnings": [],
    "source": "osm",
    "facing": "south"
@@ -11260,7 +11262,7 @@
    "buildingId": null,
    "lat": 52.5093022,
    "lon": 13.4155325,
-   "name": "Heinrich-Heine-Stra\u00dfe",
+   "name": "Heinrich-Heine-Straße",
    "kind": "yes",
    "level": null,
    "stepFree": false,
@@ -13348,7 +13350,7 @@
    "buildingId": "way/518201438",
    "lat": 52.511589,
    "lon": 13.3841844,
-   "name": "Anton-Wilhelm-Amo-Stra\u00dfe",
+   "name": "Anton-Wilhelm-Amo-Straße",
    "kind": "yes",
    "level": null,
    "stepFree": true,
@@ -13412,7 +13414,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 244.8,
-   "description": null,
+   "description": "Nicht stufenlos, Personaleingang Richtung Südwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -13467,7 +13469,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Als stufenlos erfasster Eingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -14151,7 +14153,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Als stufenlos erfasster Eingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -14187,7 +14189,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Als stufenlos erfasster Eingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -14376,7 +14378,7 @@
    "buildingId": null,
    "lat": 52.5250361,
    "lon": 13.4062778,
-   "name": "Weinmeisterstra\u00dfe",
+   "name": "Weinmeisterstraße",
    "kind": "yes",
    "level": 0,
    "stepFree": false,
@@ -14385,7 +14387,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos, Eingang Weinmeisterstraße.",
    "warnings": [],
    "source": "osm"
   },
@@ -14394,7 +14396,7 @@
    "buildingId": null,
    "lat": 52.5380877,
    "lon": 13.3961389,
-   "name": "Bernauer Stra\u00dfe",
+   "name": "Bernauer Straße",
    "kind": "yes",
    "level": null,
    "stepFree": false,
@@ -14403,7 +14405,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos, Eingang Bernauer Straße.",
    "warnings": [],
    "source": "osm"
   },
@@ -14610,7 +14612,7 @@
    "buildingId": null,
    "lat": 52.5258283,
    "lon": 13.4037867,
-   "name": "Weinmeisterstra\u00dfe",
+   "name": "Weinmeisterstraße",
    "kind": "yes",
    "level": 0,
    "stepFree": false,
@@ -14619,7 +14621,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos, Eingang Weinmeisterstraße.",
    "warnings": [],
    "source": "osm"
   },
@@ -14673,7 +14675,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 74.8,
-   "description": null,
+   "description": "Nicht stufenlos, Richtung Osten.",
    "warnings": [],
    "source": "osm",
    "facing": "east"
@@ -14692,7 +14694,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 255.5,
-   "description": null,
+   "description": "Nicht stufenlos, Haupteingang Richtung Westen.",
    "warnings": [],
    "source": "osm",
    "facing": "west"
@@ -14891,7 +14893,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenlos, Eingang Immanuel Apotheke.",
    "warnings": [],
    "source": "osm"
   },
@@ -14927,7 +14929,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos.",
    "warnings": [],
    "source": "osm"
   },
@@ -15053,7 +15055,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 62.8,
-   "description": null,
+   "description": "Stufenlos, Haupteingang zum A&O Berlin Hauptbahnhof Richtung Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -16008,7 +16010,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 65.1,
-   "description": null,
+   "description": "Stufenlos, Richtung Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -16297,7 +16299,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 240.3,
-   "description": null,
+   "description": "Mit Stufen, Haupteingang Richtung Südwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -16316,7 +16318,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 60.7,
-   "description": null,
+   "description": "Stufenlos, Diensteingang Richtung Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -16623,7 +16625,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 353.2,
-   "description": null,
+   "description": "Mit Stufen, Eingang zum Palais am Festungsgraben Richtung Norden.",
    "warnings": [],
    "source": "osm",
    "facing": "north"
@@ -16660,7 +16662,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen.",
    "warnings": [],
    "source": "osm"
   },
@@ -16678,7 +16680,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen.",
    "warnings": [],
    "source": "osm"
   },
@@ -16696,7 +16698,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Haupteingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -16714,7 +16716,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen.",
    "warnings": [],
    "source": "osm"
   },
@@ -16732,7 +16734,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen.",
    "warnings": [],
    "source": "osm"
   },
@@ -19486,7 +19488,7 @@
    "door": "hinged",
    "automatic": true,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenlos, Tür öffnet automatisch.",
    "warnings": [],
    "source": "osm"
   },
@@ -21126,7 +21128,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 35.3,
-   "description": null,
+   "description": "Stufenlos, Haupteingang zum Haus der Elektroindustrie Richtung Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -21559,7 +21561,7 @@
    "door": "revolving",
    "automatic": false,
    "approachBearing": 354.0,
-   "description": null,
+   "description": "Stufenlos, Drehtür Richtung Norden am Jacob-und-Wilhelm-Grimm-Zentrum.",
    "warnings": [
     "revolving"
    ],
@@ -21868,7 +21870,7 @@
    "door": "sliding",
    "automatic": false,
    "approachBearing": 197.9,
-   "description": null,
+   "description": "Stufenlos, Haupteingang zu The Playce mit Schiebetür nach Süden.",
    "warnings": [],
    "source": "osm",
    "facing": "south"
@@ -21887,7 +21889,7 @@
    "door": "sliding",
    "automatic": false,
    "approachBearing": 18.1,
-   "description": null,
+   "description": "Stufenlos, Haupteingang zu The Playce mit Schiebetür nach Norden.",
    "warnings": [],
    "source": "osm",
    "facing": "north"
@@ -22536,7 +22538,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 355.0,
-   "description": null,
+   "description": "Mit Stufen, Diensteingang zu Haus 1 nach Norden.",
    "warnings": [],
    "source": "osm",
    "facing": "north"
@@ -22555,7 +22557,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 179.1,
-   "description": null,
+   "description": "Mit Stufen, Diensteingang zu Haus 1 nach Süden.",
    "warnings": [],
    "source": "osm",
    "facing": "south"
@@ -23492,7 +23494,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 116.2,
-   "description": null,
+   "description": "Mit Stufen, Haupteingang nach Südosten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-east"
@@ -25113,7 +25115,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 84.0,
-   "description": null,
+   "description": "Stufenlos, Diensteingang zum Jacob-und-Wilhelm-Grimm-Zentrum nach Osten.",
    "warnings": [],
    "source": "osm",
    "facing": "east"
@@ -25159,7 +25161,7 @@
    "buildingId": null,
    "lat": 52.5054476,
    "lon": 13.3907091,
-   "name": "Kochstra\u00dfe/Checkpoint Charlie",
+   "name": "Kochstraße/Checkpoint Charlie",
    "kind": "yes",
    "level": null,
    "stepFree": false,
@@ -25168,7 +25170,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Kochstraße/Checkpoint Charlie.",
    "warnings": [],
    "source": "osm"
   },
@@ -25402,7 +25404,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 304.8,
-   "description": null,
+   "description": "Mit Stufen, Eingang Longma Thaimassage nach Nordwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-west"
@@ -25610,7 +25612,7 @@
    "buildingId": null,
    "lat": 52.5162212,
    "lon": 13.4122051,
-   "name": "Klosterstra\u00dfe",
+   "name": "Klosterstraße",
    "kind": "yes",
    "level": 0,
    "stepFree": true,
@@ -25619,7 +25621,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenlos, Eingang Klosterstraße.",
    "warnings": [],
    "source": "osm"
   },
@@ -25637,7 +25639,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 229.9,
-   "description": null,
+   "description": "Mit Stufen, Eingang Nordbahnhof nach Südwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -25656,7 +25658,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 243.1,
-   "description": null,
+   "description": "Stufenlos, Haupteingang zur DAV Kletterhalle nach Südwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -25891,7 +25893,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 46.4,
-   "description": null,
+   "description": "Stufenlos, Eingang zum Bahnhof Alexanderplatz nach Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -26783,7 +26785,7 @@
    "buildingId": null,
    "lat": 52.5197213,
    "lon": 13.3854297,
-   "name": "Friedrichstra\u00dfe",
+   "name": "Friedrichstraße",
    "kind": "yes",
    "level": null,
    "stepFree": false,
@@ -26792,7 +26794,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos, Eingang Friedrichstraße.",
    "warnings": [],
    "source": "osm"
   },
@@ -27305,7 +27307,7 @@
    "buildingId": null,
    "lat": 52.5126901,
    "lon": 13.4112419,
-   "name": "M\u00e4rkisches Museum",
+   "name": "Märkisches Museum",
    "kind": "yes",
    "level": null,
    "stepFree": false,
@@ -27314,7 +27316,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos, Eingang Märkisches Museum.",
    "warnings": [],
    "source": "osm"
   },
@@ -27332,7 +27334,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Eingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -27350,7 +27352,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos.",
    "warnings": [],
    "source": "osm"
   },
@@ -27629,7 +27631,7 @@
    "buildingId": "way/94252553",
    "lat": 52.5393719,
    "lon": 13.4149136,
-   "name": "Rechtsanwalt Klaus S\u00e4verin",
+   "name": "Rechtsanwalt Klaus Säverin",
    "kind": "yes",
    "level": null,
    "stepFree": false,
@@ -27638,7 +27640,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 76.6,
-   "description": null,
+   "description": "Nicht stufenlos, Eingang Rechtsanwalt Klaus Säverin Richtung Osten.",
    "warnings": [],
    "source": "osm",
    "facing": "east"
@@ -27837,7 +27839,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Haupteingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -28649,7 +28651,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 315.7,
-   "description": null,
+   "description": "Stufenloser Haupteingang Nordbahnhof, Richtung Nordwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-west"
@@ -28704,7 +28706,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 45.8,
-   "description": null,
+   "description": "Stufenlos, Eingang Nordbahnhof Richtung Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -28723,7 +28725,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 138.9,
-   "description": null,
+   "description": "Nicht stufenlos, Eingang Nordbahnhof Richtung Südosten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-east"
@@ -28742,7 +28744,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 136.5,
-   "description": null,
+   "description": "Nicht stufenlos, Eingang Nordbahnhof Richtung Südosten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-east"
@@ -28761,7 +28763,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos, Eingang S+U Brandenburger Tor.",
    "warnings": [],
    "source": "osm"
   },
@@ -28779,7 +28781,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos, Eingang S+U Brandenburger Tor.",
    "warnings": [],
    "source": "osm"
   },
@@ -28869,7 +28871,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 141.5,
-   "description": null,
+   "description": "Nicht stufenloser Eingang zur Markthalle Alexanderplatz, Richtung Südosten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-east"
@@ -29266,7 +29268,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenloser Eingang Potsdamer Platz.",
    "warnings": [],
    "source": "osm"
   },
@@ -29284,7 +29286,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenloser Eingang Potsdamer Platz.",
    "warnings": [],
    "source": "osm"
   },
@@ -29320,7 +29322,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Eingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -30922,7 +30924,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenloser Eingang Potsdamer Platz.",
    "warnings": [],
    "source": "osm"
   },
@@ -30958,7 +30960,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 244.8,
-   "description": null,
+   "description": "Stufenloser Eingang, Richtung Südwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -31085,7 +31087,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenloser Eingang Spittelmarkt.",
    "warnings": [],
    "source": "osm"
   },
@@ -31445,7 +31447,7 @@
    "door": "yes/manual",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Aufgang B.",
    "warnings": [],
    "source": "osm"
   },
@@ -31499,7 +31501,7 @@
    "door": "sliding",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Haupteingang mit Schiebetür.",
    "warnings": [],
    "source": "osm"
   },
@@ -31553,7 +31555,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Haupteingang, Eingang Washingtonplatz.",
    "warnings": [],
    "source": "osm"
   },
@@ -31571,7 +31573,7 @@
    "door": "revolving",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Haupteingang mit Drehtür, Eingang Europaplatz.",
    "warnings": [
     "revolving"
    ],
@@ -31951,7 +31953,7 @@
    "door": "sliding",
    "automatic": false,
    "approachBearing": 288.3,
-   "description": null,
+   "description": "Stufenloser Nebeneingang zu The Playce mit Schiebetür, Richtung Westen.",
    "warnings": [],
    "source": "osm",
    "facing": "west"
@@ -31970,7 +31972,7 @@
    "door": "sliding",
    "automatic": false,
    "approachBearing": 108.6,
-   "description": null,
+   "description": "Stufenlos, Nebeneingang mit Schiebetür nach Osten zu The Playce.",
    "warnings": [],
    "source": "osm",
    "facing": "east"
@@ -32241,7 +32243,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 320.3,
-   "description": null,
+   "description": "Stufenlos, Eingang nach Nordwesten zum Bahnhof Alexanderplatz.",
    "warnings": [],
    "source": "osm",
    "facing": "north-west"
@@ -32260,7 +32262,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 45.1,
-   "description": null,
+   "description": "Stufenlos, Eingang nach Nordosten zum Bahnhof Alexanderplatz.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -32279,7 +32281,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 45.7,
-   "description": null,
+   "description": "Stufenlos, Eingang nach Nordosten zum Bahnhof Alexanderplatz.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -32298,7 +32300,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 229.1,
-   "description": null,
+   "description": "Stufenlos, Eingang nach Südwesten zum Berolinahaus.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -32317,7 +32319,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos, Eingang Alexanderplatz.",
    "warnings": [],
    "source": "osm"
   },
@@ -32335,7 +32337,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenlos, Eingang Alexanderplatz.",
    "warnings": [],
    "source": "osm"
   },
@@ -32353,7 +32355,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenlos, Eingang Alexanderplatz.",
    "warnings": [],
    "source": "osm"
   },
@@ -32371,7 +32373,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos, Eingang Alexanderplatz.",
    "warnings": [],
    "source": "osm"
   },
@@ -32407,7 +32409,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos, Haupteingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -32470,7 +32472,7 @@
    "buildingId": null,
    "lat": 52.5199476,
    "lon": 13.3886318,
-   "name": "Friedrichstra\u00dfe",
+   "name": "Friedrichstraße",
    "kind": "yes",
    "level": 0,
    "stepFree": false,
@@ -32479,7 +32481,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos, Eingang Friedrichstraße.",
    "warnings": [],
    "source": "osm"
   },
@@ -32488,7 +32490,7 @@
    "buildingId": null,
    "lat": 52.5201194,
    "lon": 13.3886226,
-   "name": "Friedrichstra\u00dfe",
+   "name": "Friedrichstraße",
    "kind": "yes",
    "level": 0,
    "stepFree": false,
@@ -32497,7 +32499,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos, Eingang Friedrichstraße.",
    "warnings": [],
    "source": "osm"
   },
@@ -33361,7 +33363,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Haupteingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -33442,7 +33444,7 @@
    "buildingId": "way/23853280",
    "lat": 52.5199106,
    "lon": 13.4219952,
-   "name": "Schillingstra\u00dfe",
+   "name": "Schillingstraße",
    "kind": "yes",
    "level": 0,
    "stepFree": false,
@@ -33451,7 +33453,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 296.3,
-   "description": null,
+   "description": "Mit Stufen, Eingang Schillingstraße am Camp4, Richtung Nordwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-west"
@@ -33461,7 +33463,7 @@
    "buildingId": null,
    "lat": 52.5206469,
    "lon": 13.4220592,
-   "name": "Schillingstra\u00dfe",
+   "name": "Schillingstraße",
    "kind": "yes",
    "level": 0,
    "stepFree": false,
@@ -33470,7 +33472,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Schillingstraße.",
    "warnings": [],
    "source": "osm"
   },
@@ -34172,7 +34174,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 216.2,
-   "description": null,
+   "description": "Stufenlos, Richtung Südwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -34245,7 +34247,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 347.5,
-   "description": null,
+   "description": "Stufenlos am Neuen Stadthaus, Richtung Norden.",
    "warnings": [],
    "source": "osm",
    "facing": "north"
@@ -34282,7 +34284,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenlos zugänglich.",
    "warnings": [],
    "source": "osm"
   },
@@ -34426,7 +34428,7 @@
    "door": "no",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Naturkundemuseum ohne Tür.",
    "warnings": [],
    "source": "osm"
   },
@@ -34462,7 +34464,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 215.0,
-   "description": null,
+   "description": "Stufenlos, Haupteingang Richtung Südwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -34841,7 +34843,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 65.3,
-   "description": null,
+   "description": "Stufenlos, Richtung Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -34860,7 +34862,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 245.7,
-   "description": null,
+   "description": "Stufenlos, Richtung Südwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -34879,7 +34881,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 245.8,
-   "description": null,
+   "description": "Stufenlos, Richtung Südwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -35339,7 +35341,7 @@
    "buildingId": null,
    "lat": 52.5115381,
    "lon": 13.3838415,
-   "name": "Anton-Wilhelm-Amo-Stra\u00dfe",
+   "name": "Anton-Wilhelm-Amo-Straße",
    "kind": "yes",
    "level": null,
    "stepFree": false,
@@ -35348,7 +35350,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Anton-Wilhelm-Amo-Straße.",
    "warnings": [],
    "source": "osm"
   },
@@ -35357,7 +35359,7 @@
    "buildingId": null,
    "lat": 52.511903,
    "lon": 13.386316,
-   "name": "Anton-Wilhelm-Amo-Stra\u00dfe",
+   "name": "Anton-Wilhelm-Amo-Straße",
    "kind": "yes",
    "level": null,
    "stepFree": false,
@@ -35366,7 +35368,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Anton-Wilhelm-Amo-Straße.",
    "warnings": [],
    "source": "osm"
   },
@@ -35456,7 +35458,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Nebeneingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -35870,7 +35872,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Eingang Sternberg - Theater in der Spielbank.",
    "warnings": [],
    "source": "osm"
   },
@@ -35960,7 +35962,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Alexanderplatz.",
    "warnings": [],
    "source": "osm"
   },
@@ -35978,7 +35980,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Alexanderplatz.",
    "warnings": [],
    "source": "osm"
   },
@@ -35996,7 +35998,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 49.0,
-   "description": null,
+   "description": "Stufenlos, Eingang Alexanderplatz nach Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -36015,7 +36017,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Alexanderplatz.",
    "warnings": [],
    "source": "osm"
   },
@@ -36195,7 +36197,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Haupteingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -36285,7 +36287,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 261.9,
-   "description": null,
+   "description": "Stufenloser Haupteingang zu rent24, Richtung Westen.",
    "warnings": [],
    "source": "osm",
    "facing": "west"
@@ -36916,7 +36918,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 110.4,
-   "description": null,
+   "description": "Stufenloser Haupteingang zum Ausstellungsbau des Deutschen Historischen Museums, Richtung Osten.",
    "warnings": [],
    "source": "osm",
    "facing": "east"
@@ -37675,7 +37677,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 65.0,
-   "description": null,
+   "description": "Stufenlos, Richtung Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -37840,7 +37842,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 245.4,
-   "description": null,
+   "description": "Mit Stufen, Richtung Südwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -37895,7 +37897,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos, Eingang St. Oberholz.",
    "warnings": [],
    "source": "osm"
   },
@@ -38057,7 +38059,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 236.4,
-   "description": null,
+   "description": "Nicht stufenlos, Richtung Südwesten am Eduard-Henoch-Haus.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -38265,7 +38267,7 @@
    "buildingId": null,
    "lat": 52.5120447,
    "lon": 13.4090149,
-   "name": "M\u00e4rkisches Museum",
+   "name": "Märkisches Museum",
    "kind": "yes",
    "level": null,
    "stepFree": false,
@@ -38274,7 +38276,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos, Eingang Märkisches Museum.",
    "warnings": [],
    "source": "osm"
   },
@@ -38391,7 +38393,7 @@
    "buildingId": null,
    "lat": 52.5208252,
    "lon": 13.4210192,
-   "name": "U Schillingstra\u00dfe",
+   "name": "U Schillingstraße",
    "kind": "yes",
    "level": null,
    "stepFree": true,
@@ -38400,7 +38402,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Als stufenlos erfasst, Eingang U Schillingstraße.",
    "warnings": [],
    "source": "osm"
   },
@@ -38409,7 +38411,7 @@
    "buildingId": null,
    "lat": 52.5212783,
    "lon": 13.4196976,
-   "name": "Schillingstra\u00dfe",
+   "name": "Schillingstraße",
    "kind": "yes",
    "level": null,
    "stepFree": false,
@@ -38418,7 +38420,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos, Eingang Schillingstraße.",
    "warnings": [],
    "source": "osm"
   },
@@ -38526,7 +38528,7 @@
    "door": "revolving",
    "automatic": false,
    "approachBearing": 354.0,
-   "description": null,
+   "description": "Als stufenlos erfasst: Haupteingang mit Drehtür, Richtung Norden.",
    "warnings": [
     "revolving"
    ],
@@ -38799,7 +38801,7 @@
    "door": "yes",
    "automatic": true,
    "approachBearing": 145.4,
-   "description": null,
+   "description": "Als stufenlos erfasst, öffnet automatisch, Richtung Südosten am Institut für Pathologie – Museumsgebäude.",
    "warnings": [],
    "source": "osm",
    "facing": "south-east"
@@ -38827,7 +38829,7 @@
    "buildingId": null,
    "lat": 52.5365466,
    "lon": 13.397344,
-   "name": "Bernauer Stra\u00dfe",
+   "name": "Bernauer Straße",
    "kind": "yes",
    "level": null,
    "stepFree": true,
@@ -38836,7 +38838,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Als stufenlos erfasst, Eingang Bernauer Straße.",
    "warnings": [],
    "source": "osm"
   },
@@ -38845,7 +38847,7 @@
    "buildingId": null,
    "lat": 52.5368366,
    "lon": 13.3971287,
-   "name": "U Bernauer Stra\u00dfe",
+   "name": "U Bernauer Straße",
    "kind": "yes",
    "level": null,
    "stepFree": true,
@@ -38854,7 +38856,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Als stufenlos erfasst, Eingang U Bernauer Straße.",
    "warnings": [],
    "source": "osm"
   },
@@ -39466,7 +39468,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos, Eingang Rosa-Luxemburg-Platz.",
    "warnings": [],
    "source": "osm"
   },
@@ -39484,7 +39486,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos, Eingang Rosa-Luxemburg-Platz.",
    "warnings": [],
    "source": "osm"
   },
@@ -39502,7 +39504,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos, Eingang Senefelderplatz.",
    "warnings": [],
    "source": "osm"
   },
@@ -39520,7 +39522,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Hat Stufen, Eingang Senefelderplatz.",
    "warnings": [],
    "source": "osm"
   },
@@ -39538,7 +39540,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 226.9,
-   "description": null,
+   "description": "Stufenlos, Richtung Südwesten am Bahnhof Alexanderplatz.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -39557,7 +39559,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 226.8,
-   "description": null,
+   "description": "Stufenlos, Richtung Südwesten am Bahnhof Alexanderplatz.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -39576,7 +39578,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 226.2,
-   "description": null,
+   "description": "Stufenlos, Richtung Südwesten am Bahnhof Alexanderplatz.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -39649,7 +39651,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenlos, Eingang S+U Brandenburger Tor.",
    "warnings": [],
    "source": "osm"
   },
@@ -39793,7 +39795,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Eingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -39811,7 +39813,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenlos, Eingang Oranienburger Tor.",
    "warnings": [],
    "source": "osm"
   },
@@ -39829,7 +39831,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenlos, Eingang Oranienburger Tor.",
    "warnings": [],
    "source": "osm"
   },
@@ -39847,7 +39849,7 @@
    "door": "no",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Hat Stufen und keine Tür, Eingang Naturkundemuseum.",
    "warnings": [],
    "source": "osm"
   },
@@ -39865,7 +39867,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Hat Stufen, Eingang Naturkundemuseum.",
    "warnings": [],
    "source": "osm"
   },
@@ -39874,7 +39876,7 @@
    "buildingId": "way/20144739",
    "lat": 52.514355,
    "lon": 13.4193822,
-   "name": "Holzmarktstra\u00dfe",
+   "name": "Holzmarktstraße",
    "kind": "yes",
    "level": null,
    "stepFree": false,
@@ -39883,7 +39885,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 209.8,
-   "description": null,
+   "description": "Hat Stufen, Eingang Holzmarktstraße am Bahnhof S Jannowitzbrücke, Richtung Südwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -39893,7 +39895,7 @@
    "buildingId": "way/345162606",
    "lat": 52.5144956,
    "lon": 13.4182624,
-   "name": "Br\u00fcckenstra\u00dfe",
+   "name": "Brückenstraße",
    "kind": "yes",
    "level": 0,
    "stepFree": false,
@@ -39902,7 +39904,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 37.6,
-   "description": null,
+   "description": "Hat Stufen, Eingang Brückenstraße, Richtung Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -39912,7 +39914,7 @@
    "buildingId": null,
    "lat": 52.5145247,
    "lon": 13.4181997,
-   "name": "Br\u00fcckenstra\u00dfe",
+   "name": "Brückenstraße",
    "kind": "yes",
    "level": 0,
    "stepFree": null,
@@ -39930,7 +39932,7 @@
    "buildingId": null,
    "lat": 52.5146779,
    "lon": 13.418481,
-   "name": "Holzmarktstra\u00dfe",
+   "name": "Holzmarktstraße",
    "kind": "yes",
    "level": 0,
    "stepFree": null,
@@ -40011,7 +40013,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 264.3,
-   "description": null,
+   "description": "Stufenloser Haupteingang, Richtung Westen.",
    "warnings": [],
    "source": "osm",
    "facing": "west"
@@ -40021,7 +40023,7 @@
    "buildingId": null,
    "lat": 52.514666,
    "lon": 13.4180711,
-   "name": "Br\u00fcckenstra\u00dfe",
+   "name": "Brückenstraße",
    "kind": "yes",
    "level": 0,
    "stepFree": null,
@@ -40039,7 +40041,7 @@
    "buildingId": null,
    "lat": 52.5125307,
    "lon": 13.4107584,
-   "name": "U M\u00e4rkisches Museum",
+   "name": "U Märkisches Museum",
    "kind": "yes",
    "level": null,
    "stepFree": true,
@@ -40048,7 +40050,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Eingang U Märkisches Museum.",
    "warnings": [],
    "source": "osm"
   },
@@ -40057,7 +40059,7 @@
    "buildingId": null,
    "lat": 52.5180279,
    "lon": 13.4119745,
-   "name": "Klosterstra\u00dfe",
+   "name": "Klosterstraße",
    "kind": "yes",
    "level": 0,
    "stepFree": false,
@@ -40066,7 +40068,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Klosterstraße.",
    "warnings": [],
    "source": "osm"
   },
@@ -40138,7 +40140,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Eingang Belushi's Berlin.",
    "warnings": [],
    "source": "osm"
   },
@@ -40498,7 +40500,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 277.6,
-   "description": null,
+   "description": "Mit Stufen, Richtung Westen.",
    "warnings": [],
    "source": "osm",
    "facing": "west"
@@ -40859,7 +40861,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 10.8,
-   "description": null,
+   "description": "Stufenloser Ladeneingang, Richtung Norden.",
    "warnings": [],
    "source": "osm",
    "facing": "north"
@@ -41112,7 +41114,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 4.8,
-   "description": null,
+   "description": "Mit Stufen, Haupteingang Chutnify Richtung Norden.",
    "warnings": [],
    "source": "osm",
    "facing": "north"
@@ -41563,7 +41565,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Three Hands.",
    "warnings": [],
    "source": "osm"
   },
@@ -41860,7 +41862,7 @@
    "buildingId": null,
    "lat": 52.505302,
    "lon": 13.3907347,
-   "name": "Kochstra\u00dfe/Checkpoint Charlie",
+   "name": "Kochstraße/Checkpoint Charlie",
    "kind": "yes",
    "level": null,
    "stepFree": false,
@@ -41869,7 +41871,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Kochstraße/Checkpoint Charlie.",
    "warnings": [],
    "source": "osm"
   },
@@ -41878,7 +41880,7 @@
    "buildingId": null,
    "lat": 52.5065803,
    "lon": 13.3905331,
-   "name": "Kochstra\u00dfe/Checkpoint Charlie",
+   "name": "Kochstraße/Checkpoint Charlie",
    "kind": "yes",
    "level": null,
    "stepFree": false,
@@ -41887,7 +41889,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Kochstraße/Checkpoint Charlie.",
    "warnings": [],
    "source": "osm"
   },
@@ -41905,7 +41907,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Eingang U2-Spittelmarkt.",
    "warnings": [],
    "source": "osm"
   },
@@ -41914,7 +41916,7 @@
    "buildingId": null,
    "lat": 52.5350428,
    "lon": 13.377472,
-   "name": "Schwartzkopffstra\u00dfe",
+   "name": "Schwartzkopffstraße",
    "kind": "yes",
    "level": null,
    "stepFree": true,
@@ -41923,7 +41925,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Eingang Schwartzkopffstraße.",
    "warnings": [],
    "source": "osm"
   },
@@ -41932,7 +41934,7 @@
    "buildingId": null,
    "lat": 52.5359186,
    "lon": 13.3763765,
-   "name": "U Schwartzkopffstra\u00dfe",
+   "name": "U Schwartzkopffstraße",
    "kind": "yes",
    "level": null,
    "stepFree": true,
@@ -41941,7 +41943,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenlos, Eingang U Schwartzkopffstraße.",
    "warnings": [],
    "source": "osm"
   },
@@ -41959,7 +41961,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Hauptbahnhof.",
    "warnings": [],
    "source": "osm"
   },
@@ -41977,7 +41979,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen.",
    "warnings": [],
    "source": "osm"
   },
@@ -42229,7 +42231,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 62.6,
-   "description": null,
+   "description": "Mit Stufen, Eingang icono Richtung Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -42320,7 +42322,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Eingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -42338,7 +42340,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Eingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -42608,7 +42610,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 46.4,
-   "description": null,
+   "description": "Stufenlos, Eingang Nordbahnhof Richtung Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -43068,7 +43070,7 @@
    "buildingId": null,
    "lat": 52.519488,
    "lon": 13.4147772,
-   "name": "Dircksenstra\u00dfe West",
+   "name": "Dircksenstraße West",
    "kind": "yes",
    "level": null,
    "stepFree": null,
@@ -43086,7 +43088,7 @@
    "buildingId": null,
    "lat": 52.5189271,
    "lon": 13.4169396,
-   "name": "Eingang Alexanderstra\u00dfe",
+   "name": "Eingang Alexanderstraße",
    "kind": "yes",
    "level": null,
    "stepFree": null,
@@ -43203,7 +43205,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 176.5,
-   "description": null,
+   "description": "Mit Stufen, Richtung Süden.",
    "warnings": [],
    "source": "osm",
    "facing": "south"
@@ -43222,7 +43224,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 242.9,
-   "description": null,
+   "description": "Stufenloser Haupteingang, Richtung Südwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -43331,7 +43333,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Eingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -43403,7 +43405,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 238.0,
-   "description": null,
+   "description": "Mit Stufen, Eingang Kornversuchsspeicher Richtung Südwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -43584,7 +43586,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 1.6,
-   "description": null,
+   "description": "Stufenlos, Richtung Norden.",
    "warnings": [],
    "source": "osm",
    "facing": "north"
@@ -43693,7 +43695,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, auf Ebene 1.",
    "warnings": [],
    "source": "osm"
   },
@@ -44935,7 +44937,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Haupteingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -45169,7 +45171,7 @@
    "door": "no",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Hauptbahnhof.",
    "warnings": [],
    "source": "osm"
   },
@@ -45187,7 +45189,7 @@
    "door": "no",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Hauptbahnhof.",
    "warnings": [],
    "source": "osm"
   },
@@ -45205,7 +45207,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Spittelmarkt.",
    "warnings": [],
    "source": "osm"
   },
@@ -45259,7 +45261,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 283.2,
-   "description": null,
+   "description": "Stufenlos, Richtung Westen, am Rhoda-Erdmann-Haus - Institut für Biologie.",
    "warnings": [],
    "source": "osm",
    "facing": "west"
@@ -45287,7 +45289,7 @@
    "buildingId": null,
    "lat": 52.5162885,
    "lon": 13.4185025,
-   "name": "Jannowitzbr\u00fccke",
+   "name": "Jannowitzbrücke",
    "kind": "yes",
    "level": 0,
    "stepFree": false,
@@ -45296,7 +45298,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Jannowitzbrücke.",
    "warnings": [],
    "source": "osm"
   },
@@ -45440,7 +45442,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 325.6,
-   "description": null,
+   "description": "Stufenlos, Richtung Nordwesten, an der Charité Campus-Klinik.",
    "warnings": [],
    "source": "osm",
    "facing": "north-west"
@@ -45729,7 +45731,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 210.1,
-   "description": null,
+   "description": "Stufenloser Haupteingang, Richtung Südwesten, Trias.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -45874,7 +45876,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang St. Oberholz Zehdenicker.",
    "warnings": [],
    "source": "osm"
   },
@@ -46054,7 +46056,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Eingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -46063,7 +46065,7 @@
    "buildingId": null,
    "lat": 52.5092785,
    "lon": 13.415388,
-   "name": "Heinrich-Heine-Stra\u00dfe",
+   "name": "Heinrich-Heine-Straße",
    "kind": "yes",
    "level": null,
    "stepFree": false,
@@ -46072,7 +46074,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Heinrich-Heine-Straße.",
    "warnings": [],
    "source": "osm"
   },
@@ -46144,7 +46146,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 350.1,
-   "description": null,
+   "description": "Mit Stufen, Eingang nach Norden am Department für Agrarökonomie.",
    "warnings": [],
    "source": "osm",
    "facing": "north"
@@ -46163,7 +46165,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 2.7,
-   "description": null,
+   "description": "Mit Stufen, Eingang nach Norden am Department für Agrarökonomie.",
    "warnings": [],
    "source": "osm",
    "facing": "north"
@@ -46182,7 +46184,7 @@
    "door": null,
    "automatic": true,
    "approachBearing": 22.1,
-   "description": null,
+   "description": "Stufenlos, automatisch öffnende Tür nach Norden am Department für Agrarökonomie.",
    "warnings": [],
    "source": "osm",
    "facing": "north"
@@ -46201,7 +46203,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 295.8,
-   "description": null,
+   "description": "Mit Stufen, Haupteingang nach Nordwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-west"
@@ -46562,7 +46564,7 @@
    "door": "sliding",
    "automatic": false,
    "approachBearing": 288.7,
-   "description": null,
+   "description": "Stufenlos, Nebeneingang mit Schiebetür nach Westen bei The Playce.",
    "warnings": [],
    "source": "osm",
    "facing": "west"
@@ -46581,7 +46583,7 @@
    "door": "sliding",
    "automatic": false,
    "approachBearing": 108.3,
-   "description": null,
+   "description": "Stufenlos, Nebeneingang mit Schiebetür nach Osten bei The Playce.",
    "warnings": [],
    "source": "osm",
    "facing": "east"
@@ -46683,7 +46685,7 @@
    "buildingId": null,
    "lat": 52.5054231,
    "lon": 13.3908902,
-   "name": "Regionaldirektion Berlin-Brandenburg der Bundesagentur f\u00fcr Arbeit",
+   "name": "Regionaldirektion Berlin-Brandenburg der Bundesagentur für Arbeit",
    "kind": "staircase",
    "level": null,
    "stepFree": false,
@@ -46692,7 +46694,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Treppeneingang zur Regionaldirektion Berlin-Brandenburg der Bundesagentur für Arbeit.",
    "warnings": [],
    "source": "osm"
   },
@@ -46710,7 +46712,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 84.4,
-   "description": null,
+   "description": "Stufenlos, Richtung Osten zum Berufsinformationszentrum.",
    "warnings": [],
    "source": "osm",
    "facing": "east"
@@ -46720,7 +46722,7 @@
    "buildingId": "way/112149784",
    "lat": 52.5060051,
    "lon": 13.3924447,
-   "name": "Haupteingang Agentur f\u00fcr Arbeit Berlin-Mitte",
+   "name": "Haupteingang Agentur für Arbeit Berlin-Mitte",
    "kind": "yes",
    "level": null,
    "stepFree": true,
@@ -46729,7 +46731,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 264.4,
-   "description": null,
+   "description": "Stufenlos, Richtung Westen: Haupteingang Agentur für Arbeit Berlin-Mitte.",
    "warnings": [],
    "source": "osm",
    "facing": "west"
@@ -47054,7 +47056,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang S+U Brandenburger Tor.",
    "warnings": [],
    "source": "osm"
   },
@@ -47198,7 +47200,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenlos erfasster Eingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -47234,7 +47236,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenlos, Haupteingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -47558,7 +47560,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 264.6,
-   "description": null,
+   "description": "Nicht stufenlos: Haupteingang zu Haus 1, Richtung Westen.",
    "warnings": [],
    "source": "osm",
    "facing": "west"
@@ -47577,7 +47579,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 84.0,
-   "description": null,
+   "description": "Stufenlos: Haupteingang zum Langenbeck-Virchow-Haus, Richtung Osten.",
    "warnings": [],
    "source": "osm",
    "facing": "east"
@@ -47596,7 +47598,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 235.2,
-   "description": null,
+   "description": "Nicht stufenlos: Haupteingang der Institute für Pathologie u. Neuropathologie, Richtung Südwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -47678,7 +47680,7 @@
    "buildingId": null,
    "lat": 52.5253383,
    "lon": 13.376284,
-   "name": "Charit\u00e9 Station 141",
+   "name": "Charité Station 141",
    "kind": "main",
    "level": null,
    "stepFree": null,
@@ -47696,7 +47698,7 @@
    "buildingId": null,
    "lat": 52.5244108,
    "lon": 13.3773361,
-   "name": "Charit\u00e9 Stationen 147-149",
+   "name": "Charité Stationen 147-149",
    "kind": "main",
    "level": null,
    "stepFree": null,
@@ -47714,7 +47716,7 @@
    "buildingId": null,
    "lat": 52.5249514,
    "lon": 13.3770081,
-   "name": "Charit\u00e9 Station 144i",
+   "name": "Charité Station 144i",
    "kind": "main",
    "level": null,
    "stepFree": null,
@@ -47885,7 +47887,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos: Eingang S+U Brandenburger Tor.",
    "warnings": [],
    "source": "osm"
   },
@@ -47903,7 +47905,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos: Eingang S+U Brandenburger Tor.",
    "warnings": [],
    "source": "osm"
   },
@@ -47957,7 +47959,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 50.3,
-   "description": null,
+   "description": "Nicht stufenlos, Richtung Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -48138,7 +48140,7 @@
    "door": "gate",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos: Haupteingang mit Tor auf Ebene minus eins.",
    "warnings": [],
    "source": "osm"
   },
@@ -48237,7 +48239,7 @@
    "buildingId": null,
    "lat": 52.52089,
    "lon": 13.3882557,
-   "name": "Friedrichstra\u00dfe",
+   "name": "Friedrichstraße",
    "kind": "yes",
    "level": null,
    "stepFree": false,
@@ -48246,7 +48248,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos: Eingang Friedrichstraße.",
    "warnings": [],
    "source": "osm"
   },
@@ -48255,7 +48257,7 @@
    "buildingId": null,
    "lat": 52.5209827,
    "lon": 13.3879372,
-   "name": "Friedrichstra\u00dfe",
+   "name": "Friedrichstraße",
    "kind": "yes",
    "level": null,
    "stepFree": false,
@@ -48264,7 +48266,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos: Eingang Friedrichstraße.",
    "warnings": [],
    "source": "osm"
   },
@@ -48273,7 +48275,7 @@
    "buildingId": null,
    "lat": 52.5212431,
    "lon": 13.3873762,
-   "name": "Friedrichstra\u00dfe",
+   "name": "Friedrichstraße",
    "kind": "yes",
    "level": 0,
    "stepFree": false,
@@ -48282,7 +48284,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos: Eingang Friedrichstraße.",
    "warnings": [],
    "source": "osm"
   },
@@ -48291,7 +48293,7 @@
    "buildingId": null,
    "lat": 52.5198589,
    "lon": 13.3875854,
-   "name": "S+U Friedrichstra\u00dfe",
+   "name": "S+U Friedrichstraße",
    "kind": "yes",
    "level": 0,
    "stepFree": false,
@@ -48300,7 +48302,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos: Eingang S+U Friedrichstraße.",
    "warnings": [],
    "source": "osm"
   },
@@ -48309,7 +48311,7 @@
    "buildingId": null,
    "lat": 52.5195747,
    "lon": 13.3885542,
-   "name": "Friedrichstra\u00dfe",
+   "name": "Friedrichstraße",
    "kind": "yes",
    "level": 0,
    "stepFree": false,
@@ -48318,7 +48320,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Nicht stufenlos: Eingang Friedrichstraße.",
    "warnings": [],
    "source": "osm"
   },
@@ -48408,7 +48410,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 230.9,
-   "description": null,
+   "description": "Stufenlos, Haupteingang zum Neuen Museum Richtung Südwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -48481,7 +48483,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 173.7,
-   "description": null,
+   "description": "Mit Stufen, Eingang zum Centrum für Anatomie Richtung Süden.",
    "warnings": [],
    "source": "osm",
    "facing": "south"
@@ -48500,7 +48502,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 262.8,
-   "description": null,
+   "description": "Stufenlos, Centrum für Anatomie auf Ebene -1, Richtung Westen.",
    "warnings": [],
    "source": "osm",
    "facing": "west"
@@ -48591,7 +48593,7 @@
    "door": "revolving",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenlos, Haupteingang mit Drehtür.",
    "warnings": [
     "revolving"
    ],
@@ -48719,7 +48721,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 334.5,
-   "description": null,
+   "description": "Stufenlos, Theologische Fakultät der Humboldt-Universität, Richtung Nordwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-west"
@@ -48738,7 +48740,7 @@
    "door": "hinged",
    "automatic": true,
    "approachBearing": 61.3,
-   "description": null,
+   "description": "Stufenlos mit automatischer Tür, Richtung Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -48757,7 +48759,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 332.0,
-   "description": null,
+   "description": "Mit Stufen, Theologische Fakultät der Humboldt-Universität, Richtung Nordwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-west"
@@ -48814,7 +48816,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 354.0,
-   "description": null,
+   "description": "Mit Stufen, Eingang zum Oskar-Hertwig-Haus Richtung Norden.",
    "warnings": [],
    "source": "osm",
    "facing": "north"
@@ -48905,7 +48907,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 56.4,
-   "description": null,
+   "description": "Mit Stufen, Eingang zum Eduard-Henoch-Haus Richtung Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -48924,7 +48926,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenlos.",
    "warnings": [],
    "source": "osm"
   },
@@ -48942,7 +48944,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenlos.",
    "warnings": [],
    "source": "osm"
   },
@@ -48960,7 +48962,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen.",
    "warnings": [],
    "source": "osm"
   },
@@ -48996,7 +48998,7 @@
    "door": "yes",
    "automatic": true,
    "approachBearing": 175.9,
-   "description": null,
+   "description": "Stufenlos, Eingang am Oskar-Hertwig-Haus nach Süden, Tür öffnet automatisch.",
    "warnings": [],
    "source": "osm",
    "facing": "south"
@@ -49015,7 +49017,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 174.0,
-   "description": null,
+   "description": "Hat Stufen, Eingang am Oskar-Hertwig-Haus nach Süden.",
    "warnings": [],
    "source": "osm",
    "facing": "south"
@@ -49034,7 +49036,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 263.0,
-   "description": null,
+   "description": "Hat Stufen, Eingang am Salomon-Neumann-Haus nach Westen.",
    "warnings": [],
    "source": "osm",
    "facing": "west"
@@ -49271,7 +49273,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 55.1,
-   "description": null,
+   "description": "Hat Stufen, Eingang zur Neurologie, Neuro-Chirurgie und Psychiatrie nach Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -49290,7 +49292,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenlos, Haupteingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -49454,7 +49456,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 85.2,
-   "description": null,
+   "description": "Hat Stufen, Eingang nach Osten.",
    "warnings": [],
    "source": "osm",
    "facing": "east"
@@ -49473,7 +49475,7 @@
    "door": "hinged",
    "automatic": true,
    "approachBearing": 77.6,
-   "description": null,
+   "description": "Stufenlos, Haupteingang nach Osten, Tür öffnet automatisch.",
    "warnings": [],
    "source": "osm",
    "facing": "east"
@@ -51004,7 +51006,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Hat Stufen, Eingang Bundestag.",
    "warnings": [],
    "source": "osm"
   },
@@ -51022,7 +51024,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Hat Stufen, Eingang Bundestag.",
    "warnings": [],
    "source": "osm"
   },
@@ -51040,7 +51042,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Hat Stufen, Eingang Bundestag.",
    "warnings": [],
    "source": "osm"
   },
@@ -51058,7 +51060,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Hat Stufen, Eingang Bundestag.",
    "warnings": [],
    "source": "osm"
   },
@@ -51076,7 +51078,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Hat Stufen, Diensteingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -51715,7 +51717,7 @@
    "buildingId": null,
    "lat": 52.5358475,
    "lon": 13.3764711,
-   "name": "Schwartzkopffstra\u00dfe",
+   "name": "Schwartzkopffstraße",
    "kind": "yes",
    "level": null,
    "stepFree": true,
@@ -52512,7 +52514,7 @@
    "buildingId": null,
    "lat": 52.5188668,
    "lon": 13.4154813,
-   "name": "Dircksenstra\u00dfe Ost",
+   "name": "Dircksenstraße Ost",
    "kind": "yes",
    "level": null,
    "stepFree": null,
@@ -53188,7 +53190,7 @@
    "door": "yes/manual",
    "automatic": false,
    "approachBearing": 119.9,
-   "description": null,
+   "description": "Stufenlos, Richtung Südosten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-east"
@@ -53207,7 +53209,7 @@
    "door": "yes/manual",
    "automatic": false,
    "approachBearing": 100.8,
-   "description": null,
+   "description": "Stufenlos, Richtung Osten.",
    "warnings": [],
    "source": "osm",
    "facing": "east"
@@ -53226,7 +53228,7 @@
    "door": "yes/manual",
    "automatic": false,
    "approachBearing": 119.0,
-   "description": null,
+   "description": "Stufenlos, Richtung Südosten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-east"
@@ -53281,7 +53283,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 66.9,
-   "description": null,
+   "description": "Mit Stufen, Nebeneingang auf Ebene 1 Richtung Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -53336,7 +53338,7 @@
    "door": "revolving",
    "automatic": false,
    "approachBearing": 213.9,
-   "description": null,
+   "description": "Mit Stufen, Haupteingang zum SpreeDreieck mit Drehtür Richtung Südwesten.",
    "warnings": [
     "revolving"
    ],
@@ -53447,7 +53449,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 342.5,
-   "description": null,
+   "description": "Mit Stufen, Haupteingang Suriya Kanthi Richtung Norden.",
    "warnings": [],
    "source": "osm",
    "facing": "north"
@@ -53934,7 +53936,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Unter den Linden.",
    "warnings": [],
    "source": "osm"
   },
@@ -53952,7 +53954,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Unter den Linden.",
    "warnings": [],
    "source": "osm"
   },
@@ -53970,7 +53972,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Unter den Linden.",
    "warnings": [],
    "source": "osm"
   },
@@ -53988,7 +53990,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Unter den Linden.",
    "warnings": [],
    "source": "osm"
   },
@@ -54006,7 +54008,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Rotes Rathaus.",
    "warnings": [],
    "source": "osm"
   },
@@ -54024,7 +54026,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Rotes Rathaus.",
    "warnings": [],
    "source": "osm"
   },
@@ -54042,7 +54044,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Hat Stufen, Eingang Rotes Rathaus.",
    "warnings": [],
    "source": "osm"
   },
@@ -54060,7 +54062,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Hat Stufen, Eingang Unter den Linden.",
    "warnings": [],
    "source": "osm"
   },
@@ -54078,7 +54080,7 @@
    "door": "sliding",
    "automatic": false,
    "approachBearing": 160.3,
-   "description": null,
+   "description": "Stufenloser Haupteingang mit Schiebetür, Richtung Süden.",
    "warnings": [],
    "source": "osm",
    "facing": "south"
@@ -54097,7 +54099,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 263.9,
-   "description": null,
+   "description": "Stufenlos, Richtung Westen.",
    "warnings": [],
    "source": "osm",
    "facing": "west"
@@ -54242,7 +54244,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Haupteingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -54278,7 +54280,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 173.8,
-   "description": null,
+   "description": "Stufenloser Haupteingang zum Lindencorso, Richtung Süden.",
    "warnings": [],
    "source": "osm",
    "facing": "south"
@@ -54297,7 +54299,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Haupteingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -54315,7 +54317,7 @@
    "door": "sliding",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Diensteingang mit Schiebetür.",
    "warnings": [],
    "source": "osm"
   },
@@ -54333,7 +54335,7 @@
    "door": "sliding",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Diensteingang mit Schiebetür.",
    "warnings": [],
    "source": "osm"
   },
@@ -54351,7 +54353,7 @@
    "door": "sliding",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Diensteingang mit Schiebetür.",
    "warnings": [],
    "source": "osm"
   },
@@ -54369,7 +54371,7 @@
    "door": "sliding",
    "automatic": false,
    "approachBearing": 270.0,
-   "description": null,
+   "description": "Stufenloser Haupteingang mit Schiebetür, Richtung Westen.",
    "warnings": [],
    "source": "osm",
    "facing": "west"
@@ -54388,7 +54390,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Hat Stufen, Eingang L21.",
    "warnings": [],
    "source": "osm"
   },
@@ -54460,7 +54462,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Haupteingang Bocca di Bacco.",
    "warnings": [],
    "source": "osm"
   },
@@ -54505,7 +54507,7 @@
    "buildingId": null,
    "lat": 52.5249583,
    "lon": 13.4060418,
-   "name": "Weinmeisterstra\u00dfe",
+   "name": "Weinmeisterstraße",
    "kind": "yes",
    "level": 0,
    "stepFree": false,
@@ -54514,7 +54516,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Eingang Weinmeisterstraße.",
    "warnings": [],
    "source": "osm"
   },
@@ -54622,7 +54624,7 @@
    "door": "automatic",
    "automatic": false,
    "approachBearing": 148.7,
-   "description": null,
+   "description": "Stufenlos, automatische Tür nach Südosten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-east"
@@ -54713,7 +54715,7 @@
    "door": "yes",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Eingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -54767,7 +54769,7 @@
    "door": "sliding",
    "automatic": true,
    "approachBearing": 354.2,
-   "description": null,
+   "description": "Stufenlos, Haupteingang zum Axel-Springer-Neubau mit automatischer Schiebetür nach Norden.",
    "warnings": [],
    "source": "osm",
    "facing": "north"
@@ -56118,7 +56120,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Mit Stufen, Nebeneingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -56487,7 +56489,7 @@
    "buildingId": "way/87195093",
    "lat": 52.5110155,
    "lon": 13.4167838,
-   "name": "Heinrich-Heine-Stra\u00dfe",
+   "name": "Heinrich-Heine-Straße",
    "kind": "yes",
    "level": null,
    "stepFree": false,
@@ -56496,7 +56498,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 22.5,
-   "description": null,
+   "description": "Mit Stufen, Eingang Heinrich-Heine-Straße nach Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -56515,7 +56517,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 84.0,
-   "description": null,
+   "description": "Mit Stufen, Richtung Osten.",
    "warnings": [],
    "source": "osm",
    "facing": "east"
@@ -56525,7 +56527,7 @@
    "buildingId": null,
    "lat": 52.5176132,
    "lon": 13.4141071,
-   "name": "Haus der Verb\u00e4nde",
+   "name": "Haus der Verbände",
    "kind": "yes",
    "level": null,
    "stepFree": null,
@@ -56660,7 +56662,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 208.1,
-   "description": null,
+   "description": "Mit Stufen, Treppeneingang nach Südwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -56805,7 +56807,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 141.6,
-   "description": null,
+   "description": "Stufenlos, Haupteingang zu Haus 20 nach Südosten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-east"
@@ -56842,7 +56844,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 338.4,
-   "description": null,
+   "description": "Stufenlos, Eingang zu Haus 18 nach Norden.",
    "warnings": [],
    "source": "osm",
    "facing": "north"
@@ -56861,7 +56863,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 303.9,
-   "description": null,
+   "description": "Mit Stufen, Haupteingang zu Haus 33 nach Nordwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-west"
@@ -56898,7 +56900,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 51.8,
-   "description": null,
+   "description": "Mit Stufen, Eingang zu Haus 20 Richtung Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -56935,7 +56937,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 33.9,
-   "description": null,
+   "description": "Stufenlos, Notausgang an Haus 33 Richtung Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -56972,7 +56974,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 232.0,
-   "description": null,
+   "description": "Mit Stufen, Eingang zu Haus 20 Richtung Südwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -56991,7 +56993,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenlos, Notausgang auf Ebene 1.",
    "warnings": [],
    "source": "osm"
   },
@@ -57189,7 +57191,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 288.1,
-   "description": null,
+   "description": "Mit Stufen, Eingang auf Ebene -1 Richtung Westen.",
    "warnings": [],
    "source": "osm",
    "facing": "west"
@@ -57460,7 +57462,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 345.2,
-   "description": null,
+   "description": "Stufenlos, Haupteingang Richtung Norden.",
    "warnings": [],
    "source": "osm",
    "facing": "north"
@@ -57569,7 +57571,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 232.8,
-   "description": null,
+   "description": "Stufenlos, Eingang zu SpreeDreieck Richtung Südwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-west"
@@ -57588,7 +57590,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 68.7,
-   "description": null,
+   "description": "Stufenlos, Ladeneingang Richtung Osten.",
    "warnings": [],
    "source": "osm",
    "facing": "east"

@@ -1,3 +1,5 @@
+import { say } from './core/speech'
+import { apiBase } from './config'
 // Shared runtime state across screens, plus the output helpers (speech, vibration, live region).
 
 import { playCue } from './audio'
@@ -42,18 +44,22 @@ export function announce(text: string): void {
   requestAnimationFrame(() => (el.textContent = text))
 }
 
-export function speak(text: string, opts: { interrupt?: boolean } = {}): void {
-  if (!('speechSynthesis' in window)) return
-  try {
-    if (opts.interrupt) speechSynthesis.cancel()
-    const u = new SpeechSynthesisUtterance(text)
-    u.lang = document.documentElement.lang || 'en'
-    u.rate = 1.05
-    speechSynthesis.speak(u)
-  } catch {
-    /* speech unavailable */
+export function speak(text: string, opts: { interrupt?: boolean; key?: string } = {}): void {
+  // Routes through the three-tier chain (cached Gemini clip -> /api/speak ->
+  // speechSynthesis). Callers keep passing text; `key` upgrades a line to its
+  // pre-synthesised clip, which is the zero-latency, works-offline path.
+  if (opts.interrupt && 'speechSynthesis' in window) {
+    try {
+      speechSynthesis.cancel()
+    } catch {
+      /* ignore */
+    }
   }
+  void say(opts.key ?? null, text, apiBase()).then((tier) => {
+    if (tier === 'failed') announce(text) // at minimum it reaches the screen reader
+  })
 }
+
 
 export const canVibrate = (): boolean => typeof navigator.vibrate === 'function'
 

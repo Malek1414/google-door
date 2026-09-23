@@ -8,6 +8,7 @@
 // If the gesture has lapsed by step 3 on some iOS version, session.resumeAudioOnTap()
 // resumes the context on the next tap (the onboarding "Test it" tap covers this).
 
+import { initSpeech, preload } from '../core/speech'
 import { requestHeadingPermission } from '../core/heading'
 import { unlockAudio } from '../audio'
 import { resumeAudioOnTap, session, announce } from '../session'
@@ -48,6 +49,21 @@ export async function unlockAll(opts: { camera: boolean }): Promise<UnlockResult
     sound = false
   }
   resumeAudioOnTap()
+
+  // Load the Gemini TTS clip manifest on the same gesture and warm the lines the
+  // walking loop will need, so the first turn is not the slow one. Failure here is
+  // not fatal: say() falls through to /api/speak and then speechSynthesis.
+  if (session.audio) {
+    const lang = document.documentElement.lang || 'de'
+    void initSpeech(lang, session.audio, import.meta.env.BASE_URL)
+      .then((ok) =>
+        ok
+          ? preload(['turn_left', 'turn_right', 'straight', 'arrived', 'warn_revolving', 'confirmed', 'dist_10', 'dist_20', 'dist_30'])
+          : undefined,
+      )
+      .catch(() => undefined)
+  }
+
   return { compass, camera, sound }
 }
 

@@ -5,6 +5,7 @@
 
 import { arrowPulseHz, ARRIVE_M, beaconFor, cuePan, hapticFor, HAPTIC_ARRIVED, ON_BEARING_DEG, shouldAnnounceApproach, shouldSpeakArrival } from '../core/beacon'
 import { bearingDeg, haversineM, relativeBearing } from '../core/geo'
+import { distanceKey } from '../core/speech'
 import { startHeading, type Heading } from '../core/heading'
 import { snapToGraph } from '../core/match'
 import type { OutputConfig } from '../core/profile'
@@ -85,6 +86,13 @@ export function directionWord(rel: number): string {
   if (a <= 45) return rel < 0 ? t.slightLeft : t.slightRight
   if (a <= 135) return rel < 0 ? t.turnLeft : t.turnRight
   return t.behind
+}
+
+/** Clip key for a turn, on the same bands as turnGlyph and directionWord. */
+function turnKey(rel: number): string {
+  const a = Math.abs(rel)
+  if (a <= ON_BEARING_DEG) return 'straight'
+  return rel < 0 ? 'turn_left' : 'turn_right'
 }
 
 /** Material Symbols turn glyph for the green instruction card, same bands as directionWord. */
@@ -278,7 +286,7 @@ export function LiveView(opts: {
       if (word !== lastWord && now - lastSpoken > SPEAK_EVERY_MS) {
         lastWord = word
         lastSpoken = now
-        if (cfg.speak) speak(word)
+        if (cfg.speak) speak(word, { key: turnKey(rel) })
         else announce(word)
       }
     }
@@ -288,13 +296,13 @@ export function LiveView(opts: {
       calloutIdx++
       crossed = true
     }
-    if (crossed && cfg.speak && !shouldSpeakArrival(dist)) speak(t.metres(dist))
+    if (crossed && cfg.speak && !shouldSpeakArrival(dist)) speak(t.metres(dist), { key: distanceKey(dist) ?? undefined })
 
     // One-off at 10 m: he is in the vicinity of the entrance.
     if (!spokeApproach && shouldAnnounceApproach(dist)) {
       spokeApproach = true
       if ((cfg.beacon || cfg.haptics) && session.audio) playApproachChime(session.audio)
-      if (cfg.speak) speak(t.approaching, { interrupt: true })
+      if (cfg.speak) speak(t.approaching, { interrupt: true, key: 'arrived' })
       announce(t.approaching)
     }
 

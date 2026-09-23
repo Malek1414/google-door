@@ -139,6 +139,30 @@ say **"Open this link in Safari"** — that is the actual fix, 90% of the time.
   line, and say "roughly this way". Never fake precision.
 - One button: **"What am I looking at?"** → `POST /api/look`. Opt-in only.
 - **2.5m before arrival, fire the spoken line early** to hide endpoint latency.
+
+### Speech — three tiers, in this order
+
+Guidance is spoken with **Gemini TTS** (`gemini-3.1-flash-tts-preview`), but almost
+never at runtime. Implement `core/speech.ts` with exactly this fallback chain:
+
+1. **Cached WAV** — `data/audio/<lang>/<key>.wav`, listed in `data/audio/manifest.de.json`.
+   Every predictable line is here: turn_left, turn_right, arrived, dist_5..dist_100,
+   warn_revolving, confirmed, reported_only, unknown, low_accuracy, plus one clip per
+   entrance description. **Zero latency, works with no signal.** This is the normal path.
+2. **`POST /api/speak`** — only for text that could not be known in advance, which in
+   practice is the `/api/look` reply. Returns `audio/wav`.
+3. **`window.speechSynthesis`** — last resort, if both fail.
+
+```ts
+export async function say(key: string, fallbackText: string): Promise<void>
+```
+
+Preload the whole manifest on the Start tap — it is a few hundred KB and it buys you
+silence-free guidance for the entire walk.
+
+**Never leave the user in silence.** A blind user who hears nothing cannot tell the
+difference between "you are on course" and "the app died." If all three tiers fail,
+fall back to the beacon and change its pattern so the failure is *audible*.
 - Haptics: left = two short, right = three short, arrived = one long.
 
 ---

@@ -21,7 +21,7 @@ import { h } from './dom'
 import { openEntranceEditor } from './EntranceEditor'
 import { openBusinessEdit } from './BusinessEdit'
 import { keepOneMain, openEntrancesManager } from './BusinessEntrances'
-import { businessHomeHeader } from './BusinessHome'
+import { businessHomeHeader, popover } from './BusinessHome'
 import { openBusinessData } from './BusinessData'
 import { ACCESS_ATTRS, emptyDetails, loadDetails, saveDetails, type Tri } from '../core/businessDetails'
 
@@ -80,7 +80,7 @@ const S = {
     taskRoute: 'Weg vom Haupteingang zur Toilette filmen',
     taskPhoto: 'Foto vom barrierefreien Eingang',
     taskWidth: 'Türbreite messen',
-    film: 'Filmen',
+    film: 'Weg filmen',
     filmLabel: 'Weg jetzt filmen',
     taskDone: (l: string) => `Erledigt: ${l}`,
     taskOpen: (l: string) => `Offen: ${l}`,
@@ -92,9 +92,14 @@ const S = {
     doneLine: 'Erledigt',
     addPhoto: 'Foto hinzufügen',
     addPhotoLabel: 'Eingang mit Foto hinzufügen',
-    measure: 'Messen',
+    measure: 'Türbreite eintragen',
     measureLabel: 'Türbreite bei den Eingängen eintragen',
     markDone: (l: string) => `Als erledigt markieren: ${l}`,
+    markDoneShort: 'Als erledigt markieren',
+    markOpenShort: 'Als offen markieren',
+    hide: 'Ausblenden',
+    hidden: (l: string) => `Ausgeblendet: ${l}`,
+    more: (l: string) => `Weitere Optionen: ${l}`,
     switched: (n: string) => `Gewechselt zu ${n}.`,
     cancel: 'Abbrechen',
   },
@@ -118,8 +123,7 @@ const S = {
     noAddress: 'No address given',
     scoreLabel: 'Visibility',
     scoreOf: (n: number) => `${n} of 100`,
-    scoreText:
-      'Proposal to Google: businesses with complete accessibility data rank higher in search. The more complete your profile, the better.',
+    scoreText: 'More details, higher in search.',
     offerLabel: 'Offer accessibility',
     offerSub: 'Your business shows up for people looking for step-free entrances.',
     offerOn: 'Accessibility is offered.',
@@ -152,7 +156,7 @@ const S = {
     taskRoute: 'Film the way from the main entrance to the toilet',
     taskPhoto: 'Photo of the accessible entrance',
     taskWidth: 'Measure the door width',
-    film: 'Film',
+    film: 'Film the way',
     filmLabel: 'Film the way now',
     taskDone: (l: string) => `Done: ${l}`,
     taskOpen: (l: string) => `Open: ${l}`,
@@ -164,9 +168,14 @@ const S = {
     doneLine: 'Done',
     addPhoto: 'Add photo',
     addPhotoLabel: 'Add an entrance with a photo',
-    measure: 'Measure',
+    measure: 'Enter door width',
     measureLabel: 'Enter the door width at the entrances',
     markDone: (l: string) => `Mark as done: ${l}`,
+    markDoneShort: 'Mark as done',
+    markOpenShort: 'Mark as open',
+    hide: 'Hide',
+    hidden: (l: string) => `Hidden: ${l}`,
+    more: (l: string) => `More options: ${l}`,
     switched: (n: string) => `Switched to ${n}.`,
     cancel: 'Cancel',
   },
@@ -206,6 +215,25 @@ function rememberBusiness(b: BusinessProfile): void {
     localStorage.setItem(BUSINESSES_KEY, JSON.stringify(list))
   } catch {
     /* blocked or full: the active business is still saved */
+  }
+}
+
+/** Recommendation cards the owner hid with "Ausblenden", per business, on this device. */
+const hiddenKey = (bizId: string) => `doorway.bizHiddenTasks.${bizId}`
+function loadHidden(bizId: string): string[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(hiddenKey(bizId)) ?? '[]') as unknown
+    return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+function saveHidden(bizId: string, ids: string[]): boolean {
+  try {
+    localStorage.setItem(hiddenKey(bizId), JSON.stringify(ids))
+    return true
+  } catch {
+    return false
   }
 }
 
@@ -435,40 +463,67 @@ export const businessPanel: Panel = (el, ctx) => {
       return null
     }
     const doneCount = TASKS.filter((t) => b.tasks.find((x) => x.id === t.id)?.done).length
+    const hiddenIds = loadHidden(b.id)
+    const thumbIcon: Record<string, string> = { [ROUTE_TASK_ID]: 'videocam', [PHOTO_TASK_ID]: 'photo_camera', [WIDTH_TASK_ID]: 'straighten' }
+    const setDone = (t: { id: string; label: string }, done: boolean) => {
+      const next = { ...b, tasks: b.tasks.map((x) => (x.id === t.id ? { ...x, done } : x)) }
+      if (!persist(next)) return
+      ctx.announce(done ? L.taskDone(t.label) : L.taskOpen(t.label))
+      renderDashboard(true)
+    }
+    const hideTask = (t: { id: string; label: string }) => {
+      if (!saveHidden(b.id, [...hiddenIds.filter((x) => x !== t.id), t.id])) {
+        msg.textContent = L.saveFailed
+        return
+      }
+      ctx.announce(L.hidden(t.label))
+      renderDashboard(true)
+    }
     const taskCard = (t: { id: string; label: string; line: string }) => {
       const done = b.tasks.find((x) => x.id === t.id)?.done === true
-      const box = h('input', { id: `${id}-t-${t.id}`, class: 'bz-check', type: 'checkbox', checked: done, 'aria-label': L.markDone(t.label) })
-      box.addEventListener('change', () => {
-        const next = { ...b, tasks: b.tasks.map((x) => (x.id === t.id ? { ...x, done: box.checked } : x)) }
-        if (!persist(next)) {
-          box.checked = !box.checked
-          return
-        }
-        ctx.announce(box.checked ? L.taskDone(t.label) : L.taskOpen(t.label))
-        renderDashboard(true)
-      })
       const act = done ? null : taskAction(t.id)
-      return h('li', { class: `bz-rec${done ? ' bz-rec-done' : ''}` },
-        h('div', { class: 'bz-rec-text' },
-          h('h4', { class: 'bz-rec-title' }, t.label),
-          h('p', { class: 'bz-rec-line' }, done ? L.doneLine : t.line),
-          act
-            ? h('button', { class: 'bz-rec-pill', type: 'button', 'aria-label': act.aria, onclick: act.run }, icon(act.icon), act.label)
-            : null,
+      const menuId = `${id}-tm-${t.id}`
+      const moreBtn = h('button', {
+        class: 'bz-rec-more', type: 'button', 'aria-label': L.more(t.label), 'aria-expanded': 'false', 'aria-controls': menuId,
+      }, icon('more_horiz'))
+      const menu = h('div', { class: 'bzh-pop bz-rec-menu', id: menuId, hidden: true },
+        h('ul', { class: 'bzh-pop-list' },
+          h('li', {}, h('button', { class: 'bzh-pop-btn', type: 'button', onclick: () => setDone(t, !done) },
+            icon(done ? 'undo' : 'check_circle'), h('span', {}, done ? L.markOpenShort : L.markDoneShort))),
+          h('li', {}, h('button', { class: 'bzh-pop-btn', type: 'button', onclick: () => hideTask(t) },
+            icon('visibility_off'), h('span', {}, L.hide))),
         ),
-        box,
+      )
+      popover(moreBtn, menu)
+      return h('li', { class: `bz-rec${done ? ' bz-rec-done' : ''}` },
+        h('div', { class: 'bz-rec-top' },
+          h('div', { class: 'bz-rec-text' },
+            h('h4', { class: 'bz-rec-title' }, t.label),
+            h('p', { class: 'bz-rec-line' }, done ? L.doneLine : t.line),
+          ),
+          h('span', { class: 'bz-rec-thumb', 'aria-hidden': 'true' }, icon(done ? 'check' : thumbIcon[t.id] ?? 'task_alt', true)),
+        ),
+        h('div', { class: 'bz-rec-foot' },
+          act
+            ? h('button', { class: 'bz-rec-link', type: 'button', 'aria-label': act.aria, onclick: act.run }, act.label)
+            : h('span', {}),
+          moreBtn,
+        ),
+        menu,
       )
     }
-    const ordered = [...TASKS].sort((a, c) => Number(isDone(b, a.id)) - Number(isDone(b, c.id)))
-    const recs = h(
-      'section',
-      { class: 'bz-sec', 'aria-labelledby': `${id}-tasks` },
-      h('div', { class: 'bz-sec-head' },
-        h('h3', { class: 'bz-h3', id: `${id}-tasks` }, L.tasksHead),
-        h('span', { class: 'bz-sec-meta' }, L.tasksDone(doneCount, TASKS.length)),
-      ),
-      h('ul', { class: 'bz-recs' }, ...ordered.map(taskCard)),
-    )
+    const ordered = [...TASKS].filter((t) => !hiddenIds.includes(t.id)).sort((a, c) => Number(isDone(b, a.id)) - Number(isDone(b, c.id)))
+    const recs = ordered.length
+      ? h(
+          'section',
+          { class: 'bz-sec', 'aria-labelledby': `${id}-tasks` },
+          h('div', { class: 'bz-sec-head' },
+            h('h3', { class: 'bz-h3', id: `${id}-tasks` }, L.tasksHead),
+            h('span', { class: 'bz-sec-meta' }, L.tasksDone(doneCount, TASKS.length)),
+          ),
+          h('ul', { class: 'bz-recs' }, ...ordered.map(taskCard)),
+        )
+      : null
 
     const entrances = h(
       'section',
@@ -486,27 +541,15 @@ export const businessPanel: Panel = (el, ctx) => {
       offer,
     )
 
-    const divider = () => h('div', { class: 'bz-divider', 'aria-hidden': 'true' })
-    // Ranking: make visible that maintained data moves the business up in search.
-    const level = L.rankLevel(score)
+    // Ranking explanation: the "Profilstärke" card on top jumps here.
     const rank = h(
       'section',
-      { class: 'bz-sec', 'aria-labelledby': `${id}-rank` },
-      h('div', { class: 'bz-rank' },
-        h('span', { class: 'bz-rank-ic', 'aria-hidden': 'true' }, icon('trending_up')),
-        h('div', { class: 'bz-rank-text' },
-          h('h3', { class: 'bz-h3', id: `${id}-rank` }, L.rankHead),
-          h('p', { class: 'bz-rank-level' }, level),
-          h('p', { class: 'bz-rank-next' }, L.rankNext(score)),
-        ),
-        h('span', { class: 'bz-rank-score', 'aria-label': L.scoreOf(score) }, String(score)),
+      { class: 'bz-sec bz-rank', id: `${id}-rank`, 'aria-labelledby': `${id}-rank-h`, tabindex: '-1' },
+      h('div', { class: 'bz-sec-head' },
+        h('h3', { class: 'bz-h3', id: `${id}-rank-h` }, L.rankHead),
+        h('span', { class: 'bz-rank-level' }, L.rankLevel(score)),
       ),
-      h('div', { class: 'bz-rank-bar', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': score, 'aria-label': L.rankHead },
-        h('span', { style: `width:${score}%` }),
-        h('i', { style: 'left:40%', 'aria-hidden': 'true' }),
-        h('i', { style: 'left:70%', 'aria-hidden': 'true' }),
-      ),
-      h('p', { class: 'bz-rank-note' }, L.scoreText),
+      h('p', { class: 'bz-rank-note' }, `${L.scoreText} ${L.rankNext(score)}`),
     )
 
     // First visit: one short note on why this matters, dismissed for good.
@@ -576,12 +619,12 @@ export const businessPanel: Panel = (el, ctx) => {
           renderDashboard()
         },
       }, label)
-    const tabs = h('div', { class: 'gm-tabs bz-tabs', role: 'tablist' }, tabBtn('overview', L.tabOverview), tabBtn('access', L.tabAccess))
+    const tabs = h('div', { class: 'gm-tabs bz-tabs', id: `${id}-tabs`, role: 'tablist' }, tabBtn('overview', L.tabOverview), tabBtn('access', L.tabAccess))
 
     const body =
       bizTab === 'overview'
-        ? [intro, rank, divider(), recs]
-        : [visibility, divider(), questions, divider(), entrances]
+        ? [intro, rank, recs]
+        : [visibility, questions, entrances]
     el.replaceChildren(h('div', { class: 'bz bz-page' }, home(b), tabs, ...body.filter((x): x is HTMLElement => x !== null), msg))
     if (!keepScroll) el.scrollTop = 0
     ctx.setSheet('full')
@@ -599,6 +642,16 @@ export const businessPanel: Panel = (el, ctx) => {
       renderDashboard()
     }
   }
+  // Switch tab, re-render in place and bring the target into view with focus on it.
+  function jumpTo(tab: 'overview' | 'access', targetId: string) {
+    bizTab = tab
+    renderDashboard(true)
+    const target = document.getElementById(targetId)
+    if (!target) return
+    target.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+    const focusEl = target.matches('[tabindex]') ? target : target.querySelector<HTMLElement>('[aria-selected="true"]')
+    focusEl?.focus({ preventScroll: true })
+  }
   function home(b: BusinessProfile): HTMLElement {
     const back = () => {
       closeEditor()
@@ -612,6 +665,9 @@ export const businessPanel: Panel = (el, ctx) => {
         onRecord: () => ctx.openRecorder(),
         onData: () => sub(() => openBusinessData(el, ctx, b.id, back)),
         onPhotos: () => sub(() => openBusinessEdit(el, ctx, b.id, back)),
+        onHours: () => sub(() => openBusinessEdit(el, ctx, b.id, back)),
+        onAccess: () => jumpTo('access', `${id}-tabs`),
+        onScore: () => jumpTo('overview', `${id}-rank`),
         onPreview: () => {
           const list = linkedEntrances(b, loadSurvey())
           const main = list.find((e) => e.kind === 'main') ?? list[0]

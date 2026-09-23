@@ -1,0 +1,418 @@
+[
+ {
+  "t": 0,
+  "lat": 52.5274795,
+  "lon": 13.3703986,
+  "heading": 120,
+  "accuracy": 30,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 1,
+  "lat": 52.5274736,
+  "lon": 13.3704152,
+  "heading": 124,
+  "accuracy": 30,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 2,
+  "lat": 52.5274678,
+  "lon": 13.3704319,
+  "heading": 119,
+  "accuracy": 30,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 3,
+  "lat": 52.527462,
+  "lon": 13.3704485,
+  "heading": 116.3,
+  "accuracy": 30,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 4,
+  "lat": 52.5274561,
+  "lon": 13.3704652,
+  "heading": 122,
+  "accuracy": 30,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 5,
+  "lat": 52.5274503,
+  "lon": 13.3704818,
+  "heading": 123.2,
+  "accuracy": 30,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 6,
+  "lat": 52.5274444,
+  "lon": 13.3704984,
+  "heading": 117.2,
+  "accuracy": 30,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 7,
+  "lat": 52.5274386,
+  "lon": 13.3705151,
+  "heading": 117.5,
+  "accuracy": 30,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 8,
+  "lat": 52.5274327,
+  "lon": 13.3705317,
+  "heading": 123.4,
+  "accuracy": 30,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 9,
+  "lat": 52.5274269,
+  "lon": 13.3705484,
+  "heading": 121.6,
+  "accuracy": 30,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 10,
+  "lat": 52.527421,
+  "lon": 13.370565,
+  "heading": 116.2,
+  "accuracy": 30,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 11,
+  "lat": 52.5274152,
+  "lon": 13.3705817,
+  "heading": 119.4,
+  "accuracy": 30,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 12,
+  "lat": 52.5274093,
+  "lon": 13.3705983,
+  "heading": 124,
+  "accuracy": 12,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 13,
+  "lat": 52.5274035,
+  "lon": 13.3706149,
+  "heading": 105.3,
+  "accuracy": 11.5,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 14,
+  "lat": 52.5273998,
+  "lon": 13.3706332,
+  "heading": 89,
+  "accuracy": 11,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 15,
+  "lat": 52.5273981,
+  "lon": 13.3706522,
+  "heading": 83.6,
+  "accuracy": 10.5,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 16,
+  "lat": 52.5273981,
+  "lon": 13.3706714,
+  "heading": 77.9,
+  "accuracy": 10,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 17,
+  "lat": 52.5273993,
+  "lon": 13.3706905,
+  "heading": 67.7,
+  "accuracy": 9.5,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 18,
+  "lat": 52.5274012,
+  "lon": 13.3707095,
+  "heading": 66.6,
+  "accuracy": 9,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 19,
+  "lat": 52.5274031,
+  "lon": 13.3707284,
+  "heading": 75.9,
+  "accuracy": 8.5,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 20,
+  "lat": 52.5274045,
+  "lon": 13.3707475,
+  "heading": 81.9,
+  "accuracy": 8,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 21,
+  "lat": 52.5274046,
+  "lon": 13.3707667,
+  "heading": 86.2,
+  "accuracy": 7.5,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 22,
+  "lat": 52.5274031,
+  "lon": 13.3707858,
+  "heading": 101.2,
+  "accuracy": 7,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 23,
+  "lat": 52.5273995,
+  "lon": 13.3708041,
+  "heading": 120.4,
+  "accuracy": 6.5,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 24,
+  "lat": 52.5273938,
+  "lon": 13.3708208,
+  "heading": 131.3,
+  "accuracy": 6,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 25,
+  "lat": 52.5273861,
+  "lon": 13.3708353,
+  "heading": 127.2,
+  "accuracy": 5.5,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 26,
+  "lat": 52.5273784,
+  "lon": 13.3708497,
+  "heading": 132,
+  "accuracy": 5,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 27,
+  "lat": 52.5273707,
+  "lon": 13.3708642,
+  "heading": 134.9,
+  "accuracy": 4.5,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 28,
+  "lat": 52.527363,
+  "lon": 13.3708787,
+  "heading": 129.3,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 29,
+  "lat": 52.5273553,
+  "lon": 13.3708931,
+  "heading": 127.9,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 30,
+  "lat": 52.5273476,
+  "lon": 13.3709076,
+  "heading": 133.9,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 31,
+  "lat": 52.5273399,
+  "lon": 13.3709221,
+  "heading": 133.8,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 32,
+  "lat": 52.5273322,
+  "lon": 13.3709365,
+  "heading": 127.8,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 33,
+  "lat": 52.5273245,
+  "lon": 13.370951,
+  "heading": 129.4,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 34,
+  "lat": 52.5273168,
+  "lon": 13.3709655,
+  "heading": 135,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 35,
+  "lat": 52.5273091,
+  "lon": 13.3709799,
+  "heading": 131.9,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 36,
+  "lat": 52.5273014,
+  "lon": 13.3709944,
+  "heading": 127.2,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 37,
+  "lat": 52.5272937,
+  "lon": 13.3710089,
+  "heading": 131.5,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 38,
+  "lat": 52.527286,
+  "lon": 13.3710233,
+  "heading": 135.1,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 39,
+  "lat": 52.5272783,
+  "lon": 13.3710378,
+  "heading": 129.9,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 40,
+  "lat": 52.5272706,
+  "lon": 13.3710522,
+  "heading": 127.6,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 41,
+  "lat": 52.5272629,
+  "lon": 13.3710667,
+  "heading": 133.4,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 42,
+  "lat": 52.5272552,
+  "lon": 13.3710812,
+  "heading": 134.2,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 43,
+  "lat": 52.5272475,
+  "lon": 13.3710956,
+  "heading": 128.2,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 44,
+  "lat": 52.5272398,
+  "lon": 13.3711101,
+  "heading": 128.9,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 45,
+  "lat": 52.5272321,
+  "lon": 13.3711246,
+  "heading": 134.7,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 46,
+  "lat": 52.5272244,
+  "lon": 13.371139,
+  "heading": 132.5,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 47,
+  "lat": 52.5272167,
+  "lon": 13.3711535,
+  "heading": 127.3,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 48,
+  "lat": 52.5272127,
+  "lon": 13.3711611,
+  "heading": 130.9,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 49,
+  "lat": 52.5272127,
+  "lon": 13.3711611,
+  "heading": 130.9,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 50,
+  "lat": 52.5272127,
+  "lon": 13.3711611,
+  "heading": 130.9,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ },
+ {
+  "t": 51,
+  "lat": 52.5272127,
+  "lon": 13.3711611,
+  "heading": 130.9,
+  "accuracy": 4,
+  "headingSource": "ios-webkit"
+ }
+]

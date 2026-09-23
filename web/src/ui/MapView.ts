@@ -393,7 +393,7 @@ export function MapView(opts: {
     }
     if (!showDoorMarkers(mode)) {
       sheetBody.replaceChildren(
-        h('div', { class: 'gm-sheet-head' }, h('h2', { id: 'sheet-title', class: 'gm-sheet-title' }, t.inThisArea)),
+        h('div', { class: 'gm-sheet-head' }, h('h2', { id: 'sheet-title', class: 'gm-sheet-title' }, t.inThisArea), weatherChip()),
         h('p', { class: 'gm-p' }, t.standardHint),
       )
       return
@@ -409,6 +409,35 @@ export function MapView(opts: {
       ),
       h('ul', { class: 'gm-list' }, ...(doors.length ? doors.slice(0, LIST_MAX).map(({ e, d }) => doorRow(e, d)) : [h('li', { class: 'gm-empty' }, t.noDoors)])),
     )
+  }
+
+  // Weather chip like Maps' "In dieser Gegend": real current temperature from Open-Meteo
+  // (free, no key). Fetched at most every 10 minutes; hidden when it cannot be loaded.
+  let weather: { temp: number; icon: string; at: number } | null = null
+  function weatherChip(): HTMLElement {
+    const chip = h('span', { class: 'gm-badge gm-weather', hidden: true })
+    const fill = () => {
+      if (!weather) return
+      chip.replaceChildren(icon(weather.icon), h('span', {}, `${Math.round(weather.temp)}°`))
+      chip.setAttribute('aria-label', `${Math.round(weather.temp)} Grad`)
+      chip.hidden = false
+    }
+    if (weather && Date.now() - weather.at < 600000) fill()
+    else {
+      const o = origin()
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${o.lat.toFixed(3)}&longitude=${o.lon.toFixed(3)}&current=temperature_2m,weather_code`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => {
+          const c = j?.current
+          if (!c || typeof c.temperature_2m !== 'number') return
+          const code = Number(c.weather_code)
+          const ic = code === 0 ? 'clear_day' : code <= 3 ? 'partly_cloudy_day' : code <= 48 ? 'foggy' : code <= 67 ? 'rainy' : code <= 77 ? 'weather_snowy' : code <= 82 ? 'rainy' : 'thunderstorm'
+          weather = { temp: c.temperature_2m, icon: ic, at: Date.now() }
+          fill()
+        })
+        .catch(() => {})
+    }
+    return chip
   }
 
   function renderMarkers() {

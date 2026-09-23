@@ -1,0 +1,66 @@
+/* "Gesammelte Daten" in the "Unternehmen" tab. Reuses gm-* tokens (sheet, teal, tonal, nav). */
+.bd { display: flex; flex-direction: column; padding-bottom: 28px; }
+.bd-top { display: flex; align-items: center; gap: 8px; min-height: 56px; }
+.bd-back { width: 44px; height: 44px; flex: none; }
+.bd-title { flex: 1; min-width: 0; margin: 0; font: 400 21px/1.25 'Google Sans Flex', Roboto, sans-serif; color: var(--fg); }
+.bd-title:focus { outline: none; }
+.bd-intro { margin: 4px 0 0; font-size: 15px; line-height: 1.45; color: var(--fg2); }
+
+.bd-where { display: flex; gap: 14px; align-items: flex-start; margin-top: 16px; padding: 14px 16px; border-radius: 20px; background: var(--tonal); color: var(--tonal-ink); }
+.bd-where > .ms { color: var(--teal); font-size: 24px; flex: none; }
+.bd-where-t { margin: 0; font: 500 16px/1.3 'Google Sans Flex', Roboto, sans-serif; }
+.bd-where-s { margin: 4px 0 0; font-size: 14px; line-height: 1.4; }
+
+.bd-sec { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.bd-sec-head { display: flex; align-items: center; gap: 12px; min-height: 40px; }
+.bd-sec-icon { width: 40px; height: 40px; flex: none; border-radius: 50%; background: var(--circle); color: var(--fg); display: grid; place-items: center; }
+.bd-sec-icon .ms { font-size: 22px; }
+.bd-h { flex: 1; min-width: 0; margin: 0; font: 500 18px/1.3 'Google Sans Flex', Roboto, sans-serif; color: #fff; }
+.bd-count { font-size: 14px; color: var(--fg2); white-space: nowrap; }
+.bd-p { margin: 10px 0 0; font-size: 15px; line-height: 1.45; color: var(--fg2); }
+.bd-note { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 16px; background: var(--nav); color: var(--fg); }
+.bd-note > .ms { color: var(--teal); font-size: 20px; flex: none; }
+
+.bd-dl { margin: 8px 0 0; }
+.bd-row { display: flex; gap: 16px; justify-content: space-between; align-items: baseline; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.bd-row:last-child { border-bottom: 0; }
+.bd-k { margin: 0; flex: 1 1 45%; min-width: 0; font-size: 15px; color: var(--fg2); }
+.bd-v { margin: 0; flex: 1 1 55%; min-width: 0; text-align: right; font-size: 15px; color: var(--fg); overflow-wrap: anywhere; }
+.bd-row-stack { display: block; }
+.bd-hours { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 8px 0 0; font-size: 15px; }
+.bd-day { color: var(--fg); }
+.bd-time { text-align: right; color: var(--fg); }
+.bd-tri { color: var(--fg2); }
+.bd-tri-ja { color: var(--teal); font-weight: 500; }
+.bd-tri-nein { color: #f2b8b5; font-weight: 500; }
+
+.bd-score { margin-top: 10px; padding: 12px 16px; border-radius: 16px; background: var(--nav); }
+.bd-score-row { display: flex; align-items: baseline; justify-content: space-between; }
+.bd-pct { font: 500 24px/1 'Google Sans Flex', Roboto, sans-serif; color: var(--teal); }
+.bd-bar { height: 4px; margin-top: 10px; border-radius: 2px; background: var(--tonal); overflow: hidden; }
+.bd-bar-fill { height: 100%; background: var(--teal); border-radius: 2px; }
+
+.bd-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.bd-card { padding: 14px 16px 6px; border-radius: 20px; background: var(--nav); }
+.bd-card .bd-row { border-color: #2a3134; }
+.bd-card-head { display: flex; gap: 14px; align-items: center; }
+.bd-thumb { width: 56px; height: 56px; flex: none; border-radius: 12px; object-fit: cover; background: var(--circle); }
+.bd-thumb-empty { display: grid; place-items: center; color: var(--fg2); }
+.bd-card-text { flex: 1; min-width: 0; }
+.bd-card-title { margin: 0; font: 500 17px/1.3 'Google Sans Flex', Roboto, sans-serif; color: var(--fg); overflow-wrap: anywhere; }
+.bd-src { margin: 2px 0 0; font-size: 14px; color: var(--teal); }
+
+.bd-actions, .bd-confirm { display: flex; flex-direction: column; gap: 10px; margin-top: 24px; }
+.bd .bd-wide { width: 100%; justify-content: center; min-height: 48px; box-sizing: border-box; background: var(--chip); color: var(--fg); cursor: pointer; }
+.bd .bd-del { background: none; border: 1px solid #8c4a47; color: #f2b8b5; }
+.bd .bd-danger { background: #8c1d18; color: #fff; }
+.bd-confirm-text { margin: 0; font-size: 15px; line-height: 1.45; color: var(--fg); }
+.bd-status { min-height: 1.2em; margin: 12px 0 0; color: var(--teal); font-size: 15px; }
+.bd-status:empty { margin: 0; min-height: 0; }
+.bd button:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
+
+/* Round "i" button left of the bell in the "Mein Unternehmen" header. */
+.bzh-top.bzh-top-info { padding: 0 116px; }
+.bzh-info { position: absolute; right: 71px; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; border: 0; border-radius: 50%; background: none; color: #e6e1e5; display: grid; place-items: center; cursor: pointer; }
+.bzh-info .ms { font-size: 26px; }
+.bzh-info:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }

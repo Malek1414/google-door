@@ -1,0 +1,28 @@
+/* Map buttons, measured with cv2 against real Maps iOS (443x960 = CSS px):
+   rec/full_home.png (layers, locate, teal go) + rec/full_mapsheet.png (locate, View).
+   Loaded after style.css and overrides the .gm-round / .gm-layers / .gm-right / .gm-go / .gm-view rules there. */
+
+/* measured: every button ends 19px from the right edge (x 363-423 of 443) */
+.gm-layers, .gm-right { right: 19px; }
+
+/* measured: layers 42px circle, fill #2b2b2f, outlined icon 21x22 (24px glyph), light grey;
+   top edge 121px below the search-bar top (search top = --top + 6px), 20px under the chip row */
+.gm-round { width: 42px; height: 42px; background: #2b2b2f; color: #e5e5e7; box-shadow: 0 1px 3px rgb(0 0 0 / 0.45), 0 0 1px rgb(0 0 0 / 0.3); }
+.gm-layers { top: calc(var(--top) + 127px); }
+.gm-layers .ms { font-size: 24px; color: #d9d8dc; }
+
+/* measured: column of 60px circles / squares, 20px between them, 20px above the sheet top (go bottom 771, sheet 791) */
+.gm-right { gap: 20px; bottom: calc(var(--nav-h) + var(--sheet-h) + 20px); }
+.gm-right .gm-round { width: 60px; height: 60px; }
+/* measured: locate arrow glyph 21x21 -> 24px Material glyph, colour #e5e5e7 */
+.gm-right .gm-round .ms { font-size: 24px; color: #e5e5e7; }
+
+/* measured: teal square 60x60, radius 18 (row profile fits r=18), fill #62c4cb, near-black glyph #032326 */
+.gm-go { width: 60px; height: 60px; border-radius: 18px; background: #62c4cb; color: #032326; box-shadow: 0 1px 3px rgb(0 0 0 / 0.45), 0 0 1px rgb(0 0 0 / 0.3); }
+.gm-go .ms { font-size: 28px; }
+
+/* measured: View button same 60px circle in the go slot, camera glyph 20px tall ending 8px above the label,
+   label cap height ~13px -> 13px/500, glyph + label centred */
+.gm-view { width: 60px !important; height: 60px !important; gap: 0; padding: 0; line-height: 1; }
+.gm-view .ms { font-size: 24px; margin-bottom: 2px; }
+.gm-view span:last-child { font-size: 13px; font-weight: 500; letter-spacing: 0; color: #e5e5e7; }

@@ -1,0 +1,30 @@
+/* Sheet + bottom nav overrides. All values measured on real Google Maps iOS
+   (full_home.png, 443x960 CSS px). Loaded after style.css. */
+
+.gm {
+  --sheet-h: 68px;                                     /* measured: sheet top 791 -> nav top 859 */
+  --nav: #1c2224;                                      /* measured nav bg rgb(28,34,36) */
+  --nav-h: calc(66px + env(safe-area-inset-bottom));   /* measured: 859 -> 925 content, rest = home indicator */
+}
+
+/* Sheet */
+.gm-sheet { border-radius: 22px 22px 0 0; background: #151316; } /* measured radius ~22, bg rgb(21,19,22) */
+.gm-handle { height: 22px; padding: 0; } /* measured: handle 9-13px below sheet top = centred in 22px */
+.gm-handle span { width: 44px; height: 4px; border-radius: 2px; background: #605e61; } /* measured 44x4, rgb(96,94,97) */
+.gm-sheet-body { padding: 0 23px 22px; }             /* measured: title ink starts x=25, badge ends 23px from right */
+.gm-sheet-head { min-height: 44px; gap: 12px; }      /* measured: title centre 44px below sheet top */
+.gm-sheet-title { font-size: 24px; font-weight: 400; line-height: 30px; color: #e6e1e5; } /* measured cap height 18px */
+
+/* Right badge (weather chip) */
+.gm-badge { height: 44px; min-width: 60px; padding: 0 9px; border-radius: 8px; /* measured 60x44, radius 8 */
+  background: #323033; color: #e6e1e5; font-size: 15px; font-weight: 500;    /* measured bg rgb(50,48,51) */
+  justify-content: center; }
+
+/* Bottom nav */
+.gm-nav { background: var(--nav); }
+.gm-tab { justify-content: flex-start; padding-top: 5px; gap: 7px;  /* measured: pill top 5px below nav top, label cap top 49px */
+  height: 66px; font-size: 13px; line-height: 16px; font-weight: 500; color: #c4c9cb; } /* measured inactive label */
+.gm-tab-ic { width: 70px; height: 34px; border-radius: 17px; }    /* measured pill 70x34 */
+.gm-tab-ic .ms { font-size: 26px; }                                /* measured glyph ~22px */
+.gm-tab[aria-current='page'] { color: #e6e1e5; }                   /* measured active label */
+.gm-tab[aria-current='page'] .gm-tab-ic { background: #063c40; color: #a9f8ff; } /* measured pill rgb(6,60,64), icon rgb(169,248,255) */

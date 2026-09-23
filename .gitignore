@@ -1,6 +1,13 @@
 __pycache__/
 *.pyc
 .env
+.env.*
+!.env.example
 .venv/
 node_modules/
 dist/
+# runtime browser config (Maps key), never committed; see web/config.example.js
+web/config.js
+web/drag.png
+ios/Doorway.xcodeproj/
+ios/build/

@@ -1,0 +1,70 @@
+/* Place sheet and result list (PlaceCard.ts). Builds on the gm-* Google Maps clone tokens in style.css. */
+.pc-rating { display: flex; align-items: center; gap: 6px; margin: 2px 0 2px; font-size: 15px; color: var(--fg2, #c9c5ca); }
+.pc-rating-num { color: var(--fg, #e6e1e5); }
+.pc-stars { display: inline-flex; gap: 0; }
+.pc-star { font-size: 17px; color: #fbbc04; }
+.pc-star-off { color: #5d5b5f; }
+.pc-meta { margin-top: 2px; }
+.pc-open { color: #81c995; font-weight: 500; }
+.pc-closed { color: #f28b82; font-weight: 500; }
+.pc-photo-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pc-tips { margin-top: 12px; }
+.pc-tips[hidden] { display: none; }
+.pc-quotes { list-style: none; margin: 0; padding: 0; }
+.pc-quotes > li { margin: 0 0 10px; }
+.pc-quote { margin: 0; padding: 0 0 0 12px; border-left: 3px solid var(--teal, #62c4cb); }
+.pc-quote p { margin: 0 0 4px; font-size: 16px; color: var(--fg, #e6e1e5); }
+.pc-quote footer { font-size: 14px; color: var(--fg2, #c9c5ca); }
+.pc-quote-src { margin: 6px 0 0; font-size: 13px; color: var(--fg2, #c9c5ca); }
+.pc-reviews { padding-top: 8px; }
+.pc-h3 { margin: 18px 0 4px; font-size: 18px; font-weight: 500; color: #fff; }
+.pc-doors { margin-top: 4px; }
+.pc-guide { flex: none; display: inline-flex; align-items: center; height: 36px; padding: 0 14px; border-radius: 18px; background: var(--tonal, #063c40); color: var(--tonal-ink, #cdeef0); font-size: 15px; font-weight: 500; }
+.pc-access { gap: 14px; }
+.pc-access-label { flex: 1; min-width: 0; }
+.pc-access-val { flex: none; color: var(--fg2, #c9c5ca); font-weight: 500; }
+.pc-access-yes > .ms { color: #81c995; }
+.pc-access-no > .ms { color: #f28b82; }
+.pc-access-unknown > .ms { color: var(--fg2, #c9c5ca); }
+.pc-row { align-items: flex-start; }
+.pc-row .pc-rating { font-size: 14px; margin: 0; }
+.pc-row .pc-star { font-size: 15px; }
+.pc-a11y { flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: #1a3a6b; color: #a8c7fa; margin-top: 4px; }
+.pc-a11y .ms { font-size: 20px; }
+/* Google place sheet parity: rating/category/walk row, hours line, photo strip, info rows. */
+.pc-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; font-size: 15px; color: var(--fg2, #c9c5ca); }
+.pc-meta .pc-rating { margin: 0; }
+.pc-dot { color: var(--fg2, #c9c5ca); }
+.pc-walk { font-size: 17px; vertical-align: -3px; margin-right: 2px; }
+.pc-hours { margin: 4px 0 0; font-size: 15px; color: var(--fg2, #c9c5ca); }
+.gm-circle-on { background: var(--teal, #62c4cb); color: var(--teal-ink, #00363a); }
+.pc-strip { display: grid; grid-template-columns: 1fr; gap: 8px; height: 300px; margin: 0 0 8px; }
+.pc-strip-multi { grid-template-columns: 2fr 1fr; margin-right: -22px; }
+.pc-strip-big, .pc-strip-small { overflow: hidden; border-radius: 16px; background: #202124; min-height: 0; }
+.pc-strip-multi .pc-strip-small { border-radius: 16px 0 0 16px; }
+.pc-strip-col { display: grid; grid-auto-rows: 1fr; gap: 8px; min-height: 0; }
+.pc-photo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding-top: 12px; }
+.pc-photo-grid .pc-photo-img { aspect-ratio: 1; border-radius: 10px; }
+.pc-fact-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pc-fact-text .pc-hours { margin: 0; }
+.pc-fact-sub { font-size: 14px; color: var(--fg2, #c9c5ca); }
+.pc-fact-link { color: var(--teal, #62c4cb); text-decoration: none; overflow-wrap: anywhere; }
+.pc-fact-link:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+.pc-suggest { display: flex; justify-content: center; margin: 20px 0 8px; }
+.pc-card .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Skeleton shown the instant a POI is tapped, replaced when the card arrives.
+   Without it the sheet sat empty for the length of a network round-trip, which is
+   what read as lag next to Google Maps. */
+.pc-skel { padding: 4px 0 8px; display: grid; gap: 12px; }
+.pc-skel-line { height: 16px; border-radius: 8px;
+  background: linear-gradient(90deg, #2a2b2e 25%, #35363a 50%, #2a2b2e 75%);
+  background-size: 200% 100%; animation: pc-shimmer 1.15s linear infinite; }
+.pc-skel-title { height: 26px; width: 62%; }
+.pc-skel-sub { width: 44%; }
+.pc-skel-row { width: 78%; }
+.pc-skel-photo { height: 116px; border-radius: 14px;
+  background: linear-gradient(90deg, #2a2b2e 25%, #35363a 50%, #2a2b2e 75%);
+  background-size: 200% 100%; animation: pc-shimmer 1.15s linear infinite; }
+@keyframes pc-shimmer { to { background-position: -200% 0 } }
+@media (prefers-reduced-motion: reduce) { .pc-skel-line, .pc-skel-photo { animation: none } }

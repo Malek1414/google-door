@@ -1,0 +1,100 @@
+/* Live View, measured from a Google Maps Live View screen recording (iPhone, 1180x2556).
+   Sizes below are that capture divided by 2.9 to land in CSS px on a 393pt viewport. */
+
+.ar { position: fixed; inset: 0; overflow: hidden; background: #000; color: #fff;
+  font-family: 'Google Sans Flex', Roboto, -apple-system, BlinkMacSystemFont, sans-serif; }
+.ar-cam { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ar-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+/* ── top controls: two 56px circles, right aligned, below the notch ── */
+.ar-top { position: absolute; top: max(14px, env(safe-area-inset-top)); right: 16px; z-index: 5;
+  display: flex; gap: 14px; }
+.ar-round { width: 56px; height: 56px; border-radius: 50%; border: 0; display: grid; place-items: center;
+  background: rgb(32 33 36 / 0.82); color: #fff; cursor: pointer;
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+.ar-round .ms { font-size: 26px; }
+.ar-round:active { background: rgb(60 64 67 / 0.9); }
+
+/* ── scanning: instruction at the top, animated glyph, pill at the bottom ── */
+.ar-scan-text { position: absolute; top: 96px; left: 28px; right: 28px; z-index: 4;
+  text-align: center; font-size: 15px; line-height: 1.35; font-weight: 500;
+  text-shadow: 0 1px 6px rgb(0 0 0 / 0.75); }
+.ar-scan-art { position: absolute; top: 30%; left: 50%; transform: translateX(-50%); z-index: 4;
+  width: 180px; opacity: 0.96; }
+.ar-pill { position: absolute; left: 50%; transform: translateX(-50%); z-index: 5;
+  top: 46%; padding: 7px 18px; border-radius: 999px; font-size: 14px; font-weight: 600;
+  background: rgb(32 33 36 / 0.88); color: #fff; white-space: nowrap;
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.ar-pill-ready { background: #a7e2e6; color: #00363a; }
+.ar-follow { position: absolute; left: 24px; bottom: 148px; z-index: 5;
+  font-size: 19px; font-weight: 600; text-shadow: 0 1px 8px rgb(0 0 0 / 0.8); }
+
+/* the scanning glyph sweeps, like Google's lottie */
+@keyframes ar-sweep { 0%,100% { transform: translateX(-50%) rotate(-7deg) } 50% { transform: translateX(-50%) rotate(7deg) } }
+.ar-scan-art { animation: ar-sweep 2.6s ease-in-out infinite; }
+
+/* ── chevrons ── */
+.ar-stack { filter: drop-shadow(0 10px 18px rgb(0 0 0 / 0.45)); }
+@keyframes ar-drift { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-7px) } }
+.ar-chev { animation: ar-drift 2.4s ease-in-out infinite; }
+.ar-chev[data-i='1'] { animation-delay: 0.18s }
+.ar-chev[data-i='2'] { animation-delay: 0.36s }
+
+/* ── destination strip: pin left, distance under it, name to the right ── */
+.ar-dest { position: absolute; left: 12px; right: 12px; bottom: max(14px, env(safe-area-inset-bottom));
+  z-index: 5; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 18px;
+  padding: 14px 20px; border-radius: 22px; background: rgb(32 33 36 / 0.78);
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
+.ar-dest-pin { display: grid; justify-items: center; gap: 2px; }
+.ar-dest-pin .ms { font-size: 30px; }
+.ar-dest-m { font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ar-dest-name { font-size: 21px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── "Be safe": everything dims, warning centred ── */
+.ar-safe { position: absolute; inset: 0; z-index: 6; display: grid; place-content: center;
+  justify-items: center; gap: 8px; background: rgb(0 0 0 / 0.62);
+  animation: ar-fade 300ms ease-out; }
+@keyframes ar-fade { from { opacity: 0 } }
+.ar-safe .ms { font-size: 40px; }
+.ar-safe-t { font-size: 20px; font-weight: 600; }
+.ar-safe-s { font-size: 14px; color: #dadce0; text-align: center; max-width: 16rem; }
+.ar[data-safe='1'] .ar-stack, .ar[data-safe='1'] .ar-pin { opacity: 0.25; }
+.ar[data-safe='1'] .ar-dest { opacity: 0.35; }
+
+/* ── arrival card ── */
+.ar-card { position: absolute; left: 14px; right: 14px; bottom: calc(86px + env(safe-area-inset-bottom));
+  z-index: 6; padding: 20px 22px; border-radius: 22px; background: #202124;
+  animation: ar-rise 320ms cubic-bezier(0.2, 0, 0, 1); }
+@keyframes ar-rise { from { transform: translateY(26px); opacity: 0 } }
+.ar-card h2 { margin: 0 0 6px; font-size: 26px; font-weight: 600; letter-spacing: -0.3px; }
+.ar-rate { display: flex; align-items: center; gap: 6px; font-size: 15px; margin-bottom: 4px; }
+.ar-stars { color: #fbbc04; letter-spacing: 1px; }
+.ar-star-off { color: #5f6368; }
+.ar-cat { color: #9aa0a6; font-size: 15px; margin: 0 0 2px; }
+.ar-open { color: #81c995; font-weight: 500; }
+.ar-addr { color: #9aa0a6; font-size: 15px; margin: 2px 0 0; line-height: 1.35; }
+.ar-share { position: absolute; top: 18px; right: 18px; width: 44px; height: 44px; border-radius: 50%;
+  border: 0; background: #3c4043; color: #e8eaed; display: grid; place-items: center; cursor: pointer; }
+.ar-done { position: absolute; left: 14px; right: 14px; bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 6; height: 56px; border: 0; border-radius: 18px; background: #0b3b3f; color: #a7e2e6;
+  font: 600 18px/1 'Google Sans Flex', Roboto, sans-serif; display: grid; grid-auto-flow: column;
+  align-items: center; justify-content: center; gap: 10px; cursor: pointer; }
+.ar-done:active { background: #0f4e53; }
+
+/* ── accuracy + look button, kept from our build ── */
+.ar-meta { position: absolute; left: 20px; bottom: calc(96px + env(safe-area-inset-bottom)); z-index: 5;
+  font-size: 12px; color: #dadce0; text-shadow: 0 1px 4px rgb(0 0 0 / 0.8); }
+.ar-look { position: absolute; right: 14px; bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 5;
+  height: 44px; padding: 0 18px; border-radius: 22px; border: 1px solid #5f6368;
+  background: rgb(32 33 36 / 0.82); color: #a8c7fa; font: 600 15px/1 inherit;
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+.ar-look-out { position: absolute; left: 14px; right: 14px; bottom: calc(150px + env(safe-area-inset-bottom));
+  z-index: 5; padding: 12px 16px; border-radius: 14px; background: rgb(32 33 36 / 0.88); font-size: 15px;
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+.ar-look-out:empty { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ar-chev, .ar-scan-art { animation: none !important; }
+  .ar-card, .ar-safe { animation-duration: 0.01ms !important; }
+}

@@ -1,0 +1,81 @@
+/* "Mein Unternehmen" page top, measured on the 443x960 Google Maps frames:
+   page bg #151316, section dividers 8px #323033, store circle 80px #323033,
+   title 21px centred at y 98, name 21px, card borders #53575d. */
+.bzh { display: flex; flex-direction: column; margin: 0 -23px; }
+
+/* top bar */
+.bzh-top { position: relative; display: flex; align-items: center; justify-content: center; height: 56px; padding: 0 60px; }
+.bzh-title { margin: 0; font: 400 21px/1.2 'Google Sans Flex', Roboto, sans-serif; color: #e6e1e5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bzh-title:focus { outline: none; }
+.bzh-bell { position: absolute; right: 19px; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; border: 0; border-radius: 50%; background: none; color: #e6e1e5; display: grid; place-items: center; cursor: pointer; }
+.bzh-bell .ms { font-size: 26px; }
+.bzh-bell-dot { position: absolute; top: 11px; right: 12px; width: 8px; height: 8px; border-radius: 50%; background: #f2b8b5; }
+
+/* switcher row */
+.bzh-switcher { position: relative; }
+.bzh-switch { display: flex; align-items: center; gap: 22px; width: 100%; min-height: 112px; padding: 8px 23px 16px; border: 0; background: none; color: #e6e1e5; text-align: left; cursor: pointer; font-family: inherit; }
+.bzh-store { width: 80px; height: 80px; flex: none; border-radius: 50%; background: #323033; color: #e6e1e5; display: grid; place-items: center; }
+.bzh-store .ms { font-size: 34px; }
+.bzh-switch-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; align-self: flex-start; padding-top: 6px; }
+.bzh-name { font: 400 21px/1.25 'Google Sans Flex', Roboto, sans-serif; color: #e6e1e5; overflow-wrap: anywhere; }
+.bzh-addr { font-size: 15px; color: #c9c5ca; }
+.bzh-chev { align-self: flex-start; padding-top: 4px; color: #e6e1e5; }
+.bzh-chev .ms { font-size: 28px; }
+
+/* popovers (bell, switcher menu) */
+.bzh-pop { position: absolute; z-index: 20; min-width: 240px; max-width: calc(100% - 32px); padding: 8px 0; border-radius: 16px; background: #2b292d; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); }
+.bzh-pop[hidden] { display: none; }
+.bzh-pop-bell { top: 50px; right: 16px; }
+.bzh-pop-menu { top: 64px; right: 16px; }
+.bzh-pop-head { margin: 4px 16px 6px; font-size: 14px; font-weight: 500; color: #c9c5ca; }
+.bzh-pop-empty { margin: 4px 16px 8px; font-size: 15px; color: #e6e1e5; }
+.bzh-pop-list { list-style: none; margin: 0; padding: 0; }
+.bzh-pop-item { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 4px 16px; font-size: 15px; color: #e6e1e5; }
+.bzh-pop-item .ms { color: #62c4cb; font-size: 20px; }
+.bzh-pop-btn { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 48px; padding: 0 18px; border: 0; background: none; color: #e6e1e5; font: 400 16px/1.2 'Google Sans Flex', Roboto, sans-serif; text-align: left; cursor: pointer; }
+.bzh-pop-btn .ms { color: #c9c5ca; font-size: 22px; }
+.bzh-pop-btn:hover, .bzh-pop-btn:focus-visible { background: #3b393c; }
+
+.bzh-divider { height: 8px; background: #323033; }
+
+/* round tonal actions: 54px circles, 13px labels */
+.bzh-actions { list-style: none; display: flex; justify-content: space-between; gap: 2px; margin: 0; padding: 18px 12px 16px; overflow-x: auto; scrollbar-width: none; }
+.bzh-actions::-webkit-scrollbar { display: none; }
+.bzh-action { flex: 1 0 76px; }
+.bzh-action-btn { width: 100%; min-height: 84px; padding: 4px 2px; border: 0; background: none; color: #e6e1e5; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; border-radius: 12px; font-family: inherit; }
+.bzh-action-circle { width: 54px; height: 54px; border-radius: 50%; background: #063c40; color: #62c4cb; display: grid; place-items: center; transition: background 0.15s ease; }
+.bzh-action-circle .ms { font-size: 24px; }
+.bzh-action-btn:hover .bzh-action-circle, .bzh-action-btn:active .bzh-action-circle { background: #09575b; }
+.bzh-action-label { font-size: 13px; line-height: 1.2; text-align: center; color: #e6e1e5; }
+
+/* sections */
+.bzh-sec { padding: 22px 23px 22px; }
+.bzh-h3 { margin: 0; font: 400 18px/1.3 'Google Sans Flex', Roboto, sans-serif; color: #e6e1e5; }
+.bzh-sub { margin: 4px 0 0; font-size: 14px; color: #c9c5ca; }
+
+/* three stat circles */
+.bzh-stats { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); margin: 18px 0 0; padding: 0; }
+.bzh-stat { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.bzh-stat-circle { width: 64px; height: 64px; border-radius: 50%; background: #323033; display: grid; place-items: center; }
+.bzh-stat-score .bzh-stat-circle { background: conic-gradient(#62c4cb calc(var(--p, 0) * 1%), #323033 0); padding: 4px; box-sizing: border-box; }
+.bzh-stat-score .bzh-stat-value { width: 100%; height: 100%; border-radius: 50%; background: #151316; display: grid; place-items: center; color: #62c4cb; }
+.bzh-stat-value { font: 500 22px/1 'Google Sans Flex', Roboto, sans-serif; color: #e6e1e5; font-variant-numeric: tabular-nums; }
+.bzh-stat-label { font-size: 13px; color: #c9c5ca; text-align: center; }
+
+.bzh button:focus-visible { outline: 3px solid #62c4cb; outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bzh-action-circle { transition: none; }
+}
+
+/* "Gesammelte Daten" info button, mirroring Google's own data pages: a quiet
+   affordance in the header rather than a prominent action. */
+.bzh-top-info { position: relative; }
+.bzh-info {
+  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 40px; height: 40px; border: 0; border-radius: 50%;
+  background: transparent; color: var(--fg2, #c4c7c5);
+  display: grid; place-items: center; cursor: pointer;
+}
+.bzh-info:active { background: rgb(255 255 255 / 0.08); }
+.bzh-info .ms { font-size: 22px; }

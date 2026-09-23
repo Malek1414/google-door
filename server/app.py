@@ -8,11 +8,14 @@ bundle. Everything else the app needs is a static file.
     pip install fastapi uvicorn httpx
     GEMINI_API_KEY=... MAPS_API_KEY=... uvicorn server.app:app --port 8080
 """
-import json, os, re, base64
+import json, os, re, base64, asyncio
+from collections import OrderedDict
 from typing import Optional
 import httpx
 from fastapi import FastAPI, HTTPException
+from fastapi import Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
@@ -36,6 +39,10 @@ MODEL_TTS   = os.environ.get("GEMINI_MODEL_TTS",   "gemini-3.1-flash-tts-preview
 TTS_VOICE   = os.environ.get("GEMINI_TTS_VOICE",   "Kore")
 
 app = FastAPI(title="Doorway")
+from server.surface import router as surface_router
+from server.route import router as route_router
+from server.approach import router as approach_router
+
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 DATA = None
@@ -89,7 +96,15 @@ async def look(req: LookReq):
     body = {"contents": [{"parts": [
         {"text": prompt},
         {"inline_data": {"mime_type": "image/jpeg", "data": req.frame}}]}],
-        "generationConfig": {"temperature": 0.0, "maxOutputTokens": 60}}
+        "generationConfig": {
+            "temperature": 0.0,
+            # Gemini 3.x reasons by default and thinking tokens are charged against
+            # maxOutputTokens, so a small cap silently truncates the sentence
+            # ("I can'" instead of "I can't make out the entrance from here").
+            # This call wants speed, not reasoning: budget 0, and enough room to speak.
+            "thinkingConfig": {"thinkingBudget": 0},
+            "maxOutputTokens": 256,
+        }}
     async with httpx.AsyncClient(timeout=20) as c:
         r = await c.post(f"{GEMINI_URL}/{MODEL_LOOK}:generateContent",
                          json=body, headers={"x-goog-api-key": GEMINI_KEY})
@@ -128,14 +143,23 @@ async def lived(place_id: str):
 
     prompt = (
         "Below are reviews of a place. Extract ONLY first-hand statements about "
-        "physically getting INTO the building: entrances, ramps, steps, doors, lifts.\n\n"
+        "PHYSICAL ACCESS: getting into the building, and moving through it.\n\n"
+        "In scope: entrances, which door to use, ramps, steps, stairs, doors, lifts, "
+        "escalators (including broken ones), level changes, accessible toilets, step-free "
+        "routes, and anything a wheelchair user, a blind person or someone with a pram "
+        "would need to know before arriving.\n"
+        "Out of scope: food, staff, prices, cleanliness, architecture, crowds, trains.\n\n"
         "Rules:\n"
-        "- Every claim MUST include `quote`: text copied EXACTLY, character for "
-        "character, from a review below. Never paraphrase.\n"
-        "- If nothing in the reviews is about entering the building, return "
-        '{\"claims\": []}. That is the correct answer and it is common.\n'
-        "- Never invent a location, address, or direction.\n"
-        'Return JSON only: {"claims":[{"quote":"...","topic":"step-free-route|door|steps|lift"}]}\n\n'
+        "- Every claim MUST include `quote`: text copied EXACTLY, character for character, "
+        "from a review below. Never paraphrase, never repair grammar, never trim mid-word.\n"
+        "- `topic` must be one of: entrance, door, steps, ramp, lift, escalator, toilet, "
+        "step-free-route.\n"
+        "- `blocksAccess` is true only when the reviewer describes something that would "
+        "stop or seriously hinder a disabled person, false when it is merely informative.\n"
+        "- If nothing in the reviews is about physical access, return {\"claims\": []}. "
+        "That is the correct answer and it is common.\n"
+        "- Never invent a location, address, direction or detail not in the text.\n"
+        'Return JSON only: {"claims":[{"quote":"...","topic":"...","blocksAccess":true|false}]}\n\n'
         + json.dumps(corpus, ensure_ascii=False))
 
     body = {"contents": [{"parts": [{"text": prompt}]}],
@@ -164,6 +188,7 @@ async def lived(place_id: str):
         out.append({"quote": q,
                     "author": f"Google review{', ' + when if when else ''}",
                     "topic": cl.get("topic", "step-free-route"),
+                    "blocksAccess": bool(cl.get("blocksAccess")),
                     "coords": None})          # tier 3 never carries coordinates
     return {"placeId": place_id, "claims": out}
 
@@ -171,6 +196,13 @@ async def lived(place_id: str):
 class SpeakReq(BaseModel):
     text: str
     lang: str = "de"
+
+
+# Route instructions are new text with no pre-made clip, so they would hit Gemini on
+# every turn and get rate-limited. They also repeat constantly ("Links abbiegen auf
+# Invalidenstrasse"), so a small cache removes almost all of that traffic.
+_SPEAK_CACHE: "OrderedDict[str, bytes]" = OrderedDict()
+_SPEAK_CACHE_MAX = 64
 
 
 @app.post("/api/speak")
@@ -192,11 +224,25 @@ async def speak(req: SpeakReq):
                 "responseModalities": ["AUDIO"],
                 "speechConfig": {
                     "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": TTS_VOICE}}}}}
-    async with httpx.AsyncClient(timeout=20) as c:
-        r = await c.post(f"{GEMINI_URL}/{MODEL_TTS}:generateContent",
-                         json=body, headers={"x-goog-api-key": GEMINI_KEY})
-    if r.status_code != 200:
-        raise HTTPException(502, f"tts {r.status_code}")
+    key = f"{TTS_VOICE}|{req.lang}|{req.text}"
+    hit = _SPEAK_CACHE.get(key)
+    if hit is not None:
+        _SPEAK_CACHE.move_to_end(key)
+        return Response(content=hit, media_type="audio/wav",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+    # 429 is routine on this tier and is not a failure; back off rather than give up,
+    # because the client falling through to speechSynthesis is a worse voice.
+    r = None
+    for attempt in range(3):
+        async with httpx.AsyncClient(timeout=20) as c:
+            r = await c.post(f"{GEMINI_URL}/{MODEL_TTS}:generateContent",
+                             json=body, headers={"x-goog-api-key": GEMINI_KEY})
+        if r.status_code != 429:
+            break
+        await asyncio.sleep(1.5 * (2 ** attempt))
+    if r is None or r.status_code != 200:
+        raise HTTPException(502, f"tts {r.status_code if r else 'no response'}")
     try:
         b64 = r.json()["candidates"][0]["content"]["parts"][0]["inlineData"]["data"]
     except (KeyError, IndexError):
@@ -209,6 +255,21 @@ async def speak(req: SpeakReq):
     hdr = (b"RIFF" + _st.pack("<I", 36 + len(pcm)) + b"WAVEfmt " +
            _st.pack("<IHHIIHH", 16, 1, ch, rate, rate*ch*width, ch*width, width*8) +
            b"data" + _st.pack("<I", len(pcm)))
-    from fastapi import Response
-    return Response(content=hdr + pcm, media_type="audio/wav",
+    wav = hdr + pcm
+    _SPEAK_CACHE[key] = wav
+    if len(_SPEAK_CACHE) > _SPEAK_CACHE_MAX:
+        _SPEAK_CACHE.popitem(last=False)
+    return Response(content=wav, media_type="audio/wav",
                     headers={"Cache-Control": "public, max-age=86400"})
+
+
+# Serve the built PWA from the same origin as /api/*, so there is ONE url to open and
+# no CORS in the way. Mounted last: every /api route above wins over a static path.
+# DOORWAY_WEB points at web/dist; if it isn't built yet the API still runs.
+app.include_router(surface_router)
+app.include_router(route_router)
+app.include_router(approach_router)   # /api/door-fix, /api/door-check      # POST /api/route — walking directions   # POST /api/surface — see server/surface.py
+
+_web = os.environ.get("DOORWAY_WEB", "web/dist")
+if os.path.isdir(_web):
+    app.mount("/", StaticFiles(directory=_web, html=True), name="web")

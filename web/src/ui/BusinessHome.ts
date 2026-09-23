@@ -6,6 +6,7 @@
 import './business-home.css'
 import { loadSurvey, visibilityScore, type BusinessProfile } from '../core/survey'
 import { lang } from '../strings'
+import { ACCESS_ATTRS, loadDetails } from '../core/businessDetails'
 import type { FeatureCtx } from './ctx'
 import { h } from './dom'
 
@@ -95,7 +96,7 @@ export function businessHomeStats(b: BusinessProfile): { entrances: number; with
     withPhoto: linked.filter((e) => typeof e.photo === 'string' && e.photo.length > 0).length,
     tasksDone: b.tasks.filter((t) => t.done).length,
     tasksTotal: b.tasks.length,
-    score: visibilityScore(b, survey),
+    score: visibilityScore(b, survey, (() => { const d = loadDetails(b.id); return d ? ACCESS_ATTRS.filter((a) => d.access[a.id] !== 'unbekannt').length / ACCESS_ATTRS.length : 0 })()),
   }
 }
 
@@ -204,7 +205,7 @@ export function businessHomeHeader(_ctx: FeatureCtx, business: BusinessProfile, 
     )
   const perf = h('section', { class: 'bzh-sec', 'aria-labelledby': `${id}-perf` },
     h('h3', { class: 'bzh-h3', id: `${id}-perf` }, L.perf),
-    h('p', { class: 'bzh-sub' }, L.perfSub),
+
     h('ul', { class: 'bzh-stats' },
       stat(L.statEntrances, String(stats.entrances), `${L.statEntrances}: ${stats.entrances}`),
       stat(L.statPhotos, String(stats.withPhoto), `${L.statPhotos}: ${L.of(stats.withPhoto, stats.entrances)}`),

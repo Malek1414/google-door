@@ -23,6 +23,7 @@ import { openBusinessEdit } from './BusinessEdit'
 import { keepOneMain, openEntrancesManager } from './BusinessEntrances'
 import { businessHomeHeader } from './BusinessHome'
 import { openBusinessData } from './BusinessData'
+import { ACCESS_ATTRS, emptyDetails, loadDetails, saveDetails, type Tri } from '../core/businessDetails'
 
 const S = {
   de: {
@@ -46,13 +47,13 @@ const S = {
     scoreLabel: 'Sichtbarkeit',
     scoreOf: (n: number) => `${n} von 100`,
     scoreText:
-      'Vorschlag an Google: Unternehmen mit vollständigen Angaben zur Barrierefreiheit werden in der Suche weiter oben angezeigt. Je vollständiger dein Profil, desto besser.',
+      'Mehr Angaben, weiter oben in der Suche.',
     offerLabel: 'Barrierefreiheit anbieten',
-    offerSub: 'Dein Unternehmen erscheint bei Menschen, die stufenlose Eingänge suchen.',
+    offerSub: 'Sichtbar für Menschen, die stufenlos suchen.',
     offerOn: 'Barrierefreiheit wird angeboten.',
     offerOff: 'Barrierefreiheit wird nicht mehr angeboten.',
     entrancesHead: 'Eingänge verwalten',
-    entrancesEmpty: 'Noch keine Eingänge. Füge den Eingang hinzu, den Besucher mit Rollstuhl, Rollator oder Kinderwagen nutzen können.',
+    entrancesEmpty: 'Noch keine Eingänge.',
     addEntrance: 'Eingang hinzufügen',
     unnamed: 'Eingang ohne Namen',
     stepFree: 'stufenlos',
@@ -61,6 +62,20 @@ const S = {
     withPhoto: 'mit Foto',
     entranceSaved: 'Eingang gespeichert.',
     tasksHead: 'Empfohlene Maßnahmen',
+    tabOverview: 'Übersicht',
+    tabAccess: 'Barrierefreiheit',
+    questionsHead: 'Fragen zur Barrierefreiheit',
+    questionsMeta: (d: number, n: number) => `${d} von ${n} beantwortet`,
+    yes: 'Ja',
+    no: 'Nein',
+    unsure: 'Weiß nicht',
+    answerSaved: 'Antwort gespeichert.',
+    rankHead: 'Sichtbarkeit in der Suche',
+    rankLevel: (n: number) => (n >= 70 ? 'Weit oben' : n >= 40 ? 'Höher' : 'Standard'),
+    rankNext: (n: number) => (n >= 70 ? 'Du wirst bevorzugt gezeigt.' : `Noch ${n >= 40 ? 70 - n : 40 - n} Punkte bis zur nächsten Stufe.`),
+    introHead: 'So wirst du besser gefunden',
+    introText: 'Beantworte die Fragen zur Barrierefreiheit und trag deine Eingänge ein. Dann zeigt die Suche dich weiter oben.',
+    introOk: 'Verstanden',
     tasksDone: (d: number, n: number) => `${d} von ${n} erledigt`,
     taskRoute: 'Weg vom Haupteingang zur Toilette filmen',
     taskPhoto: 'Foto vom barrierefreien Eingang',
@@ -119,6 +134,20 @@ const S = {
     withPhoto: 'with photo',
     entranceSaved: 'Entrance saved.',
     tasksHead: 'Recommended actions',
+    tabOverview: 'Overview',
+    tabAccess: 'Accessibility',
+    questionsHead: 'Accessibility questions',
+    questionsMeta: (d: number, n: number) => `${d} of ${n} answered`,
+    yes: 'Yes',
+    no: 'No',
+    unsure: 'Not sure',
+    answerSaved: 'Answer saved.',
+    rankHead: 'Visibility in search',
+    rankLevel: (n: number) => (n >= 70 ? 'Near the top' : n >= 40 ? 'Higher' : 'Standard'),
+    rankNext: (n: number) => (n >= 70 ? 'You are shown first.' : `${n >= 40 ? 70 - n : 40 - n} points to the next level.`),
+    introHead: 'How to be found more often',
+    introText: 'Answer the accessibility questions and add your entrances. Search then shows you higher up.',
+    introOk: 'Got it',
     tasksDone: (d: number, n: number) => `${d} of ${n} done`,
     taskRoute: 'Film the way from the main entrance to the toilet',
     taskPhoto: 'Photo of the accessible entrance',
@@ -226,6 +255,7 @@ function newBusinessId(): string {
 
 export const businessPanel: Panel = (el, ctx) => {
   let editorCleanup: (() => void) | null = null
+  let bizTab: 'overview' | 'access' = 'overview'
   const id = `bz${++uid}`
 
   const closeEditor = () => {
@@ -320,7 +350,11 @@ export const businessPanel: Panel = (el, ctx) => {
     if (JSON.stringify(b) !== JSON.stringify(stored)) saveBusiness(b)
     rememberBusiness(b)
     const linked = linkedEntrances(b, survey)
-    const score = visibilityScore(b, survey)
+    const answeredShare = (() => {
+      const d = loadDetails(b.id)
+      return d ? ACCESS_ATTRS.filter((a) => d.access[a.id] !== 'unbekannt').length / ACCESS_ATTRS.length : 0
+    })()
+    const score = visibilityScore(b, survey, answeredShare)
     const msg = status()
 
     const persist = (next: BusinessProfile): boolean => {
@@ -448,16 +482,107 @@ export const businessPanel: Panel = (el, ctx) => {
 
     const visibility = h(
       'section',
-      { class: 'bz-sec', 'aria-labelledby': `${id}-vis` },
-      h('h3', { class: 'bz-h3', id: `${id}-vis` }, L.offerHead),
+      { class: 'bz-sec', 'aria-label': L.offerHead },
       offer,
-      h('p', { class: 'gm-p bz-small' }, `${L.scoreLabel}: ${L.scoreOf(score)}. ${L.scoreText}`),
     )
 
     const divider = () => h('div', { class: 'bz-divider', 'aria-hidden': 'true' })
-    el.replaceChildren(
-      h('div', { class: 'bz bz-page' }, home(b), divider(), recs, divider(), visibility, divider(), entrances, msg),
+    // Ranking: make visible that maintained data moves the business up in search.
+    const level = L.rankLevel(score)
+    const rank = h(
+      'section',
+      { class: 'bz-sec', 'aria-labelledby': `${id}-rank` },
+      h('div', { class: 'bz-rank' },
+        h('span', { class: 'bz-rank-ic', 'aria-hidden': 'true' }, icon('trending_up')),
+        h('div', { class: 'bz-rank-text' },
+          h('h3', { class: 'bz-h3', id: `${id}-rank` }, L.rankHead),
+          h('p', { class: 'bz-rank-level' }, level),
+          h('p', { class: 'bz-rank-next' }, L.rankNext(score)),
+        ),
+        h('span', { class: 'bz-rank-score', 'aria-label': L.scoreOf(score) }, String(score)),
+      ),
+      h('div', { class: 'bz-rank-bar', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': score, 'aria-label': L.rankHead },
+        h('span', { style: `width:${score}%` }),
+        h('i', { style: 'left:40%', 'aria-hidden': 'true' }),
+        h('i', { style: 'left:70%', 'aria-hidden': 'true' }),
+      ),
+      h('p', { class: 'bz-rank-note' }, L.scoreText),
     )
+
+    // First visit: one short note on why this matters, dismissed for good.
+    let introSeen = true
+    try {
+      introSeen = localStorage.getItem('doorway.bizIntroSeen') === '1'
+    } catch {
+      /* storage blocked: show it */
+      introSeen = false
+    }
+    const intro = introSeen
+      ? null
+      : h('section', { class: 'bz-intro', role: 'note' },
+          h('span', { class: 'bz-rank-ic', 'aria-hidden': 'true' }, icon('trending_up')),
+          h('div', {}, h('h3', { class: 'bz-h3' }, L.introHead), h('p', { class: 'bz-intro-text' }, L.introText)),
+          h('button', {
+            class: 'gm-pill gm-pill-primary', type: 'button',
+            onclick: () => {
+              try {
+                localStorage.setItem('doorway.bizIntroSeen', '1')
+              } catch {
+                /* ignore */
+              }
+              renderDashboard(true)
+            },
+          }, L.introOk),
+        )
+
+    // Barrierefreiheit tab: every question can be answered directly, no video needed.
+    const details = loadDetails(b.id) ?? { ...emptyDetails(), name: b.name, address: b.address ?? '', lat: b.lat, lon: b.lon }
+    const answered = ACCESS_ATTRS.filter((a) => details.access[a.id] !== 'unbekannt').length
+    const question = (a: (typeof ACCESS_ATTRS)[number]) => {
+      const cur = details.access[a.id]
+      const opt = (v: Tri, label: string) =>
+        h('button', {
+          class: `bz-seg-btn${cur === v ? ' is-on' : ''}`, type: 'button', 'aria-pressed': String(cur === v),
+          onclick: () => {
+            const next = { ...details, access: { ...details.access, [a.id]: v }, updatedAt: new Date().toISOString() }
+            if (!saveDetails(b.id, next)) {
+              msg.textContent = L.saveFailed
+              return
+            }
+            ctx.announce(L.answerSaved)
+            renderDashboard(true)
+          },
+        }, label)
+      return h('li', { class: 'bz-q' },
+        h('span', { class: 'bz-q-label', id: `${id}-q-${a.id}` }, a.label),
+        h('div', { class: 'bz-seg', role: 'group', 'aria-labelledby': `${id}-q-${a.id}` }, opt('ja', L.yes), opt('nein', L.no), opt('unbekannt', L.unsure)),
+      )
+    }
+    const questions = h(
+      'section',
+      { class: 'bz-sec', 'aria-labelledby': `${id}-q` },
+      h('div', { class: 'bz-sec-head' },
+        h('h3', { class: 'bz-h3', id: `${id}-q` }, L.questionsHead),
+        h('span', { class: 'bz-sec-meta' }, L.questionsMeta(answered, ACCESS_ATTRS.length)),
+      ),
+      h('ul', { class: 'bz-qs' }, ...ACCESS_ATTRS.map(question)),
+    )
+
+    const tabBtn = (key: 'overview' | 'access', label: string) =>
+      h('button', {
+        class: 'gm-tabbtn', type: 'button', role: 'tab', 'aria-selected': String(bizTab === key),
+        onclick: () => {
+          bizTab = key
+          renderDashboard()
+        },
+      }, label)
+    const tabs = h('div', { class: 'gm-tabs bz-tabs', role: 'tablist' }, tabBtn('overview', L.tabOverview), tabBtn('access', L.tabAccess))
+
+    const body =
+      bizTab === 'overview'
+        ? [intro, rank, divider(), recs]
+        : [visibility, divider(), questions, divider(), entrances]
+    el.replaceChildren(h('div', { class: 'bz bz-page' }, home(b), tabs, ...body.filter((x): x is HTMLElement => x !== null), msg))
     if (!keepScroll) el.scrollTop = 0
     ctx.setSheet('full')
   }

@@ -148,13 +148,22 @@ export function openBusinessEdit(el: HTMLElement, ctx: FeatureCtx, businessId: s
     const times = h('div', { class: 'be-times' }, from, h('span', { class: 'be-dash', 'aria-hidden': 'true' }, 'bis'), to)
     times.hidden = !hrs.open
     cb.addEventListener('change', () => {
+      d.hoursSet = true
       hrs.open = cb.checked
       state.textContent = cb.checked ? 'Geöffnet' : 'Geschlossen'
       times.hidden = !cb.checked
       updateScore()
     })
-    from.addEventListener('change', () => from.value && (hrs.from = from.value))
-    to.addEventListener('change', () => to.value && (hrs.to = to.value))
+    from.addEventListener('change', () => {
+      if (from.value) hrs.from = from.value
+      d.hoursSet = true
+      updateScore()
+    })
+    to.addEventListener('change', () => {
+      if (to.value) hrs.to = to.value
+      d.hoursSet = true
+      updateScore()
+    })
     return h(
       'div',
       { class: 'be-day' },

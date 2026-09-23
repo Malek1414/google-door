@@ -52,7 +52,7 @@
 /* Full-height "Mein Unternehmen" page: sections split by 8px #323033 bands (measured),
    recommendation cards with a 1px #53575d border and 16px radius. */
 .bz-page { min-height: 100%; padding-bottom: 32px; }
-.bz-divider { height: 8px; margin: 0 -23px; background: #323033; }
+.bz-divider { height: 12px; }
 .bz-sec { padding: 22px 0; }
 .bz-sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .bz-sec .bz-h3 { font-weight: 400; color: #e6e1e5; }
@@ -72,3 +72,31 @@
 .bz-rec-pill:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
 .bz-rec .bz-check { margin-top: 2px; width: 28px; height: 28px; border-radius: 50%; }
 .bz-rec-done .bz-rec-title { color: var(--fg2); text-decoration: line-through; }
+
+/* Tabs Übersicht / Barrierefreiheit under the page header */
+.bz-tabs { margin: 0 -16px; padding: 0 16px; }
+/* Ranking card: the visible "higher in search" signal */
+.bz-rank { display: flex; align-items: center; gap: 14px; }
+.bz-rank-ic { width: 44px; height: 44px; flex: none; border-radius: 50%; background: #063c40; color: #62c4cb; display: grid; place-items: center; }
+.bz-rank-text { flex: 1; min-width: 0; }
+.bz-rank-level { margin: 2px 0 0; font-size: 20px; font-weight: 500; color: #62c4cb; }
+.bz-rank-next { margin: 2px 0 0; font-size: 14px; color: #c9c5ca; }
+.bz-rank-score { font-size: 32px; font-weight: 500; color: #fff; font-variant-numeric: tabular-nums; }
+.bz-rank-bar { position: relative; height: 8px; margin: 14px 0 8px; border-radius: 4px; background: #2b2c2e; overflow: hidden; }
+.bz-rank-bar span { position: absolute; inset: 0 auto 0 0; background: #62c4cb; border-radius: 4px; }
+.bz-rank-bar i { position: absolute; top: 0; bottom: 0; width: 2px; background: #151316; }
+.bz-rank-note { margin: 0; font-size: 14px; color: #c9c5ca; }
+/* First-visit note */
+.bz-intro { display: grid; grid-template-columns: auto 1fr; gap: 12px 14px; align-items: start; margin: 16px 0; padding: 16px; border-radius: 20px; background: #1c2224; }
+.bz-intro .gm-pill { grid-column: 2; justify-self: start; }
+.bz-intro-text { margin: 4px 0 0; font-size: 15px; color: #c9c5ca; }
+/* Questions with Ja / Nein / Weiß nicht */
+.bz-qs { list-style: none; margin: 0; padding: 0; }
+.bz-q { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-bottom: 1px solid #2e2c30; }
+.bz-q:last-child { border-bottom: 0; }
+.bz-q-label { font-size: 16px; color: #e6e1e5; }
+.bz-seg { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid #8e918f; border-radius: 20px; overflow: hidden; }
+.bz-seg-btn { min-height: 40px; border: 0; border-left: 1px solid #8e918f; background: none; color: #e6e1e5; font: 500 14px/1 'Google Sans Flex', Roboto, sans-serif; cursor: pointer; }
+.bz-seg-btn:first-child { border-left: 0; }
+.bz-seg-btn.is-on { background: #063c40; color: #cdeef0; }
+.bz-seg-btn:focus-visible { outline: 3px solid #62c4cb; outline-offset: -3px; }

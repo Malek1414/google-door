@@ -187,7 +187,7 @@ export function mergeSurvey(entrances: Entrance[], survey: SurveyEntrance[]): En
  *  - task 'route' (route recorded) done:             15
  * An entrance is linked if its id is in b.entranceIds or its businessId is b.id.
  */
-export function visibilityScore(b: BusinessProfile, entrances: SurveyEntrance[]): number {
+export function visibilityScore(b: BusinessProfile, entrances: SurveyEntrance[], answeredShare?: number): number {
   const linked = entrances.filter((e) => b.entranceIds.includes(e.id) || e.businessId === b.id)
   let score = 0
   if (b.accessibility) score += 20
@@ -196,7 +196,10 @@ export function visibilityScore(b: BusinessProfile, entrances: SurveyEntrance[])
   if (linked.some((e) => e.door != null)) score += 10
   if (linked.some((e) => typeof e.photo === 'string' && e.photo.length > 0)) score += 10
   if (b.tasks.some((t) => t.id === ROUTE_TASK_ID && t.done)) score += 15
-  return Math.max(0, Math.min(100, score))
+  // With the accessibility questions (share answered, 0..1) they count for 30 of 100 and the
+  // rest scales to 70, so answering questions alone already moves the business up.
+  if (answeredShare !== undefined) score = score * 0.7 + Math.max(0, Math.min(1, answeredShare)) * 30
+  return Math.round(Math.max(0, Math.min(100, score)))
 }
 
 // ---------- storage ----------

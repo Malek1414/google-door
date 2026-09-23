@@ -212,3 +212,13 @@ describe('community reports are text until confirmed', () => {
     expect(merged.tier).toBe(0)
   })
 })
+
+describe('visibility with accessibility answers', () => {
+  it('answering questions raises the score, old calls unchanged', async () => {
+    const { visibilityScore } = await import('../src/core/survey')
+    const b = { id: 'b1', name: 'x', lat: 52.5, lon: 13.4, accessibility: false, entranceIds: [], tasks: [] }
+    expect(visibilityScore(b, [])).toBe(0)
+    expect(visibilityScore(b, [], 1)).toBe(30)
+    expect(visibilityScore({ ...b, accessibility: true }, [], 0.5)).toBe(29)
+  })
+})

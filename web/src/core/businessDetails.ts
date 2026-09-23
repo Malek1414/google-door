@@ -39,6 +39,8 @@ export interface BusinessDetails {
   lat: number | null
   lon: number | null
   hours: DayHours[] // 7 entries, Monday first
+  /** True once the owner touched the hours; the Mon-Fri default alone does not count. */
+  hoursSet: boolean
   photos: string[] // JPEG data URLs
   access: Record<AccessAttrId, Tri>
   updatedAt: string
@@ -59,6 +61,7 @@ export function emptyDetails(): BusinessDetails {
     lat: null,
     lon: null,
     hours: DAYS.map((_, i) => ({ open: i < 5, from: '09:00', to: '18:00' })),
+    hoursSet: false,
     photos: [],
     access,
     updatedAt: '',
@@ -81,6 +84,7 @@ export function normalizeDetails(o: unknown): BusinessDetails {
   d.address = str(r.address, 300)
   d.lat = num(r.lat)
   d.lon = num(r.lon)
+  d.hoursSet = r.hoursSet === true
   if (Array.isArray(r.hours)) {
     d.hours = d.hours.map((def, i) => {
       const h = r.hours && (r.hours as unknown[])[i]
@@ -117,7 +121,8 @@ export function completeness(d: BusinessDetails): number {
     d.website.trim() !== '',
     d.address.trim() !== '',
     d.lat !== null && d.lon !== null,
-    d.hours.some((h) => h.open),
+    // Prefilled default hours are a suggestion, not data: only count them once confirmed.
+    d.hoursSet && d.hours.some((h) => h.open),
     d.photos.length > 0,
   ]
   for (const a of ACCESS_ATTRS) checks.push(d.access[a.id] !== 'unbekannt')

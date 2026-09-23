@@ -36,7 +36,7 @@
 .bzh-pop-btn .ms { color: #c9c5ca; font-size: 22px; }
 .bzh-pop-btn:hover, .bzh-pop-btn:focus-visible { background: #3b393c; }
 
-.bzh-divider { height: 8px; background: #323033; }
+.bzh-divider { height: 12px; }
 
 /* round tonal actions: 54px circles, 13px labels */
 .bzh-actions { list-style: none; display: flex; justify-content: space-between; gap: 2px; margin: 0; padding: 18px 12px 16px; overflow-x: auto; scrollbar-width: none; }

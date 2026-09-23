@@ -24,7 +24,7 @@ if grep -rqE "AIza|sk-|AKIA" dist/; then echo "key found in dist/, abort"; exit 
 echo "==> upload"
 ssh "$VPS" "mkdir -p $DEST/web $DEST/server $DEST/data && test -f $DEST/.env || { echo 'missing $DEST/.env on server'; exit 1; }"
 rsync -rlptD --delete --exclude '.DS_Store' dist/ "$VPS:$DEST/web/"
-rsync -lt --chmod=F644 config.js "$VPS:$DEST/web/config.js"
+rsync -lt config.js "$VPS:$DEST/web/config.js" && ssh "$VPS" "chmod 644 $DEST/web/config.js"
 rsync -rlptD --delete --exclude '__pycache__' "$REPO/server/" "$VPS:$DEST/server/"
 rsync -rlptD --delete "$REPO/data/" "$VPS:$DEST/data/"
 

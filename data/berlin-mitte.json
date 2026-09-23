@@ -13,7 +13,7 @@
    "buildings": 106,
    "entrances": 3061,
    "tier1": 296,
-   "described": 272,
+   "described": 296,
    "withBearing": 147
   }
  },
@@ -10146,7 +10146,7 @@
    "door": "yes",
    "automatic": false,
    "approachBearing": 354.4,
-   "description": null,
+   "description": "Hat Stufen, Eingang zu Haus 1 Richtung Norden.",
    "warnings": [],
    "source": "osm",
    "facing": "north"
@@ -10165,7 +10165,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 354.4,
-   "description": null,
+   "description": "Hat Stufen, Haupteingang zum Centrum für Anatomie Richtung Norden.",
    "warnings": [],
    "source": "osm",
    "facing": "north"
@@ -10238,7 +10238,7 @@
    "door": "sliding",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenlos, mit Schiebetür.",
    "warnings": [],
    "source": "osm"
   },
@@ -10310,7 +10310,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Hat Stufen.",
    "warnings": [],
    "source": "osm"
   },
@@ -10868,7 +10868,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 116.2,
-   "description": null,
+   "description": "Hat Stufen, Haupteingang zum Ambulatorium Schillingstraße 12 Richtung Südosten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-east"
@@ -10887,7 +10887,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 116.2,
-   "description": null,
+   "description": "Hat Stufen, Haupteingang zum Ambulatorium Schillingstraße 12 Richtung Südosten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-east"
@@ -10978,7 +10978,7 @@
    "door": "hinged",
    "automatic": true,
    "approachBearing": 264.6,
-   "description": null,
+   "description": "Stufenlos, Eingang zu Haus 1 Richtung Westen öffnet automatisch.",
    "warnings": [],
    "source": "osm",
    "facing": "west"
@@ -11107,7 +11107,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 52.6,
-   "description": null,
+   "description": "Stufenlos, Haupteingang Richtung Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -11180,7 +11180,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 330.9,
-   "description": null,
+   "description": "Stufenlos, Richtung Nordwesten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-west"
@@ -11271,7 +11271,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Hat Stufen, Eingang Heinrich-Heine-Straße.",
    "warnings": [],
    "source": "osm"
   },
@@ -11307,7 +11307,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Hat Stufen.",
    "warnings": [],
    "source": "osm"
   },
@@ -13359,7 +13359,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 71.7,
-   "description": null,
+   "description": "Stufenlos, Eingang Anton-Wilhelm-Amo-Straße Richtung Osten.",
    "warnings": [],
    "source": "osm",
    "facing": "east"
@@ -51726,7 +51726,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenlos, Eingang Schwartzkopffstraße.",
    "warnings": [],
    "source": "osm"
   },
@@ -51816,7 +51816,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Haupteingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -51834,7 +51834,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 124.9,
-   "description": null,
+   "description": "Stufenloser Haupteingang KUGU Home GmbH, Richtung Südosten.",
    "warnings": [],
    "source": "osm",
    "facing": "south-east"
@@ -52285,7 +52285,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 55.4,
-   "description": null,
+   "description": "Hat Stufen, Richtung Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -52376,7 +52376,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": 74.2,
-   "description": null,
+   "description": "Hat Stufen, Richtung Osten.",
    "warnings": [],
    "source": "osm",
    "facing": "east"
@@ -52431,7 +52431,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": 43.4,
-   "description": null,
+   "description": "Hat Stufen, Richtung Nordosten.",
    "warnings": [],
    "source": "osm",
    "facing": "north-east"
@@ -52504,7 +52504,7 @@
    "door": "sliding",
    "automatic": false,
    "approachBearing": 267.4,
-   "description": null,
+   "description": "Stufenloser Haupteingang mit Schiebetür zu The Social Hub, Richtung Westen.",
    "warnings": [],
    "source": "osm",
    "facing": "west"
@@ -52595,7 +52595,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Hat Stufen, Eingang MangiarBene.",
    "warnings": [],
    "source": "osm"
   },
@@ -52649,7 +52649,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Stufenloser Haupteingang.",
    "warnings": [],
    "source": "osm"
   },
@@ -52919,7 +52919,7 @@
    "door": null,
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Hat Stufen, Eingang 1820.",
    "warnings": [],
    "source": "osm"
   },
@@ -52991,7 +52991,7 @@
    "door": "hinged",
    "automatic": false,
    "approachBearing": null,
-   "description": null,
+   "description": "Hat Stufen, Nebeneingang auf Ebene 1.",
    "warnings": [],
    "source": "osm"
   },
@@ -53171,7 +53171,7 @@
    "door": "yes/manual",
    "automatic": false,
    "approachBearing": 107.6,
-   "description": null,
+   "description": "Stufenlos, Richtung Osten.",
    "warnings": [],
    "source": "osm",
    "facing": "east"

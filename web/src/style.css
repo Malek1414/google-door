@@ -251,3 +251,94 @@ blockquote footer { color: var(--muted); font-size: 1rem; }
 .nav-row .gm-pill { flex: 1; justify-content: center; min-height: 52px; font-size: 16px; }
 .nav-exit { width: 52px; height: 52px; flex: none; border-radius: 50%; border: 0; background: #d93025; color: #fff; display: grid; place-items: center; cursor: pointer; }
 .nav-exit:focus-visible { outline: 3px solid #1a73e8; outline-offset: 2px; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   PACEMARK OVERLAY — Malek's design system applied over the Maps shell.
+   The shell's structure (search pill, chips, sheet, turn glyphs) is kept
+   wholesale; only the tokens and the instrument treatment change.
+
+   Why not Maps' own teal: volt carries 16.9:1 on this ground against the
+   teal's 9.7:1. In Pacemark volt was chosen precisely because it stays
+   legible over map and photographic backgrounds — which is this app's
+   entire problem, an arrow drawn over a live camera feed.
+
+   Type rule: prose in SF, every MEASUREMENT and every PROVENANCE claim in
+   monospace with tabular figures. A distance falling 60 -> 0 jitters
+   without tabular digits exactly as a running clock does.
+   ══════════════════════════════════════════════════════════════════════ */
+.gm {
+  --s0: #0b0d0c;          /* Pacemark ground — near-black, never pure #000:
+                             pure black crushes elevation cues and makes OLED
+                             smearing obvious while scrolling. */
+  --s1: #141715;
+  --s2: #1d211e;
+  --s3: #2a2f2b;
+  --line: rgb(244 246 243 / 0.12);
+  --fg: #f4f6f3;
+  --fg2: #a9b0aa;
+  --acc: #d4ff3f;          /* volt */
+  --acc-ink: #0a0c08;
+  --blue: #d4ff3f;         /* one accent only: the eye always knows where the action is */
+  --ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  --num: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+  font-family: var(--ui);
+}
+.gm-search { background: var(--s2); border: 1px solid var(--line); box-shadow: 0 8px 24px rgb(0 0 0 / 0.5); }
+.gm-search-input { font-family: var(--ui); }
+.gm-avatar { background: var(--acc); color: var(--acc-ink); }
+.gm-results, .gm-sheet { background: var(--s1); border: 1px solid var(--line); }
+.gm-chip { background: var(--s2); border: 1px solid var(--line); font-family: var(--ui); font-weight: 550; }
+.gm-chip[aria-pressed='true'] { background: rgb(212 255 63 / 0.16); color: var(--acc); border-color: color-mix(in srgb, var(--acc) 45%, transparent); }
+.gm-fab { background: var(--s2); color: var(--acc); border: 1px solid var(--line); }
+.gm-handle span { background: rgb(244 246 243 / 0.28); width: 38px; height: 5px; }
+.gm-sheet-title { font-family: var(--ui); font-weight: 650; letter-spacing: -0.015em; }
+.gm-h3 { font-family: var(--ui); font-weight: 600; }
+
+/* Shape still carries the meaning; volt and grey only reinforce it. */
+.shape-step-free { background: var(--acc); border: 0; border-radius: 50%; box-shadow: none; }
+.shape-not-step-free { background: #8e968f; border: 0; border-radius: 2px; box-shadow: none; }
+
+/* PROVENANCE CHIP — the confidence ladder, always visible, never hidden.
+   Most products hide uncertainty. Here misplaced confidence is the harm. */
+.tier, .gm-status {
+  font-family: var(--num); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.09em; text-transform: uppercase;
+  padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--line); background: transparent; color: var(--fg2);
+}
+.tier-surveyed { color: var(--acc); border-color: color-mix(in srgb, var(--acc) 45%, transparent); background: rgb(212 255 63 / 0.14); }
+.tier-reported { color: #ffc24a; border-color: rgb(255 194 74 / 0.4); }
+.tier-none { color: var(--fg); border-style: dashed; border-color: var(--fg); }
+
+/* THE INSTRUMENT PLATE — Maps' turn card, re-set as a measuring device.
+   Opaque, not glass: this is the one thing Erdin must read. */
+.nav-card {
+  background: var(--s1) !important;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.55);
+}
+.nav-card > .ms { color: var(--acc); font-size: 34px; }
+.nav-card h1 { font-family: var(--ui); font-size: 15px; font-weight: 600; color: var(--fg2); letter-spacing: 0; }
+/* Signature: the distance, in tabular mono volt, sized to be read at arm's length
+   by someone who cannot read the label above it. */
+.nav-card .distance, .distance {
+  font-family: var(--num) !important;
+  font-variant-numeric: tabular-nums;
+  font-size: 44px; line-height: 1.02; font-weight: 700;
+  letter-spacing: -0.03em; color: var(--acc); margin: 2px 0 0;
+}
+.nav-card .direction, .direction { font-family: var(--ui); font-size: 18px; font-weight: 600; color: var(--fg); }
+.accuracy { font-family: var(--num); font-size: 12px; color: var(--fg2); letter-spacing: 0; }
+.nav-bottom .gm-pill, .gm-pill {
+  background: var(--s2); color: var(--fg); border: 1px solid var(--line);
+  font-family: var(--ui); font-weight: 600;
+}
+.nav-exit { background: var(--s2); color: var(--fg); border: 1px solid var(--line); }
+
+/* The arrow: dark stroke painted BEHIND the fill so it survives whatever the
+   camera happens to be pointing at. */
+.arrow-shape { fill: var(--acc); stroke: #05070a; stroke-width: 5; paint-order: stroke; }
+.cone-shape { fill: var(--acc); fill-opacity: 0.38; stroke: #05070a; stroke-width: 3; stroke-dasharray: 6 4; paint-order: stroke; }
+.dest-fill { fill: var(--acc); }
+.dest-outline { fill: #05070a; }

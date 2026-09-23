@@ -15,7 +15,7 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         INFOPLIST_FILE: Doorway/Resources/Info.plist
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: "UUMBRL7788"
+        DEVELOPMENT_TEAM: "AHU398M2XY"
         TARGETED_DEVICE_FAMILY: "1"
         SWIFT_VERSION: "5.0"
         GENERATE_INFOPLIST_FILE: NO

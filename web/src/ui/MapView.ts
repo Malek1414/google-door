@@ -444,7 +444,7 @@ export function MapView(opts: {
       if (want && !opened) {
         opened = true
         openEntrance(want)
-      } else if (!selected) renderSheet()
+      } else if (!selected && !placeOpen) renderSheet()
     } catch {
       status.textContent = t.noDoors
     }
@@ -477,6 +477,7 @@ export function MapView(opts: {
   }
 
   function renderSheet() {
+    placeOpen = false
     if (selected) return
     panelCleanup?.()
     panelCleanup = null
@@ -833,6 +834,10 @@ export function MapView(opts: {
   /** Tapping a Google POI gives only an id, so fetch the details then open the card. */
   /** Places already fetched this session. A second tap on the same POI is instant. */
   const placeCache = new Map<string, PlaceHit>()
+  /** Set while a place card owns the sheet. `selected` only tracks doors, so without
+   *  this the map's own idle/geolocation callbacks re-render the nearby list over the
+   *  card a moment after it opens. */
+  let placeOpen = false
   let placeInFlight: string | null = null
 
   /**
@@ -851,6 +856,7 @@ export function MapView(opts: {
     }
     if (placeInFlight === placeId) return // second tap while the first is still running
     placeInFlight = placeId
+    placeOpen = true // claim the sheet immediately; the skeleton is about to fill it
 
     // --- immediate, same frame as the tap ---
     if (at) map?.panTo(at)
@@ -869,10 +875,12 @@ export function MapView(opts: {
         placeCache.set(placeId, hit)
         openPlace(hit)
       } else {
+        placeOpen = false
         renderSheet()
       }
     } catch (err) {
       console.warn('[doorway] place lookup failed', err)
+      placeOpen = false
       renderSheet()
     } finally {
       placeInFlight = null
@@ -894,6 +902,7 @@ export function MapView(opts: {
 
   function openPlace(p: PlaceHit) {
     selected = null
+    placeOpen = true
     panelCleanup?.()
     chips.hidden = true
     morePill.hidden = false
@@ -902,6 +911,7 @@ export function MapView(opts: {
     panelCleanup = null
     try {
       panelCleanup = renderPlaceCard(sheetBody, featureCtx, p, () => {
+        placeOpen = false
         chips.hidden = false
         morePill.hidden = true
         goBtn.hidden = false
@@ -1114,7 +1124,7 @@ export function MapView(opts: {
           if (!opts.openDoor) map?.setCenter({ lat: me.lat, lng: me.lon })
           if (!map) void load(bboxAround(me.lat, me.lon, 500))
         }
-        if (!selected) renderSheet()
+        if (!selected && !placeOpen) renderSheet()
       },
       () => {},
       { enableHighAccuracy: true, maximumAge: 5000 },

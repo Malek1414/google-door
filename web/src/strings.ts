@@ -35,7 +35,7 @@ export const en = {
   onboardTestHint: 'You should hear a beep moving from left to right, see the arrow pulse and feel one buzz.',
   testPlaying: 'Playing test. Beep moves from left to right.',
   testDone: 'Test finished.',
-  noVibration: 'This phone does not support vibration in the browser. Sound and visuals still work.',
+  noVibration: 'This phone cannot vibrate from the browser. Instead you hear short sounds from the side to turn: two for left, three for right, one long one on arrival.',
   done: 'Done',
   stepOf: (n: number, total: number) => `Step ${n} of ${total}`,
 
@@ -112,6 +112,7 @@ export const en = {
   waitingGps: 'Waiting for your position.',
   arrived: 'You have arrived at the door.',
   arrivingSoon: 'The door is just ahead.',
+  approaching: 'You are near the entrance. About 10 metres.',
   guidingTo: (name: string) => `Guiding to ${name}.`,
   sayDistanceDir: (m: number, dir: string) => `${Math.round(m)} metres. ${dir}.`,
   replayDone: 'Replay finished.',

@@ -7,6 +7,9 @@ import {
   HAPTIC_RIGHT,
   hapticFor,
   shouldSpeakArrival,
+  cuePan,
+  shouldAnnounceApproach,
+  APPROACH_M,
 } from '../src/core/beacon'
 
 describe('beaconFor pulse (parking-sensor grammar)', () => {
@@ -88,5 +91,22 @@ describe('cues', () => {
     expect(shouldSpeakArrival(5.5)).toBe(true)
     expect(shouldSpeakArrival(5.6)).toBe(false)
     expect(shouldSpeakArrival(NaN)).toBe(false)
+  })
+})
+
+describe('sound cues and approach line', () => {
+  it('pans left cues left, right cues right, arrival centred', () => {
+    expect(cuePan(HAPTIC_LEFT)).toBe(-1)
+    expect(cuePan(HAPTIC_RIGHT)).toBe(1)
+    expect(cuePan(HAPTIC_ARRIVED)).toBe(0)
+  })
+  it('announces the approach at 10 m, not before, and hands over to the arrival line at 5.5 m', () => {
+    expect(APPROACH_M).toBe(10)
+    expect(shouldAnnounceApproach(10.5)).toBe(false)
+    expect(shouldAnnounceApproach(10)).toBe(true)
+    expect(shouldAnnounceApproach(6)).toBe(true)
+    expect(shouldAnnounceApproach(5.5)).toBe(false)
+    expect(shouldSpeakArrival(5.5)).toBe(true)
+    expect(shouldAnnounceApproach(NaN)).toBe(false)
   })
 })

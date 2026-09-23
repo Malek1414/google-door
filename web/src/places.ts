@@ -39,6 +39,21 @@ export interface PlaceHit {
   /** true/false when opening hours allow a verdict, null when unknown. */
   openNow?: boolean | null
   photoUrl?: string
+  /** Up to three photo URLs, the first equals photoUrl. */
+  photoUrls?: string[]
+  /** National format, e.g. "030 1234567". */
+  phone?: string
+  website?: string
+  /** Open around the clock. */
+  open24?: boolean
+  /** "HH:MM" local time of the next close while open (absent for 24/7). */
+  closesAt?: string
+  /** "HH:MM" local time of the next opening while closed. */
+  opensAt?: string
+  /** Days until opensAt: 0 today, 1 tomorrow, ... */
+  opensInDays?: number
+  /** Weekday of opensAt, 0 = Sunday. */
+  opensWeekday?: number
   access: PlaceAccess
 }
 
@@ -64,6 +79,9 @@ const FIELDS = [
   'utcOffsetMinutes',
   'accessibilityOptions',
   'photos',
+  'nationalPhoneNumber',
+  'internationalPhoneNumber',
+  'websiteURI',
 ]
 
 const MAX_RESULTS = 20
@@ -102,34 +120,88 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
 
 const WEEK_MIN = 7 * 24 * 60
 
-/** Open-now verdict from opening-hour periods in the place's local time; null when unknown. */
-function computeOpenNow(place: google.maps.places.Place): boolean | null {
-  const hours = place.currentOpeningHours ?? place.regularOpeningHours
-  if (!hours || hours.periods.length === 0) return null
-  const offset = place.utcOffsetMinutes
-  const now = new Date()
-  const local = offset == null ? now : new Date(now.getTime() + (offset + now.getTimezoneOffset()) * 60_000)
-  const nowMin = local.getDay() * 1440 + local.getHours() * 60 + local.getMinutes()
-  for (const p of hours.periods) {
-    if (!p.close) return true // open 24/7
+const pad = (n: number) => String(n).padStart(2, '0')
+const hhmm = (weekMin: number) => {
+  const m = ((weekMin % 1440) + 1440) % 1440
+  return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`
+}
+
+export interface OpenState {
+  openNow: boolean | null
+  open24?: boolean
+  closesAt?: string
+  opensAt?: string
+  opensInDays?: number
+  opensWeekday?: number
+}
+
+type Period = { open: { day: number; hour: number; minute: number }; close?: { day: number; hour: number; minute: number } | null }
+
+/** Open-now verdict plus next close/open time from weekly periods; nowMin = minutes since Sunday 00:00 local. */
+export function openStateAt(periods: readonly Period[] | null | undefined, nowMin: number): OpenState {
+  if (!periods || periods.length === 0) return { openNow: null }
+  const iv: [number, number][] = []
+  for (const p of periods) {
+    if (!p.close) return { openNow: true, open24: true } // Places marks 24/7 as one period without close
     const open = p.open.day * 1440 + p.open.hour * 60 + p.open.minute
     let close = p.close.day * 1440 + p.close.hour * 60 + p.close.minute
     if (close <= open) close += WEEK_MIN
-    if ((nowMin >= open && nowMin < close) || (nowMin + WEEK_MIN >= open && nowMin + WEEK_MIN < close)) return true
+    iv.push([open, close])
   }
-  return false
+  iv.sort((x, y) => x[0] - y[0])
+  // Merge touching periods; 23:59 -> 00:00 counts as touching (daily "open 24 hours").
+  const merged: [number, number][] = []
+  for (const [o, c] of iv) {
+    const last = merged[merged.length - 1]
+    if (last && o - last[1] <= 1) last[1] = Math.max(last[1], c)
+    else merged.push([o, c])
+  }
+  if (merged.length > 1) {
+    const first = merged[0]
+    const last = merged[merged.length - 1]
+    if (first[0] + WEEK_MIN - last[1] <= 1) {
+      last[1] = first[1] + WEEK_MIN
+      merged.shift()
+    }
+  }
+  if (merged.some(([o, c]) => c - o >= WEEK_MIN - 1)) return { openNow: true, open24: true }
+  let nextOpen: number | null = null
+  for (const [o, c] of merged) {
+    for (const n of [nowMin, nowMin + WEEK_MIN]) if (n >= o && n < c) return { openNow: true, closesAt: hhmm(c) }
+    const ahead = (o - nowMin + WEEK_MIN) % WEEK_MIN
+    if (nextOpen === null || ahead < (nextOpen - nowMin + WEEK_MIN) % WEEK_MIN) nextOpen = o % WEEK_MIN
+  }
+  if (nextOpen === null) return { openNow: false }
+  const day = Math.floor(nextOpen / 1440)
+  return { openNow: false, opensAt: hhmm(nextOpen), opensInDays: (day - Math.floor(nowMin / 1440) + 7) % 7, opensWeekday: day }
+}
+
+/** Open state in the place's local time; openNow null when unknown. */
+function computeOpenState(place: google.maps.places.Place): OpenState {
+  const hours = place.currentOpeningHours ?? place.regularOpeningHours
+  const periods = hours?.periods?.length ? hours.periods : place.regularOpeningHours?.periods
+  const offset = place.utcOffsetMinutes
+  const now = new Date()
+  const local = offset == null ? now : new Date(now.getTime() + (offset + now.getTimezoneOffset()) * 60_000)
+  return openStateAt(periods, local.getDay() * 1440 + local.getHours() * 60 + local.getMinutes())
 }
 
 function toHit(place: google.maps.places.Place): PlaceHit | null {
   const loc = place.location
   if (!loc) return null
   const acc = place.accessibilityOptions
-  let photoUrl: string | undefined
-  try {
-    photoUrl = place.photos?.[0]?.getURI({ maxHeight: 400 })
-  } catch {
-    photoUrl = undefined
+  const photoUrls: string[] = []
+  for (const ph of place.photos?.slice(0, 3) ?? []) {
+    try {
+      const u = ph.getURI({ maxHeight: 400 })
+      if (u) photoUrls.push(u)
+    } catch {
+      /* photo without URI: skip */
+    }
   }
+  const photoUrl = photoUrls[0]
+  const st = computeOpenState(place)
+  const phone = place.nationalPhoneNumber ?? place.internationalPhoneNumber ?? undefined
   return {
     placeId: place.id,
     name: place.displayName ?? '',
@@ -139,8 +211,16 @@ function toHit(place: google.maps.places.Place): PlaceHit | null {
     ratingCount: place.userRatingCount ?? undefined,
     category: place.primaryTypeDisplayName ?? undefined,
     address: place.formattedAddress ?? undefined,
-    openNow: computeOpenNow(place),
+    openNow: st.openNow,
+    open24: st.open24,
+    closesAt: st.closesAt,
+    opensAt: st.opensAt,
+    opensInDays: st.opensInDays,
+    opensWeekday: st.opensWeekday,
     photoUrl,
+    photoUrls: photoUrls.length ? photoUrls : undefined,
+    phone: phone || undefined,
+    website: place.websiteURI || undefined,
     access: {
       entrance: acc?.hasWheelchairAccessibleEntrance ?? null,
       restroom: acc?.hasWheelchairAccessibleRestroom ?? null,

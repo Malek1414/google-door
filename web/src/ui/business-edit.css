@@ -18,8 +18,10 @@
 .be-input:focus { outline: 3px solid var(--teal); outline-offset: 1px; border-color: transparent; }
 .be-textarea { padding: 12px 16px; min-height: 120px; resize: vertical; }
 .be-hint { margin: 6px 0 0; font-size: 14px; color: var(--fg2); }
-.be-wide { width: 100%; justify-content: center; min-height: 48px; margin-top: 12px; background: var(--chip); color: var(--fg); cursor: pointer; box-sizing: border-box; }
+.be .be-wide { width: 100%; justify-content: center; min-height: 48px; margin-top: 12px; background: var(--chip); color: var(--fg); cursor: pointer; box-sizing: border-box; }
 .be-status { min-height: 1.2em; margin: 16px 0 0; color: var(--teal); font-size: 15px; }
+.be-error { margin: 6px 0 0; font-size: 14px; color: #f2b8b5; }
+.be-error:empty { display: none; }
 .be-status:empty { margin: 0; min-height: 0; }
 
 .be-days { display: flex; flex-direction: column; margin-top: 6px; }
@@ -55,7 +57,8 @@
 .be-seg-input:checked + span { background: var(--tonal); color: var(--tonal-ink); box-shadow: inset 0 0 0 2px var(--teal); }
 .be-seg-input:focus-visible + span { outline: 3px solid var(--teal); outline-offset: 2px; }
 
-.be-actions { position: sticky; bottom: 0; z-index: 2; display: flex; gap: 10px; margin: 20px -16px 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+/* bottom -22px: the sheet body has 22px bottom padding, sticky stops inside it and content showed below the bar */
+.be-actions { position: sticky; bottom: -22px; z-index: 2; display: flex; gap: 10px; margin: 20px -22px 0; padding: 12px 22px calc(12px + env(safe-area-inset-bottom));
   background: var(--sheet); border-top: 1px solid var(--line); }
 .be-bar-btn { flex: 1; justify-content: center; min-height: 48px; padding: 0 16px; cursor: pointer; }
 .be-bar-btn:not(.gm-pill-primary) { background: var(--chip); color: var(--fg); }

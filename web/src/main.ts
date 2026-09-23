@@ -90,7 +90,7 @@ async function startSim(p: Profile) {
   const run = () =>
     LiveView({
       target,
-      sensors: replaySensors(track, { speed: params.speed, imageUrl: `${import.meta.env.BASE_URL}sim/placeholder-facade.svg`, label: `${t.simBanner} ${params.track}` }),
+      sensors: replaySensors(track, { speed: params.speed, imageUrl: `${import.meta.env.BASE_URL}sim/placeholder-facade.svg`, label: t.simBanner }),
       config: output(),
       onExit: () => showMap(p),
       onReplay: run,

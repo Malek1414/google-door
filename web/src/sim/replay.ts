@@ -116,6 +116,7 @@ export function Recorder(opts: { onBack?: () => void } = {}): void {
   let uiTimer: number | null = null
   let t0 = 0
   let recording = false
+  let blobUrl: string | null = null
 
   const time = h('div', { class: 'rec-time', role: 'timer', 'aria-label': REC.duration }, '00:00')
   const count = h('p', { class: 'rec-points', 'aria-live': 'polite' }, str.recordPoints(0))
@@ -196,7 +197,8 @@ export function Recorder(opts: { onBack?: () => void } = {}): void {
     setRecording(false)
     time.textContent = elapsed
     const json = JSON.stringify(points, null, 1)
-    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }))
+    if (blobUrl) URL.revokeObjectURL(blobUrl)
+    const url = (blobUrl = URL.createObjectURL(new Blob([json], { type: 'application/json' })))
     const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')
     const copy = h('button', { class: 'rec-pill', type: 'button' }, icon('content_copy'), str.recordCopy)
     copy.addEventListener('click', async () => {

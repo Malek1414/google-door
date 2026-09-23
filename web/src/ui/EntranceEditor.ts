@@ -176,7 +176,21 @@ export function openEntranceEditor(ctx: FeatureCtx, el: HTMLElement, opts: Entra
       }),
     )
     ctx.map.setZoom(EDIT_ZOOM)
-    ctx.map.panTo({ lat: pos.lat, lng: pos.lon })
+    ctx.map.setCenter({ lat: pos.lat, lng: pos.lon })
+    // The map centre lies under the half-open sheet. Once the sheet has settled, shift the
+    // view so the pin stands in the middle of the map strip that is still visible.
+    const map = ctx.map
+    setTimeout(() => {
+      if (closed) return
+      const sheet = el.closest('.gm-sheet') ?? el
+      const mapRect = map.getDiv().getBoundingClientRect()
+      const sheetTop = sheet.getBoundingClientRect().top
+      const topUi = mapRect.top + 170 // search bar, chips and status line
+      if (sheetTop <= topUi) return
+      const want = (topUi + sheetTop) / 2
+      const now = mapRect.top + mapRect.height / 2
+      if (now > want) map.panBy(0, Math.round(now - want))
+    }, 400)
   }
 
   // ---- form helpers ----
@@ -227,6 +241,7 @@ export function openEntranceEditor(ctx: FeatureCtx, el: HTMLElement, opts: Entra
     'select',
     { id: `${id}-door`, class: 'ee-input' },
     ...([
+      ['yes', lang === 'de' ? 'Tür, Art unbekannt' : 'Door, type unknown'],
       ['no', L.doorNone],
       ['hinged', L.doorHinged],
       ['sliding', L.doorSliding],
@@ -275,7 +290,10 @@ export function openEntranceEditor(ctx: FeatureCtx, el: HTMLElement, opts: Entra
   const form = h(
     'form',
     { class: 'ee', novalidate: true },
-    h('div', { class: 'gm-sheet-head' }, h('h2', { id: 'sheet-title', class: 'gm-sheet-title', tabindex: '-1' }, L.title)),
+    // Save and cancel sit in the header like Maps edit screens, so they are reachable while
+    // the sheet is only half open and the map above stays usable for placing the pin.
+    h('div', { class: 'gm-sheet-head ee-head' }, h('h2', { id: 'sheet-title', class: 'gm-sheet-title', tabindex: '-1' }, L.title), h('div', { class: 'ee-head-actions' }, cancelBtn, saveBtn)),
+    err,
     hint,
     coordsBlock,
     field(L.name, nameIn, `${id}-name`),
@@ -288,8 +306,6 @@ export function openEntranceEditor(ctx: FeatureCtx, el: HTMLElement, opts: Entra
     tactile.row,
     field(L.note, noteIn, `${id}-note`),
     h('div', { class: 'ee-field' }, h('label', { class: 'ee-label', for: `${id}-photo` }, L.photo), photoIn, preview),
-    err,
-    h('div', { class: 'gm-actions ee-actions' }, saveBtn, cancelBtn),
   )
 
   form.addEventListener('submit', async (ev) => {
@@ -317,7 +333,7 @@ export function openEntranceEditor(ctx: FeatureCtx, el: HTMLElement, opts: Entra
       kind: init.kind ?? 'main',
       level: init.level ?? null,
       stepFree,
-      tier: surveyTier({ lat: pos.lat, lon: pos.lon, stepFree }),
+      tier: surveyTier({ lat: pos.lat, lon: pos.lon, stepFree, by: opts.by }),
       confidence: 'surveyed',
       door,
       automatic: automatic.input.checked,

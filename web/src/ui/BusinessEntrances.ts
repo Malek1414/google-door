@@ -91,6 +91,16 @@ function entrancesOf(businessId: string): SurveyEntrance[] {
     .sort((a, b) => Number(b.kind === 'main') - Number(a.kind === 'main') || a.createdAt.localeCompare(b.createdAt))
 }
 
+/**
+ * The entrance editor saves new entrances as kind 'main'. A business has one main entrance,
+ * so a newly added one is demoted when another main entrance already exists.
+ */
+export function keepOneMain(businessId: string, saved: SurveyEntrance): void {
+  if (saved.kind !== 'main') return
+  const otherMain = entrancesOf(businessId).some((e) => e.id !== saved.id && e.kind === 'main')
+  if (otherMain) saveSurveyEntrance({ ...saved, kind: 'yes' })
+}
+
 export function openEntrancesManager(el: HTMLElement, ctx: FeatureCtx, businessId: string, onDone: () => void): () => void {
   const id = `bem${++uid}`
   let editorCleanup: (() => void) | null = null
@@ -130,6 +140,7 @@ export function openEntrancesManager(el: HTMLElement, ctx: FeatureCtx, businessI
         // The editor keeps init.id, so an edit replaces in place. Guard anyway.
         if (initial && saved.id !== initial.id) deleteSurveyEntrance(initial.id)
         linkToBusiness(saved.id, initial?.id)
+        if (!initial) keepOneMain(businessId, saved)
         ctx.refresh()
         render()
         say(L.saved)

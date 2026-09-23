@@ -20,7 +20,7 @@ import type { FeatureCtx, Panel } from './ctx'
 import { h } from './dom'
 import { openEntranceEditor } from './EntranceEditor'
 import { openBusinessEdit } from './BusinessEdit'
-import { openEntrancesManager } from './BusinessEntrances'
+import { keepOneMain, openEntrancesManager } from './BusinessEntrances'
 import { businessHomeHeader } from './BusinessHome'
 
 const S = {
@@ -198,6 +198,18 @@ function withTasks(b: BusinessProfile): BusinessProfile {
   return { ...b, tasks: [...tasks, ...extra] }
 }
 
+/**
+ * Photo and door-width tasks count as done once an entrance carries that data, whichever
+ * screen added it (the entrances manager does not know about tasks). Never unsets a check.
+ */
+function autoDone(b: BusinessProfile, linked: SurveyEntrance[]): BusinessProfile {
+  const hasPhoto = linked.some((e) => typeof e.photo === 'string' && e.photo.length > 0)
+  const hasWidth = linked.some((e) => typeof (e as { widthCm?: unknown }).widthCm === 'number')
+  const tasks = b.tasks.map((t) =>
+    !t.done && ((t.id === PHOTO_TASK_ID && hasPhoto) || (t.id === WIDTH_TASK_ID && hasWidth)) ? { ...t, done: true } : t)
+  return { ...b, tasks }
+}
+
 function linkedEntrances(b: BusinessProfile, all: SurveyEntrance[]): SurveyEntrance[] {
   return all.filter((e) => b.entranceIds.includes(e.id) || e.businessId === b.id)
 }
@@ -291,16 +303,21 @@ export const businessPanel: Panel = (el, ctx) => {
       msg,
     )
     el.replaceChildren(form)
+    el.scrollTop = 0
     ctx.setSheet('full')
   }
 
   // ---------- steps 2 to 5: dashboard as a full-height page ----------
-  function renderDashboard(): void {
+  // keepScroll: re-render in place (toggle, task check); otherwise start at the page top,
+  // not at the scroll offset of the sub-screen the owner comes back from.
+  function renderDashboard(keepScroll = false): void {
     const stored = loadBusiness()
     if (!stored) return renderCreate()
-    const b = withTasks(stored)
-    rememberBusiness(b)
     const survey = loadSurvey()
+    // In-place re-renders skip autoDone so an owner can still uncheck a task by hand.
+    const b = keepScroll ? withTasks(stored) : autoDone(withTasks(stored), linkedEntrances(stored, survey))
+    if (JSON.stringify(b) !== JSON.stringify(stored)) saveBusiness(b)
+    rememberBusiness(b)
     const linked = linkedEntrances(b, survey)
     const score = visibilityScore(b, survey)
     const msg = status()
@@ -322,7 +339,7 @@ export const businessPanel: Panel = (el, ctx) => {
         return
       }
       ctx.announce(toggle.checked ? L.offerOn : L.offerOff)
-      renderDashboard()
+      renderDashboard(true)
     })
     const offer = h(
       'label',
@@ -357,6 +374,7 @@ export const businessPanel: Panel = (el, ctx) => {
           const tasks = e.photo ? cur.tasks.map((t) => (t.id === PHOTO_TASK_ID ? { ...t, done: true } : t)) : cur.tasks
           const next = { ...cur, entranceIds: ids, tasks }
           if (saveBusiness(next)) rememberBusiness(next)
+          keepOneMain(b.id, e)
           ctx.refresh()
           ctx.announce(L.entranceSaved)
           renderDashboard()
@@ -366,6 +384,7 @@ export const businessPanel: Panel = (el, ctx) => {
           renderDashboard()
         },
       })
+      el.scrollTop = 0
     }
 
     // "Empfohlene Maßnahmen": one card per task, title, one line, action pill, done check
@@ -391,7 +410,7 @@ export const businessPanel: Panel = (el, ctx) => {
           return
         }
         ctx.announce(box.checked ? L.taskDone(t.label) : L.taskOpen(t.label))
-        renderDashboard()
+        renderDashboard(true)
       })
       const act = done ? null : taskAction(t.id)
       return h('li', { class: `bz-rec${done ? ' bz-rec-done' : ''}` },
@@ -438,6 +457,7 @@ export const businessPanel: Panel = (el, ctx) => {
     el.replaceChildren(
       h('div', { class: 'bz bz-page' }, home(b), divider(), recs, divider(), visibility, divider(), entrances, msg),
     )
+    if (!keepScroll) el.scrollTop = 0
     ctx.setSheet('full')
   }
 
@@ -447,6 +467,7 @@ export const businessPanel: Panel = (el, ctx) => {
     closeEditor()
     try {
       editorCleanup = open()
+      el.scrollTop = 0
     } catch (err) {
       console.error('[doorway] business sub-screen failed', err)
       renderDashboard()
@@ -465,7 +486,8 @@ export const businessPanel: Panel = (el, ctx) => {
         onRecord: () => ctx.openRecorder(),
         onPhotos: () => sub(() => openBusinessEdit(el, ctx, b.id, back)),
         onPreview: () => {
-          const main = linkedEntrances(b, loadSurvey())[0]
+          const list = linkedEntrances(b, loadSurvey())
+          const main = list.find((e) => e.kind === 'main') ?? list[0]
           if (main) ctx.openDoor(main)
           else ctx.announce(L.entrancesEmpty)
         },

@@ -198,7 +198,7 @@ await step('business-create', page, async () => {
 // 7 contribute: report entrance -> editor with "Stufenlos"
 await step('contribute-report', page, async () => {
   await openTab(page, 'Beitragen')
-  const tile = page.locator('.ct-tile:visible', { hasText: /Eingang melden/i }).first()
+  const tile = page.locator('.gm-sheet-body button:visible', { hasText: /Eingang (melden|hinzufügen)/i }).first()
   await tile.waitFor({ state: 'visible', timeout: 5000 })
   await tile.scrollIntoViewIfNeeded().catch(() => {})
   await tile.click()

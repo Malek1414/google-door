@@ -24,3 +24,8 @@
 .ee-error:empty { display: none; }
 .ee-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .ee-btn { min-height: 46px; }
+
+/* Header with Abbrechen / Speichern, sticky at the top of the sheet body. */
+.ee-head { position: sticky; top: 0; z-index: 2; background: #151316; padding: 4px 0 8px; }
+.ee-head-actions { display: flex; gap: 8px; flex: none; }
+.ee-head-actions .ee-btn { height: 40px; padding: 0 16px; }

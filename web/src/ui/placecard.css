@@ -52,3 +52,9 @@
 .pc-fact-link:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 .pc-suggest { display: flex; justify-content: center; margin: 20px 0 8px; }
 .pc-card .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* Anrufen pill is a tel: link: no underline, pill colours instead of link colours. */
+.pc-card a.gm-pill { text-decoration: none; color: var(--tonal-ink, #cdeef0); }
+/* meta row: each bit keeps its leading dot, so a wrap never leaves a dot dangling at a line end */
+.pc-meta-bit { white-space: nowrap; }
+/* headings get focus programmatically (tabindex -1) for screen readers; no ring on a non-control */
+.pc-card h2[tabindex='-1']:focus, .pc-list h2[tabindex='-1']:focus { outline: none; }

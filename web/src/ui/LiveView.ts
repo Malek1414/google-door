@@ -296,7 +296,11 @@ export function LiveView(opts: {
 
   function showArrivalCard() {
     const lines: string[] = []
-    const doorType = e.door ? t.door[e.door] ?? null : null
+    const doorBase = e.door ? t.door[e.door] ?? null : null
+    const doorType = doorBase && e.automatic ? `${doorBase}, ${t.automatic}` : doorBase ?? (e.automatic ? t.chipAutomatic : null)
+    const access = e.stepFree === true ? t.stepFreeYes : e.stepFree === false ? t.stepFreeNo : null
+    const level = e.level !== null && e.level !== 0 ? `${t.levelLabel} ${e.level}` : null
+    const desc = e.description?.trim() || null
     const face = e.approachBearing !== null ? ARR.face(compassWord(e.approachBearing)) : null
     const warns = e.warnings.map((w) => t.warning[w] ?? w)
     const secsEl = h('p', { class: 'arrival-count' }, ARR.backIn(ARRIVAL_EXIT_S))
@@ -315,7 +319,10 @@ export function LiveView(opts: {
       h(
         'div',
         { class: 'arrival-body' },
+        access ? h('p', { class: 'arrival-door' }, access) : null,
         doorType ? h('p', { class: 'arrival-door' }, doorType) : null,
+        level ? h('p', {}, level) : null,
+        desc ? h('p', {}, desc) : null,
         ...warns.map((w) => h('p', { class: 'arrival-warn', role: 'note' }, h('strong', {}, `${t.warningPrefix}: `), w)),
         face ? h('p', { class: 'arrival-face' }, face) : null,
         secsEl,
@@ -327,7 +334,9 @@ export function LiveView(opts: {
     stayBtn.focus({ preventScroll: true })
 
     lines.push(`${ARR.title}. ${name}.`)
+    if (access) lines.push(`${access}.`)
     if (doorType) lines.push(`${doorType}.`)
+    if (level) lines.push(`${level}.`)
     for (const w of warns) lines.push(`${t.warningPrefix}. ${w}`)
     if (face) lines.push(face)
     if (cfg.speak) speak(lines.join(' '))
@@ -532,6 +541,13 @@ export function LiveView(opts: {
     cancelAnimationFrame(raf)
     stopSensors()
     beacon?.stop()
+    // Camera off when guidance ends: the map must not keep the camera light on.
+    // The next Start tap (unlockAll) asks for a fresh stream.
+    if (opts.sensors.media.kind === 'stream') {
+      const st = opts.sensors.media.stream
+      st.getTracks().forEach((tr) => tr.stop())
+      if (session.stream === st) session.stream = null
+    }
     try {
       speechSynthesis?.cancel()
     } catch {

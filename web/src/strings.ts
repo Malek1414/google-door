@@ -365,7 +365,7 @@ export const de: Strings = {
   recordStart: 'Aufnahme starten',
   recordStop: 'Stoppen und speichern',
   recordPoints: (n: number) => `${n} Punkte aufgezeichnet`,
-  recordDownload: 'Weg als JSON laden',
+  recordDownload: 'Weg als JSON herunterladen',
   recordCopy: 'Weg als JSON kopieren',
   copied: 'Kopiert.',
 }

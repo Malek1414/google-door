@@ -14,7 +14,7 @@ import {
   type BusinessDetails,
   type Tri,
 } from '../core/businessDetails'
-import { loadBusiness } from '../core/survey'
+import { loadBusiness, saveBusiness } from '../core/survey'
 import type { FeatureCtx } from './ctx'
 import { h } from './dom'
 
@@ -252,7 +252,8 @@ export function openBusinessEdit(el: HTMLElement, ctx: FeatureCtx, businessId: s
       class: 'gm-pill gm-pill-primary be-bar-btn',
       onclick: () => {
         if (!d.name.trim()) {
-          status.textContent = 'Bitte gib einen Namen ein.'
+          nameError.textContent = 'Bitte gib einen Namen ein.'
+          nameInput.setAttribute('aria-invalid', 'true')
           nameInput.focus()
           return
         }
@@ -260,6 +261,7 @@ export function openBusinessEdit(el: HTMLElement, ctx: FeatureCtx, businessId: s
           status.textContent = 'Speichern nicht möglich. Der Speicher ist blockiert oder voll, eventuell Fotos löschen.'
           return
         }
+        syncProfile()
         ctx.announce('Profil gespeichert.')
         finish()
       },
@@ -268,6 +270,27 @@ export function openBusinessEdit(el: HTMLElement, ctx: FeatureCtx, businessId: s
   )
 
   const nameInput = text('name', 'text', 'z. B. Café am Platz', 'organization')
+  // Inline error right under the field: the status line sits far below, behind the sticky bar.
+  const nameError = h('p', { class: 'be-error', id: nextId('err'), role: 'alert' })
+  nameInput.setAttribute('aria-describedby', nameError.id)
+  nameInput.addEventListener('input', () => {
+    if (!nameError.textContent) return
+    nameError.textContent = ''
+    nameInput.removeAttribute('aria-invalid')
+  })
+
+  /** Name, address and pin also live on the business profile the dashboard shows. */
+  const syncProfile = () => {
+    const b = loadBusiness()
+    if (!b || b.id !== businessId) return
+    const address = d.address.trim()
+    saveBusiness({
+      ...b,
+      name: d.name.trim(),
+      address: address || undefined,
+      ...(d.lat !== null && d.lon !== null ? { lat: d.lat, lon: d.lon } : {}),
+    })
+  }
 
   const root = h(
     'form',
@@ -281,7 +304,7 @@ export function openBusinessEdit(el: HTMLElement, ctx: FeatureCtx, businessId: s
     ),
     section(
       'Info',
-      field('Name des Unternehmens', nameInput),
+      field('Name des Unternehmens', nameInput, nameError),
       field('Kategorie', text('category', 'text', 'z. B. Café')),
       field('Beschreibung', desc, counter),
     ),

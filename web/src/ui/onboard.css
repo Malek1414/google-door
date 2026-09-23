@@ -30,7 +30,7 @@
 
 /* Segmented Ja / Nein: 40 high outlined pill, selected segment tonal with a check. */
 .ob-segmented { display: inline-flex; margin-top: 10px; border: 1px solid #938f99; border-radius: 20px; overflow: hidden; }
-.ob-seg { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 96px; height: 40px; padding: 0 16px; border: 0; background: none; color: var(--fg); font: 500 15px/1 'Google Sans Flex', Roboto, sans-serif; cursor: pointer; }
+.ob-seg { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: 1; min-width: 96px; height: 40px; padding: 0 16px; border: 0; background: none; color: var(--fg); font: 500 15px/1 'Google Sans Flex', Roboto, sans-serif; cursor: pointer; }
 .ob-seg + .ob-seg { border-left: 1px solid #938f99; }
 .ob-seg:focus-visible { outline-offset: -3px; }
 .ob-seg .ms { display: none; font-size: 18px; }

@@ -156,3 +156,8 @@
 @media (prefers-reduced-motion: reduce) {
   .gx-carousel { scroll-behavior: auto; }
 }
+
+/* QA: the feed brings its own 23px gutters; cancel the sheet body's padding so titles line up
+   with the place list (x 23) and carousels scroll to the screen edge. */
+.gm-sheet-body > .gx-feed { margin: 0 -23px; }
+.gm-sheet-body > .gx-feed .gx-head { padding-right: 23px; }

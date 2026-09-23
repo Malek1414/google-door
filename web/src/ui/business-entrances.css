@@ -21,7 +21,7 @@
 .bem-actions, .bem-confirm { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .bem-actions .gm-pill, .bem-confirm .gm-pill { min-height: 44px; }
 .bem-confirm-text { flex-basis: 100%; margin: 0; font-size: 15px; color: var(--fg); }
-.bem-danger { background: #8c1d18; color: #fff; }
+.bem .bem-danger { background: #8c1d18; color: #fff; }
 .bem-add { width: 100%; justify-content: center; height: 48px; margin-top: 16px; }
 .bem-empty { margin-top: 12px; }
 .bem-status { min-height: 1.2em; margin: 10px 0 0; color: var(--teal); font-size: 15px; }

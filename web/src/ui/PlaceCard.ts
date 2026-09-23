@@ -36,7 +36,10 @@ const S = {
     tabPhotos: 'Fotos',
     call: 'Anrufen',
     closesAt: (t: string) => `Schließt um ${t}`,
+    open24: '24 Stunden geöffnet',
     opensAt: (t: string) => `Öffnet um ${t}`,
+    opensTomorrow: (t: string) => `Öffnet morgen um ${t}`,
+    opensDay: (d: string, t: string) => `Öffnet ${d} um ${t}`,
     walkMin: (n: number) => `${n} min`,
     walkLabel: (n: number) => `${n} Minuten zu Fuß`,
     hours: 'Öffnungszeiten',
@@ -56,7 +59,7 @@ const S = {
     stepFree: 'Stufenlos',
     notStepFree: 'Mit Stufen',
     unknown: 'Unbekannt',
-    noEntrance: 'Kein genauer Eingang bekannt. Hilf mit: Eingang melden',
+    noEntrance: 'Kein genauer Eingang bekannt. Hinzufügen kannst du ihn unter Beitragen.',
     accessTitle: 'Barrierefreiheit laut Google',
     accessNote: 'Diese Angaben gelten für das Gebäude, nicht für eine bestimmte Tür.',
     accessNoteDoor: (n: number) => (n === 1 ? 'Ein genau vermessener Eingang ist bekannt, siehe unten.' : `${n} genau vermessene Eingänge sind bekannt, siehe unten.`),
@@ -91,7 +94,10 @@ const S = {
     tabPhotos: 'Photos',
     call: 'Call',
     closesAt: (t: string) => `Closes ${t}`,
+    open24: 'Open 24 hours',
     opensAt: (t: string) => `Opens ${t}`,
+    opensTomorrow: (t: string) => `Opens tomorrow ${t}`,
+    opensDay: (d: string, t: string) => `Opens ${d} ${t}`,
     walkMin: (n: number) => `${n} min`,
     walkLabel: (n: number) => `${n} minute walk`,
     hours: 'Opening hours',
@@ -111,7 +117,7 @@ const S = {
     stepFree: 'Step-free',
     notStepFree: 'Has steps',
     unknown: 'Unknown',
-    noEntrance: 'No exact entrance known. Help out: report an entrance',
+    noEntrance: 'No exact entrance known. You can add it under Contribute.',
     accessTitle: 'Accessibility according to Google',
     accessNote: 'This applies to the building, not to a specific door.',
     accessNoteDoor: (n: number) => (n === 1 ? 'One surveyed entrance is known, see below.' : `${n} surveyed entrances are known, see below.`),
@@ -173,22 +179,22 @@ function openState(p: PlaceHit): HTMLElement | null {
 }
 
 /** Optional fields a richer PlaceHit may carry; read defensively, never required. */
-type PlaceExtras = { photoUrls?: unknown; phone?: unknown; website?: unknown; closesAt?: unknown; opensAt?: unknown; hoursText?: unknown }
+type PlaceExtras = { hoursText?: unknown }
 const extras = (p: PlaceHit) => p as PlaceHit & PlaceExtras
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null)
 
 function photoList(p: PlaceHit): string[] {
-  const raw = extras(p).photoUrls
+  const raw: unknown = p.photoUrls
   const list = Array.isArray(raw) ? raw.filter((u): u is string => typeof u === 'string' && /^https:\/\//.test(u)) : []
   if (p.photoUrl && !list.includes(p.photoUrl)) list.unshift(p.photoUrl)
   return list
 }
 function phoneOf(p: PlaceHit): string | null {
-  const v = str(extras(p).phone)
+  const v = str(p.phone)
   return v && /^[+\d][\d\s()/-]{3,}$/.test(v) ? v : null
 }
 function websiteOf(p: PlaceHit): string | null {
-  const v = str(extras(p).website)
+  const v = str(p.website)
   if (!v) return null
   try {
     const u = new URL(v)
@@ -197,11 +203,21 @@ function websiteOf(p: PlaceHit): string | null {
     return null
   }
 }
+/** "Öffnet um 9:00", "Öffnet morgen um 9:00" or "Öffnet Mo. um 9:00". */
+function opensText(p: PlaceHit, t: string): string {
+  const d = p.opensInDays
+  if (!d) return L.opensAt(t)
+  if (d === 1) return L.opensTomorrow(t)
+  if (typeof p.opensWeekday !== 'number') return L.opensAt(t)
+  // 2024-09-01 was a Sunday, so day n is weekday n.
+  const wd = new Date(2024, 8, 1 + p.opensWeekday).toLocaleDateString(locale, { weekday: 'short' })
+  return L.opensDay(wd, t)
+}
 /** "Geöffnet · Schließt um 19:00" when data allows, else null. */
 function hoursLine(p: PlaceHit): HTMLElement | null {
   if (typeof p.openNow !== 'boolean') return null
-  const t = p.openNow ? str(extras(p).closesAt) : str(extras(p).opensAt)
-  const tail = t ? (p.openNow ? L.closesAt(t) : L.opensAt(t)) : null
+  const t = p.openNow ? str(p.closesAt) : str(p.opensAt)
+  const tail = p.openNow && p.open24 ? L.open24 : t ? (p.openNow ? L.closesAt(t) : opensText(p, t)) : null
   return h('p', { class: 'pc-hours' }, h('span', { class: p.openNow ? 'pc-open' : 'pc-closed' }, p.openNow ? L.open : L.closed), tail ? ` · ${tail}` : null)
 }
 
@@ -286,8 +302,7 @@ export function renderPlaceCard(el: HTMLElement, ctx: FeatureCtx, p: PlaceHit, o
   metaBits.push(h('span', { 'aria-label': L.walkLabel(walk) }, h('span', { class: 'ms pc-walk', 'aria-hidden': 'true' }, 'directions_walk'), L.walkMin(walk)))
   const meta = h('p', { class: 'gm-sheet-sub pc-meta' })
   metaBits.forEach((b, i) => {
-    if (i) meta.append(h('span', { class: 'pc-dot', 'aria-hidden': 'true' }, '·'))
-    meta.append(b)
+    meta.append(i ? h('span', { class: 'pc-meta-bit' }, h('span', { class: 'pc-dot', 'aria-hidden': 'true' }, '· '), b) : b)
   })
   const hours = hoursLine(p)
   const phone = phoneOf(p)
@@ -450,9 +465,16 @@ export function renderPlaceCard(el: HTMLElement, ctx: FeatureCtx, p: PlaceHit, o
       b.tabIndex = j === i ? 0 : -1
     })
     panels.forEach((pn, j) => (pn.hidden = j !== i))
-    if (focus) tabBtns[i].focus()
+    // Keep the chosen tab fully inside the horizontally scrolling tab row (22px side padding).
+    const b = tabBtns[i]
+    const pad = 22
+    const br = b.getBoundingClientRect()
+    const tr = tabs.getBoundingClientRect()
+    if (br.left - pad < tr.left) tabs.scrollLeft -= tr.left - br.left + pad
+    else if (br.right + pad > tr.right) tabs.scrollLeft += br.right + pad - tr.right
+    if (focus) b.focus({ preventScroll: true })
   }
-  const tabs = h(
+  const tabs: HTMLElement = h(
     'div',
     { class: 'gm-tabs', role: 'tablist' },
     ...[L.tabOverview, L.tabReviews, L.tabPhotos, L.tabAccess].map((label, i) => {

@@ -11,7 +11,7 @@
 import { requestHeadingPermission } from '../core/heading'
 import { unlockAudio } from '../audio'
 import { resumeAudioOnTap, session, announce } from '../session'
-import { t } from '../strings'
+import { lang, t } from '../strings'
 import { h, mount } from './dom'
 
 export interface UnlockResult {
@@ -64,7 +64,7 @@ export async function unlockAll(opts: { camera: boolean }): Promise<UnlockResult
 }
 
 export function Start(opts: { sim: boolean; onDone: (r: UnlockResult) => void }): void {
-  const status = h('ul', { class: 'sensor-list', 'aria-label': 'Sensor status' })
+  const status = h('ul', { class: 'sensor-list', 'aria-label': lang === 'de' ? 'Sensorstatus' : 'Sensor status' })
   const extra = h('div', { class: 'start-extra' })
   let busy = false
 

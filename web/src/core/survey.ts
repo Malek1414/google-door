@@ -139,8 +139,10 @@ export function makeSurveyEntrance(input: SurveyInput, now: Date = new Date()): 
 export function mergeSurvey(entrances: Entrance[], survey: SurveyEntrance[]): Entrance[] {
   const out = entrances.map((e) => ({ ...e }))
   for (const raw of survey) {
-    // Re-derive the tier: stored data is untrusted.
-    const s: SurveyEntrance = { ...raw, tier: surveyTier(raw) }
+    // Re-derive the tier: stored data is untrusted. An entry without a valid author counts
+    // as a community report, so it can never become guidable.
+    const by = trustedBy(raw.by)
+    const s: SurveyEntrance = { ...raw, by, tier: surveyTier({ ...raw, by }) }
     let bestIdx = -1
     let bestD = Infinity
     if (s.tier === 1) {
@@ -240,23 +242,31 @@ function isSurveyEntrance(x: unknown): x is SurveyEntrance {
   )
 }
 
+/** Only an explicit 'business' author is trusted; anything else is a community report. */
+const trustedBy = (by: unknown): 'business' | 'community' => (by === 'business' ? 'business' : 'community')
+
 export function loadSurvey(): SurveyEntrance[] {
   const data = readJson(SURVEY_KEY)
   if (!Array.isArray(data)) return []
-  return data.filter(isSurveyEntrance).map((e) => ({
-    ...e,
-    source: 'survey' as const,
-    confidence: 'surveyed' as const,
-    stepFree: e.stepFree === true ? true : e.stepFree === false ? false : null,
-    tier: surveyTier(e),
-    warnings: Array.isArray(e.warnings) ? e.warnings : [],
-  }))
+  return data.filter(isSurveyEntrance).map((e) => {
+    const by = trustedBy(e.by)
+    return {
+      ...e,
+      by,
+      source: 'survey' as const,
+      confidence: 'surveyed' as const,
+      stepFree: e.stepFree === true ? true : e.stepFree === false ? false : null,
+      tier: surveyTier({ ...e, by }),
+      warnings: Array.isArray(e.warnings) ? e.warnings : [],
+    }
+  })
 }
 
 /** Insert or replace by id. Returns false if the photo is too large or storage fails. */
 export function saveSurveyEntrance(e: SurveyEntrance): boolean {
   if (e.photo !== undefined && e.photo.length > MAX_PHOTO_BYTES) return false
-  const clean: SurveyEntrance = { ...e, tier: surveyTier(e), source: 'survey', confidence: 'surveyed' }
+  const by = trustedBy(e.by)
+  const clean: SurveyEntrance = { ...e, by, tier: surveyTier({ ...e, by }), source: 'survey', confidence: 'surveyed' }
   const list = loadSurvey().filter((x) => x.id !== clean.id)
   list.push(clean)
   return writeJson(SURVEY_KEY, list)

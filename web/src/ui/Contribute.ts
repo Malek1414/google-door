@@ -163,33 +163,52 @@ function pointsDeco(): SVGSVGElement {
   )
 }
 
+/** An open entrance editor. `finish` points at the panel instance that currently owns it. */
+interface EditorSession {
+  close: () => void
+  finish: (saved: SurveyEntrance | null) => void
+}
+// MapView remounts the active panel whenever entrances reload (map idle after the editor's
+// pan and zoom, every GPS fix). Such a remount runs cleanup and mount in the same task, so an
+// open editor is parked for one microtask and adopted by the new panel instead of closed.
+// Without this the first tap on "Eingang hinzufügen" opened the editor and closed it again.
+let parked: EditorSession | null = null
+
 export const contributePanel: Panel = (el, ctx) => {
-  let editorCleanup: (() => void) | null = null
+  let editor: EditorSession | null = null
   let alive = true
 
   const closeEditor = () => {
-    editorCleanup?.()
-    editorCleanup = null
+    editor?.close()
+    editor = null
+  }
+  const finish = (entry: SurveyEntrance | null) => {
+    editor = null
+    if (entry) {
+      ctx.refresh()
+      ctx.announce(L.thanks(pointsFor(entry)))
+    }
+    render()
   }
 
   function openEditor(at: LatLon, extra: { name?: string | null; focusPhoto?: boolean; focusNote?: boolean } = {}) {
     closeEditor()
     el.replaceChildren()
     ctx.setSheet('full')
-    editorCleanup = openEntranceEditor(ctx, el, {
+    const session: EditorSession = { close: () => {}, finish }
+    editor = session
+    session.close = openEntranceEditor(ctx, el, {
       lat: at.lat,
       lon: at.lon,
       by: 'community',
       initial: extra.name ? { name: extra.name } : undefined,
       onSaved: (entry: SurveyEntrance) => {
-        closeEditor()
-        ctx.refresh()
-        ctx.announce(L.thanks(pointsFor(entry)))
-        render()
+        session.close()
+        session.finish(entry)
       },
       onCancel: () => {
-        closeEditor()
-        render()
+        session.close()
+        session.finish(null)
       },
     })
     const focusSel = extra.focusPhoto ? '.ee-file' : extra.focusNote ? '.ee-textarea' : null
@@ -409,9 +428,22 @@ export const contributePanel: Panel = (el, ctx) => {
     )
   }
 
-  render()
+  const adopt = parked && el.querySelector('form.ee')
+  if (parked && adopt) {
+    editor = parked
+    editor.finish = finish
+    parked = null
+  } else render()
   return () => {
     alive = false
-    closeEditor()
+    const open = editor
+    editor = null
+    if (!open) return
+    parked = open
+    queueMicrotask(() => {
+      if (parked !== open) return
+      parked = null
+      open.close()
+    })
   }
 }

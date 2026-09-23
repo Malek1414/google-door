@@ -178,7 +178,7 @@ blockquote footer { color: var(--muted); font-size: 1rem; }
 .gm-more { display: block; margin: 16px auto 0; height: 40px; padding: 0 18px; border-radius: 20px; border: 0; background: rgb(28 34 36 / 0.92); color: #a7e2e6; font-size: 15px; font-weight: 500; cursor: pointer; }
 .gm-more[hidden] { display: none; }
 .gm-status:empty { display: none; }
-.gm-status { display: inline-block; margin: 10px 0 0; padding: 6px 12px; border-radius: 10px; background: var(--round); color: var(--fg); font-size: 14px; }
+.gm-status { display: inline-block; margin: 10px 56px 0 0; padding: 6px 12px; border-radius: 10px; background: var(--round); color: var(--fg); font-size: 14px; }
 
 /* round map buttons */
 .gm-round { width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--round); color: var(--fg); display: grid; place-items: center; box-shadow: 0 1px 4px rgb(0 0 0 / 0.5); cursor: pointer; }
@@ -196,6 +196,9 @@ blockquote footer { color: var(--muted); font-size: 1rem; }
 
 /* bottom sheet: peek shows the title row above the nav bar */
 .gm { --sheet-h: 66px; --sheet-max: calc(100dvh - var(--nav-h) - var(--top) - 8px); }
+/* overflow: hidden still lets focus/scrollIntoView scroll the shell (card tabs pushed the nav bar
+   into the middle of the screen); clip forbids any scroll of the root. */
+.gm { overflow: clip; }
 .gm[data-sheet='half'] { --sheet-h: 46dvh; }
 .gm[data-sheet='full'] { --sheet-h: 100%; }
 /* The sheet spans top to nav bar by position, not by a vh calculation: percentages in the
@@ -220,6 +223,8 @@ blockquote footer { color: var(--muted); font-size: 1rem; }
 .gm-row-shape { width: 30px; height: 30px; flex: none; }
 .door-step-free .gm-row-shape { background: #ffd60a; border: 3px solid #000; border-radius: 50%; width: 34px; height: 34px; box-shadow: 0 0 0 2px #fff; }
 .door-not-step-free .gm-row-shape { background: #9aa0a6; border: 3px solid #202124; transform: rotate(45deg) scale(0.75); box-shadow: 0 0 0 2px #fff; }
+.door-unconfirmed .gm-row-shape { background: #5f6368; border: 3px dashed #e8eaed; border-radius: 50%; box-sizing: border-box; display: grid; place-items: center; }
+.door-unconfirmed .gm-row-shape::after { content: '?'; color: #fff; font: 700 16px/1 Roboto, sans-serif; }
 .gm-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .gm-row-title { font-size: 17px; font-weight: 500; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gm-row-meta { font-size: 14px; color: var(--fg2); }

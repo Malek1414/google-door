@@ -16,6 +16,7 @@ import { mapsKey } from '../config'
 import { bboxAround, fetchEntrances, fetchLived, findEntrance, type BBox } from '../data'
 import { announce } from '../session'
 import { unlockAll } from './Start'
+import { openEntranceEditor } from './EntranceEditor'
 import type { FeatureCtx, Panel } from './ctx'
 import { businessPanel } from './Business'
 import { contributePanel } from './Contribute'
@@ -48,6 +49,28 @@ const ICON_NOT_STEP_FREE = svgUrl(
 const ICON_TIER2 = svgUrl(
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="#000" stroke-width="5" stroke-dasharray="6 4"/><circle cx="20" cy="20" r="16" fill="none" stroke="#FFD60A" stroke-width="2.5" stroke-dasharray="6 4"/></svg>',
 )
+
+// Community report (survey, tier 0): shown so the reporter sees it, but muted, round, with a '?'.
+// It never gets an arrow: guidanceFor() still refuses it.
+const ICON_UNCONFIRMED = svgUrl(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill="#5F6368" fill-opacity="0.85" stroke="#E8EAED" stroke-width="2.5" stroke-dasharray="4 3"/><text x="16" y="21.5" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="700" fill="#fff">?</text></svg>',
+)
+const UNCONFIRMED = lang === 'de' ? 'Nicht bestätigt' : 'Unconfirmed'
+const BY_COMMUNITY = lang === 'de' ? 'Von der Community gemeldet, noch nicht bestätigt' : 'Reported by the community, not confirmed yet'
+const REASON_UNCONFIRMED = lang === 'de' ? 'Diese Meldung ist noch nicht bestätigt, deshalb zeigt Doorway hier keinen Pfeil.' : 'This report is not confirmed yet, so Doorway will not point an arrow here.'
+const BY_BUSINESS = lang === 'de' ? 'Vom Unternehmen eingetragen' : 'Entered by the business'
+
+type MapKind = ReturnType<typeof markerKind> | 'unconfirmed'
+/** markerKind plus the unconfirmed community reports (survey entries below tier 1). */
+function mapKind(e: Entrance): MapKind {
+  const k = markerKind(e)
+  if (k !== 'no-marker') return k
+  return e.source === 'survey' && Number.isFinite(e.lat) && Number.isFinite(e.lon) ? 'unconfirmed' : 'no-marker'
+}
+function sourceText(e: Entrance): string {
+  if (e.source !== 'survey') return t.confidence[e.confidence] ?? e.confidence
+  return (e as Entrance & { by?: string }).by === 'business' ? BY_BUSINESS : BY_COMMUNITY
+}
 
 let mapsLoading: Promise<void> | null = null
 function loadMaps(key: string): Promise<void> {
@@ -148,16 +171,29 @@ export function MapView(opts: {
   let placeHits: PlaceHit[] = []
   let placeTitle = ''
   let activePlaceChip: string | null = null
+  // Open place card. Like `selected`, it blocks background re-renders (map idle, GPS ticks).
+  let placeShown: PlaceHit | null = null
 
   // ---- top: search bar, chips, layers ----
   const status = h('p', { class: 'gm-status', role: 'status' }, '')
+  // Snackbar-like: a message stays about 4 s, then clears so it never lingers over the map.
+  // `sticky` keeps "Suche läuft" until its result replaces it.
+  let statusTimer: ReturnType<typeof setTimeout> | undefined
+  let offlineShown = false
+  const setStatus = (text: string, sticky = false) => {
+    clearTimeout(statusTimer)
+    status.textContent = text
+    if (text && !sticky) statusTimer = setTimeout(() => (status.textContent = ''), 4000)
+  }
   const mapEl = h('div', { class: 'gm-map', role: 'region', 'aria-label': t.mapTitle })
   const searchInput = h('input', { class: 'gm-search-input', type: 'search', placeholder: t.searchPlaceholder, 'aria-label': t.searchLabel, autocomplete: 'off', enterkeyhint: 'search' }) as HTMLInputElement
   const results = h('ul', { class: 'gm-results', role: 'listbox', 'aria-label': t.searchLabel, hidden: true })
   const micBtn = h('button', { class: 'gm-search-btn', type: 'button', 'aria-label': t.voiceSearch }, icon('mic'))
   const lensBtn = h('button', { class: 'gm-search-btn', type: 'button', 'aria-label': t.look }, icon('photo_camera'))
   const avatar = h('button', { class: 'gm-avatar', type: 'button', 'aria-label': t.profileButton, onclick: opts.onSettings }, 'S')
-  const search = h('div', { class: 'gm-search' }, pinLogo(), searchInput, micBtn, lensBtn, avatar)
+  // While text-search results are on screen the bar shows the query with an X, like Maps.
+  const clearSearchBtn = h('button', { class: 'gm-search-btn', type: 'button', 'aria-label': lang === 'de' ? 'Suche schließen' : 'Close search', hidden: true }, icon('close'))
+  const search = h('div', { class: 'gm-search' }, pinLogo(), searchInput, clearSearchBtn, micBtn, lensBtn, avatar)
 
   const chipDefs: [Filter, string, string][] = [
     ['stepFree', 'accessible', t.chipStepFree],
@@ -186,6 +222,9 @@ export function MapView(opts: {
     saveMode(m)
     clearPlaces()
     selected = null
+    placeShown = null
+    routeLine?.setMap(null)
+    routeLine = null
     renderChips()
     renderMarkers()
     renderSheet()
@@ -198,6 +237,8 @@ export function MapView(opts: {
   }
   renderChips()
   const morePill = h('button', { class: 'gm-more', type: 'button', hidden: true, onclick: () => closeCard() }, t.moreDoors)
+  // Over a place card the pill leads back to the place list, so it names places, not entrances.
+  const MORE_PLACES = lang === 'de' ? 'Ähnliche Orte ansehen' : 'See similar places'
   const layersBtn = h('button', { class: 'gm-round gm-layers', type: 'button', 'aria-label': t.layers }, icon('layers'))
 
   // ---- right column above the sheet ----
@@ -223,7 +264,9 @@ export function MapView(opts: {
   nav.addEventListener('click', (ev) => {
     const b = (ev.target as HTMLElement).closest<HTMLButtonElement>('.gm-tab')
     if (!b) return
-    const id = b.dataset.tab as Tab
+    selectTab(b.dataset.tab as Tab)
+  })
+  function selectTab(id: Tab) {
     tab = id
     nav.querySelectorAll<HTMLButtonElement>('.gm-tab').forEach((x) => {
       const on = x.dataset.tab === tab
@@ -232,11 +275,14 @@ export function MapView(opts: {
       x.querySelector('.ms')?.classList.toggle('ms-fill', on)
     })
     selected = null
+    placeShown = null
+    routeLine?.setMap(null)
+    routeLine = null
     clearPlaces()
     renderMarkers()
     renderSheet()
     setSheet(tab === 'explore' ? 'peek' : 'full')
-  })
+  }
 
   const root = h(
     'section',
@@ -250,6 +296,10 @@ export function MapView(opts: {
     nav,
   )
   mount(root)
+  // The shell never scrolls; undo any scroll that focus or scrollIntoView forces on it anyway.
+  root.addEventListener('scroll', () => {
+    if (root.scrollTop || root.scrollLeft) root.scrollTo(0, 0)
+  })
 
   // ---- sheet snap states: drag or tap the handle ----
   const setSheet = (st: SheetState) => {
@@ -378,7 +428,7 @@ export function MapView(opts: {
 
   const origin = () => me ?? (map?.getCenter() ? { lat: map.getCenter()!.lat(), lon: map.getCenter()!.lng() } : DEFAULT_CENTER)
   const visible = (e: Entrance) => {
-    const k = markerKind(e)
+    const k = mapKind(e)
     if (k === 'no-marker') return false
     if (filters.has('stepFree') && !filters.has('withSteps') && k !== 'step-free') return false
     if (filters.has('withSteps') && !filters.has('stepFree') && k !== 'not-step-free') return false
@@ -406,27 +456,32 @@ export function MapView(opts: {
       }
       entrances = mergeSurvey(r.entrances, survey)
       buildings = r.buildings
-      status.textContent = r.source === 'static' ? t.offlineData : ''
+      // Offline data: say it once, not on every map pan.
+      if (r.source === 'static' && !offlineShown) {
+        offlineShown = true
+        setStatus(t.offlineData)
+      }
       renderMarkers()
       const want = opts.openDoor ? entrances.find((x) => x.id === opts.openDoor) : undefined
       if (want && !opened) {
         opened = true
         openEntrance(want)
-      } else if (!selected) renderSheet()
+      } else refreshList()
     } catch {
-      status.textContent = t.noDoors
+      setStatus(t.noDoors)
     }
   }
 
   // ---- sheet content per tab ----
   function doorRow(e: Entrance, d: number) {
-    const meta = [stepFreeLabel(e.stepFree), t.metresShort(d), ...e.warnings.map((w) => t.door[w] ?? w)].join(' · ')
+    const k = mapKind(e)
+    const meta = [k === 'unconfirmed' ? UNCONFIRMED : null, stepFreeLabel(e.stepFree), t.metresShort(d), ...e.warnings.map((w) => t.door[w] ?? w)].filter(Boolean).join(' · ')
     return h(
       'li',
       {},
       h(
         'button',
-        { class: `gm-row door-${markerKind(e)}`, type: 'button', onclick: () => openEntrance(e) },
+        { class: `gm-row door-${k}`, type: 'button', onclick: () => openEntrance(e) },
         h('span', { class: 'gm-row-shape', 'aria-hidden': 'true' }),
         h('span', { class: 'gm-row-text' }, h('span', { class: 'gm-row-title' }, e.name ?? t.unnamedEntrance), h('span', { class: 'gm-row-meta' }, meta)),
       ),
@@ -445,9 +500,11 @@ export function MapView(opts: {
   }
 
   function renderSheet() {
-    if (selected) return
+    if (selected || placeShown) return
     panelCleanup?.()
     panelCleanup = null
+    // A panel's cleanup may leave its DOM behind (editor forms); the feed only appends.
+    sheetBody.replaceChildren()
     morePill.hidden = true
     chips.hidden = false
     viewBtn.hidden = true
@@ -476,7 +533,7 @@ export function MapView(opts: {
       return
     }
     const doors = nearby()
-    const stepFreeCount = doors.filter(({ e }) => e.stepFree === true).length
+    const stepFreeCount = doors.filter(({ e }) => mapKind(e) === 'step-free').length
     sheetBody.replaceChildren(
       h(
         'div',
@@ -523,13 +580,14 @@ export function MapView(opts: {
     markers = []
     for (const e of entrances) {
       if ((!visible(e) || !showDoorMarkers(mode)) && selected !== e) continue
-      const big = markerKind(e) === 'step-free'
+      const kind = mapKind(e)
+      const big = kind === 'step-free'
       const size = (big ? BASE_PIN * 1.4 : BASE_PIN) * (selected === e ? 1.25 : 1)
       const m = new google.maps.Marker({
         map,
         position: { lat: e.lat, lng: e.lon },
-        title: `${e.name ?? t.unnamedEntrance}, ${stepFreeLabel(e.stepFree)}`,
-        icon: { url: big ? ICON_STEP_FREE : ICON_NOT_STEP_FREE, scaledSize: new google.maps.Size(size, size), anchor: new google.maps.Point(size / 2, size / 2) },
+        title: `${e.name ?? t.unnamedEntrance}, ${kind === 'unconfirmed' ? `${UNCONFIRMED}, ` : ''}${stepFreeLabel(e.stepFree)}`,
+        icon: { url: big ? ICON_STEP_FREE : kind === 'unconfirmed' ? ICON_UNCONFIRMED : ICON_NOT_STEP_FREE, scaledSize: new google.maps.Size(size, size), anchor: new google.maps.Point(size / 2, size / 2) },
         zIndex: selected === e ? 3 : big ? 2 : 1,
         opacity: big ? 1 : 0.85,
       })
@@ -589,25 +647,30 @@ export function MapView(opts: {
   function showCard(item: Entrance | Building, ...children: (Node | null)[]) {
     panelCleanup?.()
     panelCleanup = null
+    placeShown = null
     selected = item
     renderMarkers()
     chips.hidden = true
     morePill.hidden = false
     goBtn.hidden = true
+    morePill.textContent = t.moreDoors
     sheetBody.replaceChildren(...children.filter((c): c is Node => c !== null))
     setSheet('half')
     sheetBody.scrollTop = 0
-    sheetBody.querySelector<HTMLElement>('h2')?.focus()
+    // preventScroll: focusing the title of a sheet that is still animating would scroll the whole
+    // .gm root and push the nav bar into the middle of the screen.
+    sheetBody.querySelector<HTMLElement>('h2')?.focus({ preventScroll: true })
   }
   function closeCard() {
     panelCleanup?.()
     panelCleanup = null
     selected = null
+    placeShown = null
     routeLine?.setMap(null)
     routeLine = null
     renderMarkers()
     renderSheet()
-    setSheet('peek')
+    setSheet(placeHits.length ? 'half' : 'peek')
   }
 
   function drawRoute(e: Entrance) {
@@ -647,7 +710,7 @@ export function MapView(opts: {
     const tips: string[] = []
     if (e.stepFree === true) tips.push(t.tipStepFree)
     if (e.stepFree === false) tips.push(t.tipNotStepFree)
-    if (e.door) tips.push(`${t.door[e.door] ?? e.door}${e.automatic ? `, ${t.automatic}` : ''}.`)
+    if (e.door && !(e.door === 'revolving' && e.warnings.includes('revolving'))) tips.push(`${t.door[e.door] ?? e.door}${e.automatic ? `, ${t.automatic}` : ''}.`)
     for (const w of e.warnings) tips.push(t.warning[w] ?? w)
     if (e.approachBearing !== null) tips.push(t.faceToEnter(t.compass[Math.round(e.approachBearing / 45) % 8]))
     if (e.description) tips.unshift(e.description)
@@ -697,7 +760,7 @@ export function MapView(opts: {
       'div',
       { class: 'gm-tabpanel' },
       tipsCard(e),
-      g.kind === 'arrow' ? null : h('p', { class: 'reason' }, reasonText[g.reason]),
+      g.kind === 'arrow' ? null : h('p', { class: 'reason' }, mapKind(e) === 'unconfirmed' && g.reason === 'not-tier1' ? REASON_UNCONFIRMED : reasonText[g.reason]),
       warningsBlock(e),
       h(
         'ul',
@@ -706,7 +769,7 @@ export function MapView(opts: {
         e.door ? fact('door_front', `${t.door[e.door] ?? e.door}${e.automatic ? `, ${t.automatic}` : ''}`) : null,
         e.level !== null ? fact('stairs', `${t.levelLabel} ${e.level}`) : null,
         e.approachBearing !== null ? fact('explore', t.faceToEnter(t.compass[Math.round(e.approachBearing / 45) % 8])) : null,
-        fact('verified', t.confidence[e.confidence] ?? e.confidence),
+        fact(e.source === 'survey' ? 'group' : 'verified', sourceText(e)),
       ),
       unknownNearby ? h('p', { class: 'gm-p' }, t.nearbyUnknown(unknownNearby)) : null,
     )
@@ -771,6 +834,9 @@ export function MapView(opts: {
     placeMarkers = []
     placeHits = []
     activePlaceChip = null
+    searchInput.value = '' // the bar shows the query only while its results are on screen
+    syncSearchBar()
+    if (status.textContent === t.loading) setStatus('')
     placeChips.forEach((b) => b.setAttribute('aria-pressed', 'false'))
   }
   function showPlaces(hits: PlaceHit[], title: string) {
@@ -778,6 +844,7 @@ export function MapView(opts: {
     placeMarkers = []
     placeHits = hits
     placeTitle = title
+    syncSearchBar()
     if (map) {
       const bounds = new google.maps.LatLngBounds()
       for (const p of hits) {
@@ -789,11 +856,19 @@ export function MapView(opts: {
       if (hits.length > 1) map.fitBounds(bounds, { top: 170, bottom: 280, left: 30, right: 30 })
     }
     selected = null
+    placeShown = null
     renderSheet()
     setSheet('half')
   }
   function openPlace(p: PlaceHit) {
+    const wasDoor = selected !== null
     selected = null
+    placeShown = p
+    routeLine?.setMap(null)
+    routeLine = null
+    if (wasDoor) renderMarkers()
+    viewBtn.hidden = true
+    morePill.textContent = MORE_PLACES
     panelCleanup?.()
     chips.hidden = true
     morePill.hidden = false
@@ -802,35 +877,84 @@ export function MapView(opts: {
     panelCleanup = null
     try {
       panelCleanup = renderPlaceCard(sheetBody, featureCtx, p, () => {
+        placeShown = null
         chips.hidden = false
         morePill.hidden = true
         goBtn.hidden = false
         renderSheet()
-      })
+      }, (hit) => suggestEdit(hit))
     } catch (err) {
       console.error('[doorway] place card failed', err)
       sheetBody.replaceChildren(h('p', { class: 'gm-p', role: 'alert' }, t.panelError))
     }
     setSheet('half')
   }
+  // "Änderung vorschlagen" on a place card: Beitragen tab with the entrance editor at that place.
+  function suggestEdit(p: PlaceHit) {
+    selectTab('contribute')
+    const back = () => {
+      if (tab === 'contribute' && !selected) mountPanel(contributePanel)
+    }
+    mountPanel((el, ctx) => {
+      el.replaceChildren()
+      ctx.setSheet('full')
+      const close = openEntranceEditor(ctx, el, {
+        lat: p.lat,
+        lon: p.lon,
+        by: 'community',
+        initial: { name: p.name, placeId: p.placeId },
+        onSaved: () => {
+          close()
+          ctx.refresh()
+          back()
+        },
+        onCancel: () => {
+          close()
+          back()
+        },
+      })
+      return () => {
+        close()
+        el.replaceChildren()
+      }
+    })
+  }
+  function syncSearchBar() {
+    const showing = placeHits.length > 0 && searchInput.value.trim() !== ''
+    clearSearchBtn.hidden = !showing
+    micBtn.hidden = showing || !RecCtor
+    lensBtn.hidden = showing
+  }
+  clearSearchBtn.addEventListener('click', () => {
+    clearPlaces()
+    closeCard()
+  })
+  let categoryReq = 0
   async function runCategory(id: string, label: string) {
     if (!map) return
+    const req = ++categoryReq
     if (activePlaceChip === id) {
       clearPlaces()
       renderSheet()
+      setSheet('peek')
       return
     }
     activePlaceChip = id
+    searchInput.value = ''
+    syncSearchBar()
     placeChips.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.chip === id)))
-    status.textContent = t.loading
+    setStatus(t.loading, true)
     try {
       const hits = await searchCategory(map, id)
-      status.textContent = hits.length ? '' : t.searchNoResults
+      // A chip toggled off or another chip tapped meanwhile: drop this late result.
+      if (req !== categoryReq || activePlaceChip !== id) return
+      setStatus(hits.length ? '' : t.searchNoResults)
       showPlaces(hits, label)
     } catch (err) {
+      if (req !== categoryReq) return
       activePlaceChip = null
       placeChips.forEach((b) => b.setAttribute('aria-pressed', 'false'))
-      status.textContent = err instanceof PlacesUnavailable ? err.message : t.placesError
+      setStatus(err instanceof PlacesUnavailable ? err.message : t.placesError)
     }
   }
 
@@ -849,7 +973,7 @@ export function MapView(opts: {
     }
     const placeHits = t.places.filter((p) => p.name.toLowerCase().includes(q)).map((p) => ({ title: p.name, sub: p.sub, go: () => flyTo(p.lat, p.lon), ic: 'location_on' }))
     const doorHits = entrances
-      .filter((e) => e.name && e.name.toLowerCase().includes(q) && markerKind(e) !== 'no-marker')
+      .filter((e) => e.name && e.name.toLowerCase().includes(q) && mapKind(e) !== 'no-marker')
       .map((e) => ({ title: e.name!, sub: stepFreeLabel(e.stepFree), go: () => openEntrance(e), ic: 'door_front' }))
     const hits = [...placeHits, ...doorHits].slice(0, SEARCH_MAX)
     results.replaceChildren(
@@ -888,13 +1012,14 @@ export function MapView(opts: {
     const runQuery = (q: string) => {
       searchInput.value = q
       if (!map) return
-      status.textContent = t.loading
+      setStatus(t.loading, true)
       searchText(map, q)
         .then((hits) => {
-          status.textContent = hits.length ? '' : t.searchNoResults
+          if (tab !== 'explore') return // user moved to another tab meanwhile
+          setStatus(hits.length ? '' : t.searchNoResults)
           showPlaces(hits, q)
         })
-        .catch((err) => (status.textContent = err instanceof PlacesUnavailable ? err.message : t.placesError))
+        .catch((err) => setStatus(err instanceof PlacesUnavailable ? err.message : t.placesError))
     }
     let close: () => void = () => {}
     try {
@@ -916,7 +1041,7 @@ export function MapView(opts: {
           if (!ql) return []
           const places = t.places.filter((p) => p.name.toLowerCase().includes(ql)).map((p) => ({ title: p.name, sub: p.sub, icon: 'location_on', go: () => { close(); flyTo(p.lat, p.lon) } }))
           const doors = entrances
-            .filter((e) => typeof e.name === 'string' && e.name.toLowerCase().includes(ql) && markerKind(e) !== 'no-marker')
+            .filter((e) => typeof e.name === 'string' && e.name.toLowerCase().includes(ql) && mapKind(e) !== 'no-marker')
             .map((e) => ({ title: e.name!, sub: stepFreeLabel(e.stepFree), icon: 'door_front', go: () => { close(); openEntrance(e) } }))
           return [...places, ...doors].slice(0, SEARCH_MAX)
         },
@@ -936,13 +1061,14 @@ export function MapView(opts: {
         const q = searchInput.value.trim()
         results.hidden = true
         searchInput.blur()
-        status.textContent = t.loading
+        setStatus(t.loading, true)
         searchText(map, q)
           .then((hits) => {
-            status.textContent = hits.length ? '' : t.searchNoResults
+            if (tab !== 'explore') return // user moved to another tab meanwhile
+            setStatus(hits.length ? '' : t.searchNoResults)
             showPlaces(hits, q)
           })
-          .catch((err) => (status.textContent = err instanceof PlacesUnavailable ? err.message : t.placesError))
+          .catch((err) => setStatus(err instanceof PlacesUnavailable ? err.message : t.placesError))
       }
     }
     if (ev.key === 'Escape') results.hidden = true
@@ -975,7 +1101,7 @@ export function MapView(opts: {
     const hit = nearby().find(({ e }) => guidanceFor(e, opts.profile).kind === 'arrow')
     if (!hit) {
       announce(t.noDoors)
-      status.textContent = t.noDoors
+      setStatus(t.noDoors)
       return
     }
     openEntrance(hit.e)
@@ -1004,6 +1130,12 @@ export function MapView(opts: {
     if (me) flyTo(me.lat, me.lon)
   })
 
+  // Background data (map idle, GPS) refreshes only the Erkunden list, never an open card or a
+  // panel tab (Beitragen, Unternehmen hold forms that a remount would wipe).
+  let lastListPos: LatLon | null = null
+  function refreshList() {
+    if (!selected && !placeShown && tab === 'explore') renderSheet()
+  }
   if ('geolocation' in navigator) {
     geoWatch = navigator.geolocation.watchPosition(
       (p) => {
@@ -1014,7 +1146,11 @@ export function MapView(opts: {
           if (!opts.openDoor) map?.setCenter({ lat: me.lat, lng: me.lon })
           if (!map) void load(bboxAround(me.lat, me.lon, 500))
         }
-        if (!selected) renderSheet()
+        // Only re-render after a real move: every GPS tick would rebuild the feed and refetch Places.
+        if (first || !lastListPos || haversineM(lastListPos, me) > 25) {
+          lastListPos = me
+          refreshList()
+        }
       },
       () => {},
       { enableHighAccuracy: true, maximumAge: 5000 },
@@ -1073,6 +1209,7 @@ export function MapView(opts: {
     } catch {
       /* ignore */
     }
+    clearTimeout(statusTimer)
     placeMarkers.forEach((m) => m.setMap(null))
     if (geoWatch !== null) navigator.geolocation.clearWatch(geoWatch)
     markers.forEach((m) => m.setMap(null))

@@ -14,6 +14,7 @@ import { glyphPaths, h, s } from './dom'
 const SAVED_KEY = 'doorway.saved'
 const RECENT_KEY = 'doorway.recent'
 const LISTS_KEY = 'doorway.lists'
+const HIDDEN_KEY = 'doorway.foryou.hidden' // recommendations the user removed
 const RECENT_MAX = 10
 const RECOMMEND_MAX = 5
 const ROWS_COLLAPSED = 3
@@ -268,8 +269,9 @@ export const forYouPanel: Panel = (el, ctx) => {
   const origin = ctx.origin()
   const dist = (e: Entrance) => haversineM(origin, e)
 
+  const hidden = new Set(readIds(HIDDEN_KEY))
   const recommended = entrances
-    .filter((e) => guidanceFor(e, ctx.profile).kind === 'arrow')
+    .filter((e) => !hidden.has(e.id) && guidanceFor(e, ctx.profile).kind === 'arrow')
     .sort((a, b) => dist(a) - dist(b))
     .slice(0, RECOMMEND_MAX)
 
@@ -292,6 +294,12 @@ export const forYouPanel: Panel = (el, ctx) => {
       writeJson(SAVED_KEY, saved.filter((x) => x !== e.id))
       writeJson(RECENT_KEY, recent.filter((x) => x !== e.id))
       writeJson(LISTS_KEY, lists.map((l) => ({ ...l, ids: l.ids.filter((x) => x !== e.id) })))
+      // A recommendation is derived, not stored: remember the removal or it comes straight back.
+      if (recommended.some((r) => r.id === e.id)) {
+        hidden.add(e.id)
+        writeJson(HIDDEN_KEY, [...hidden])
+        recommended.splice(recommended.findIndex((r) => r.id === e.id), 1)
+      }
       ctx.announce(T.removed)
       render('.fy-title')
     }
@@ -382,7 +390,7 @@ export const forYouPanel: Panel = (el, ctx) => {
 
     // Meine Listen: Favoriten (= saved) first, then stored lists.
     const listIcons: Record<string, [string, string]> = { fav: ['favorite', 'fy-ic-heart'], marked: ['star', 'fy-ic-star'], wishes: ['flag', 'fy-ic-flag'] }
-    const allLists: (List & { shared: boolean })[] = [{ id: 'fav', name: T.favourites, ids: saved, shared: true }, ...lists.map((l) => ({ ...l, shared: l.id !== 'marked' }))]
+    const allLists: (List & { shared: boolean })[] = [{ id: 'fav', name: T.favourites, ids: saved, shared: true }, ...lists.map((l) => ({ ...l, shared: l.id === 'wishes' }))]
     const listRow = (l: List & { shared: boolean }) => {
       const [ic, cls] = listIcons[l.id] ?? ['list', 'fy-ic-list']
       const open = state.openList === l.id

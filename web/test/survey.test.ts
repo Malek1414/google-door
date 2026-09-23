@@ -12,6 +12,7 @@ import {
   surveyTier,
   visibilityScore,
   type BusinessProfile,
+  type SurveyEntrance,
 } from '../src/core/survey'
 import type { Entrance } from '../src/core/types'
 
@@ -197,5 +198,17 @@ describe('community reports are text until confirmed', () => {
     const { surveyTier } = await import('../src/core/survey')
     expect(surveyTier({ lat: 52.5, lon: 13.4, stepFree: true, by: 'community' })).toBe(0)
     expect(surveyTier({ lat: 52.5, lon: 13.4, stepFree: true, by: 'business' })).toBe(1)
+  })
+
+  it('treats a stored entry without a valid author as a community report', () => {
+    const forged = { ...makeSurveyEntrance({ ...HBF, stepFree: true, by: 'business' }), by: undefined, tier: 1 }
+    const raw = JSON.stringify([forged])
+    vi.stubGlobal('localStorage', { getItem: () => raw, setItem: () => {}, removeItem: () => {} })
+    const [loaded] = loadSurvey()
+    vi.unstubAllGlobals()
+    expect(loaded.by).toBe('community')
+    expect(loaded.tier).toBe(0)
+    const [merged] = mergeSurvey([], [forged as unknown as SurveyEntrance])
+    expect(merged.tier).toBe(0)
   })
 })

@@ -137,7 +137,6 @@ export function Onboard(opts: { initial?: Profile | null; onDone: (p: Profile) =
           switchRow('visual', 'zoom_in', t.chVisual),
           switchRow('haptic', 'vibration', S.vibration, canVibrate() ? null : t.noVibration),
         ),
-        h('h2', { class: 'ob-sub' }, t.onboardTest),
         testRow,
         h('div', { class: 'ob-actions' }, h('button', { class: 'ob-primary', type: 'button', onclick: done }, t.done)),
       ),

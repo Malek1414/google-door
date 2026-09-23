@@ -13,8 +13,9 @@ import type { Profile } from '../core/profile'
 import { guidanceFor, markerKind, type ArrowTarget } from '../core/target'
 import type { Building, Entrance } from '../core/types'
 import { mapsKey } from '../config'
-import { bboxAround, fetchEntrances, fetchLived, type BBox } from '../data'
+import { bboxAround, fetchEntrances, fetchLived, findEntrance, type BBox } from '../data'
 import { announce } from '../session'
+import { unlockAll } from './Start'
 import { t } from '../strings'
 import { h, mount } from './dom'
 
@@ -76,7 +77,13 @@ type Filter = { stepFree: boolean; withSteps: boolean }
 /** Material Symbols glyph. Decorative: the text next to it carries the meaning. */
 const icon = (name: string) => h('span', { class: 'ms', 'aria-hidden': 'true' }, name)
 
-export function MapView(opts: { profile: Profile; onGuide: (target: ArrowTarget) => void; onSettings: () => void }): () => void {
+export function MapView(opts: {
+  profile: Profile
+  openDoor?: string | null
+  onGuide: (target: ArrowTarget) => void
+  onSettings: () => void
+  onContribute: () => void
+}): () => void {
   let entrances: Entrance[] = []
   let buildings: Building[] = []
   let me: LatLon | null = null
@@ -86,6 +93,7 @@ export function MapView(opts: { profile: Profile; onGuide: (target: ArrowTarget)
   let geoWatch: number | null = null
   let lastBox = ''
   let selected: Entrance | Building | null = null
+  let opened = false
   // A step-free profile starts with only step-free doors shown; the chip turns the rest on.
   const filter: Filter = { stepFree: true, withSteps: !opts.profile.stepFreeRequired }
 
@@ -125,6 +133,13 @@ export function MapView(opts: { profile: Profile; onGuide: (target: ArrowTarget)
       h('div', { class: 'gm-top' }, search, results, chips, status),
       locateBtn,
       sheet,
+      h(
+        'nav',
+        { class: 'gm-nav', 'aria-label': t.navLabel },
+        h('button', { class: 'gm-tab', type: 'button', 'aria-current': 'page' }, icon('location_on'), h('span', {}, t.tabExplore)),
+        h('button', { class: 'gm-tab', type: 'button', onclick: () => { teardown(); opts.onContribute() } }, icon('add_circle'), h('span', {}, t.tabContribute)),
+        h('button', { class: 'gm-tab', type: 'button', onclick: opts.onSettings }, icon('accessibility_new'), h('span', {}, t.tabSettings)),
+      ),
     ),
   )
 
@@ -180,7 +195,11 @@ export function MapView(opts: { profile: Profile; onGuide: (target: ArrowTarget)
       status.textContent = r.source === 'static' ? t.offlineData : ''
       if (r.source === 'static') console.warn('[doorway] /api/entrances unreachable, using static data/berlin-mitte.json')
       renderMarkers()
-      if (!selected) renderList()
+      const want = opts.openDoor ? entrances.find((x) => x.id === opts.openDoor) : undefined
+      if (want && !opened) {
+        opened = true
+        openEntrance(want)
+      } else if (!selected) renderList()
     } catch {
       status.textContent = t.noDoors
     }
@@ -269,6 +288,23 @@ export function MapView(opts: { profile: Profile; onGuide: (target: ArrowTarget)
     return h('div', { class: 'gm-section' }, btn, out)
   }
 
+  function sharePill(e: Entrance) {
+    const url = `${location.origin}${location.pathname}?door=${encodeURIComponent(e.id)}`
+    const b = h('button', { class: 'gm-pill', type: 'button' }, icon('share'), t.share)
+    b.addEventListener('click', async () => {
+      try {
+        if (navigator.share) await navigator.share({ title: e.name ?? t.unnamedEntrance, url })
+        else {
+          await navigator.clipboard.writeText(url)
+          announce(t.copied)
+        }
+      } catch {
+        /* share sheet dismissed */
+      }
+    })
+    return b
+  }
+
   // ---- place card (sheet content for one door or building) ----
   function showCard(item: Entrance | Building, ...children: (Node | null)[]) {
     selected = item
@@ -302,14 +338,17 @@ export function MapView(opts: { profile: Profile; onGuide: (target: ArrowTarget)
             {
               class: 'gm-pill gm-pill-primary',
               type: 'button',
-              onclick: () => {
+              onclick: async () => {
+                // The Start pill is the one gesture that unlocks compass, camera and sound.
+                // unlockAll must be the first await so iOS still sees the tap.
+                await unlockAll({ camera: true })
                 teardown()
                 opts.onGuide(g.target)
               },
             },
             icon('navigation'),
             t.guideMe,
-          ))
+          ), sharePill(e))
         : h('p', { class: 'reason' }, reasonText[g.reason])
     showCard(
       e,
@@ -444,8 +483,13 @@ export function MapView(opts: { profile: Profile; onGuide: (target: ArrowTarget)
           gestureHandling: 'greedy',
           disableDefaultUI: true,
           keyboardShortcuts: true,
+          mapTypeId: 'hybrid',
         })
         drawMe()
+        if (opts.openDoor)
+          void findEntrance(opts.openDoor).then((e) => {
+            if (e) map?.setCenter({ lat: e.lat, lng: e.lon })
+          })
         map.addListener('click', () => {
           results.hidden = true
           if (sheet.dataset.state === 'full') setSheet('half')

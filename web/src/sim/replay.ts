@@ -6,7 +6,7 @@
 // when no compass was available while recording.
 
 import { normalize360, relativeBearing } from '../core/geo'
-import { startHeading, type Heading, type HeadingSource } from '../core/heading'
+import { requestHeadingPermission, startHeading, type Heading, type HeadingSource } from '../core/heading'
 import { announce } from '../session'
 import { t as str } from '../strings'
 import { h, mount } from '../ui/dom'
@@ -94,7 +94,7 @@ export function replaySensors(track: TrackPoint[], opts: { speed: number; imageU
 }
 
 /** ?record=1 screen. Samples the latest fix and heading once per second. */
-export function Recorder(): void {
+export function Recorder(opts: { onBack?: () => void } = {}): void {
   const points: TrackPoint[] = []
   let heading: Heading | null = null
   let fix: GeolocationPosition | null = null
@@ -108,7 +108,9 @@ export function Recorder(): void {
   const startBtn = h('button', { class: 'btn', type: 'button' }, str.recordStart)
   const stopBtn = h('button', { class: 'btn btn-secondary', type: 'button', disabled: true }, str.recordStop)
 
-  startBtn.addEventListener('click', () => {
+  startBtn.addEventListener('click', async () => {
+    // Opened from the Contribute tab there was no Start screen: ask for the compass inside this tap.
+    await requestHeadingPermission()
     points.length = 0
     out.replaceChildren()
     t0 = performance.now()
@@ -156,6 +158,9 @@ export function Recorder(): void {
     h(
       'section',
       { class: 'screen screen-record', 'aria-labelledby': 'rec-title' },
+      opts.onBack
+        ? h('button', { class: 'btn btn-secondary btn-small', type: 'button', onclick: () => { if (timer !== null) window.clearInterval(timer); if (watch !== null) navigator.geolocation.clearWatch(watch); stopHeading?.(); opts.onBack!() } }, str.back)
+        : null,
       h('h1', { id: 'rec-title' }, str.recordTitle),
       h('p', { class: 'hint' }, str.recordHint),
       count,

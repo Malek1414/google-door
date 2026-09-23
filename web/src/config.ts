@@ -32,6 +32,8 @@ export interface Params {
   door: string
   track: string
   speed: number
+  /** ?door=node/123 without sim: open that door's card on the map. */
+  openDoor: string | null
 }
 
 export const DEFAULT_SIM_DOOR = 'node/10795939972' // Hauptbahnhof step-free door, see CONTRACT fixture
@@ -48,5 +50,6 @@ export function readParams(search = location.search): Params {
     // Only same-origin relative track paths: never load an arbitrary URL from the query string.
     track: /^[\w./-]+\.json$/.test(track) && !track.includes('..') ? track : DEFAULT_TRACK,
     speed: Number.isFinite(speed) && speed > 0 && speed <= 20 ? speed : 1,
+    openDoor: /^(node|way)\/\d+$/.test(q.get('door') ?? '') ? q.get('door') : null,
   }
 }

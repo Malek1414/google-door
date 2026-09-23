@@ -25,11 +25,18 @@ function withProfile(next: (p: Profile) => void) {
   else Onboard({ onDone: next })
 }
 
+// Everyone starts on the map. Without saved settings the default profile applies (any route,
+// speech and large visuals); the accessibility button top right opens the three questions.
+const DEFAULT_PROFILE: Profile = { stepFreeRequired: false, channels: ['speech', 'visual'] }
+
 function showMap(p: Profile) {
+  applyContrast(outputFor(p).contrast)
   MapView({
     profile: p,
+    openDoor: params.openDoor,
     onGuide: (target) => showLive(target, p),
     onSettings: () => Onboard({ initial: p, onDone: showMap }),
+    onContribute: () => Recorder({ onBack: () => showMap(p) }),
   })
 }
 
@@ -59,5 +66,5 @@ if (params.record) {
 } else if (params.sim) {
   Start({ sim: true, onDone: () => withProfile((p) => void startSim(p).catch((e) => fatal(String(e)))) })
 } else {
-  Start({ sim: false, onDone: () => withProfile(showMap) })
+  showMap(session.profile ?? DEFAULT_PROFILE)
 }

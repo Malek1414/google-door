@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { outputFor, parseProfile } from '../src/core/profile'
 
 describe('outputFor (spec personas)', () => {
-  it('Erden, partially blind: large visuals + speech', () => {
+  it('Erdin, partially blind: large visuals + speech', () => {
     const o = outputFor({ stepFreeRequired: false, channels: ['visual', 'speech'] })
     expect(o).toMatchObject({ speak: true, beacon: true, haptics: false, dimScreen: false, contrast: 'yellow-black' })
     expect(o.arrowScale).toBeGreaterThan(1)

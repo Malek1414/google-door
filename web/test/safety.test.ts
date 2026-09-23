@@ -75,6 +75,15 @@ describe('stepFree null is never coerced to false (or true)', () => {
     const e = { ...base, stepFree: null }
     expect(guidanceFor(e, { stepFreeRequired: true })).toEqual({ kind: 'text', reason: 'step-free-unknown' })
   })
+  // DATA DISCREPANCY: pipeline/ingest_osm.py assigns tier 1 to wheelchair=no doors too
+  // (CONTRACT says tier 1 = wheelchair=yes). The gate must hold regardless.
+  it('tier-1 stepFree:false door under a step-free profile never gets an arrow', () => {
+    const e = { ...base, tier: 1 as Tier, stepFree: false }
+    expect(arrowTargetFor(e, { stepFreeRequired: true })).toBeNull()
+    const d: Dataset = JSON.parse(readFileSync(resolve(__dirname, '../../data/berlin-mitte.json'), 'utf8'))
+    const bad = d.entrances.filter((x) => x.tier === 1 && x.stepFree !== true)
+    for (const x of bad) expect(arrowTargetFor(x, { stepFreeRequired: true })).toBeNull()
+  })
   it('explicit false is reported as not step-free', () => {
     const e = { ...base, stepFree: false }
     expect(guidanceFor(e, { stepFreeRequired: true })).toEqual({ kind: 'text', reason: 'not-step-free' })

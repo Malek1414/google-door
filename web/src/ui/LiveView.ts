@@ -11,9 +11,9 @@ import { progressAlong, currentStep, type Route } from '../core/route'
 import { fetchRoute } from '../data'
 import { chevronStack, destinationPin, stackTransform, type ArPhase } from './ar'
 import './ar.css'
-import { startHeading, type Heading } from '../core/heading'
+import { startHeading, startPitch, type Heading } from '../core/heading'
 import { snapToGraph } from '../core/match'
-import type { OutputConfig } from '../core/profile'
+import type { OutputConfig, Profile } from '../core/profile'
 import type { ArrowTarget } from '../core/target'
 import { BeaconAudio, playApproachChime } from '../audio'
 import { postLook } from '../data'
@@ -21,6 +21,8 @@ import { announce, session, speak, vibrate } from '../session'
 import { lang, t } from '../strings'
 import { h, mount, s } from './dom'
 import './arrival.css'
+import { APPROACH_TRIGGER, approachModeFor, type ApproachMode } from './approachPort'
+import './approach.css'
 
 export interface Fix {
   lat: number
@@ -174,7 +176,7 @@ function lookTargetText(target: ArrowTarget): string {
   return parts.join(', ')
 }
 
-function grabFrame(el: HTMLVideoElement | HTMLImageElement | null): string | null {
+export function grabFrame(el: HTMLVideoElement | HTMLImageElement | null): string | null {
   if (!el) return null
   const w = el instanceof HTMLVideoElement ? el.videoWidth : el.naturalWidth || 1024
   const hgt = el instanceof HTMLVideoElement ? el.videoHeight : el.naturalHeight || 768
@@ -195,6 +197,10 @@ export function LiveView(opts: {
   config: OutputConfig
   onExit: () => void
   onReplay?: () => void
+  /** Decides whether the arrival card offers "Zum Eingang führen" (never for deaf-only). */
+  profile?: Profile | null
+  /** Opens the last-10-metres screen. LiveView tears itself down first. */
+  onApproach?: (mode: ApproachMode) => void
 }): () => void {
   const { target, config: cfg } = opts
   const e = target.entrance
@@ -300,6 +306,9 @@ export function LiveView(opts: {
   const SAFE_EVERY_MS = 45000
   const SAFE_SHOW_MS = 4000
   let arPhase: ArPhase = 'scanning'
+  // Device pitch (beta), low-passed. null until the first orientation event: then the
+  // chevrons keep today's fixed screen placement.
+  let pitch: number | null = null
   let lastSafe = 0
 
   // Walking route to the door. Until it arrives (or if none exists) guidance falls
@@ -383,6 +392,12 @@ export function LiveView(opts: {
     const secsEl = h('p', { class: 'arrival-count' }, ARR.backIn(ARRIVAL_EXIT_S))
     const stayBtn = h('button', { class: 'gm-pill gm-pill-primary', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'pan_tool'), ARR.stay)
     const mapBtn = h('button', { class: 'gm-pill', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'map'), ARR.toMap)
+    // The last 10 metres. An ordinary button: VoiceOver's own double-tap activates it,
+    // a custom double-tap handler would be swallowed by VoiceOver.
+    const mode = opts.onApproach ? approachModeFor(opts.profile) : null
+    const approachBtn = mode
+      ? h('button', { class: 'apr-trigger', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'door_front'), APPROACH_TRIGGER)
+      : null
     cardEl = h(
       'div',
       { class: 'arrival', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'arrival-title' },
@@ -399,6 +414,7 @@ export function LiveView(opts: {
         doorType ? h('p', { class: 'arrival-door' }, doorType) : null,
         ...warns.map((w) => h('p', { class: 'arrival-warn', role: 'note' }, h('strong', {}, `${t.warningPrefix}: `), w)),
         face ? h('p', { class: 'arrival-face' }, face) : null,
+        approachBtn,
         secsEl,
         h('div', { class: 'nav-row' }, mapBtn, stayBtn),
       ),
@@ -428,6 +444,10 @@ export function LiveView(opts: {
       stayBtn.remove()
     })
     mapBtn.addEventListener('click', exit)
+    approachBtn?.addEventListener('click', () => {
+      teardown()
+      opts.onApproach!(mode!)
+    })
   }
 
   function cancelArrival() {
@@ -508,7 +528,7 @@ export function LiveView(opts: {
       turnIcon.textContent = turnGlyph(rel)
       // Chevrons foreshorten as they swing away, the way an extruded plate would.
       // Attribute rather than CSS transform: the group lives in the SVG user space.
-      stackG.setAttribute('transform', stackTransform(rel, 393, 760))
+      stackG.setAttribute('transform', stackTransform(rel, 393, 760, pitch))
       if (cone) {
         // Poor localisation dims the chevrons rather than hiding them: Google keeps
         // guidance on screen and softens the wording, and an empty screen tells a
@@ -592,6 +612,12 @@ export function LiveView(opts: {
 
   if (cfg.speak) speak(t.guidingTo(name),{ interrupt: true })
 
+  // Ground plane: re-project the chevrons as the phone tilts. Transform only, no redraw.
+  const stopPitch = startPitch((b) => {
+    pitch = pitch === null ? b : pitch + 0.25 * (b - pitch)
+    if (heading && heading.source !== 'none') stackG.setAttribute('transform', stackTransform(rel, 393, 760, pitch))
+  })
+
   const stopSensors = opts.sensors.start(
     (f) => {
       fix = f
@@ -646,6 +672,7 @@ export function LiveView(opts: {
     clearTimers()
     cancelAnimationFrame(raf)
     stopSensors()
+    stopPitch()
     beacon?.stop()
     try {
       speechSynthesis?.cancel()

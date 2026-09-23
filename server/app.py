@@ -37,6 +37,8 @@ MODEL_TTS   = os.environ.get("GEMINI_MODEL_TTS",   "gemini-3.1-flash-tts-preview
 TTS_VOICE   = os.environ.get("GEMINI_TTS_VOICE",   "Kore")
 
 app = FastAPI(title="Doorway")
+from server.surface import router as surface_router
+
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 DATA = None
@@ -236,6 +238,8 @@ async def speak(req: SpeakReq):
 # Serve the built PWA from the same origin as /api/*, so there is ONE url to open and
 # no CORS in the way. Mounted last: every /api route above wins over a static path.
 # DOORWAY_WEB points at web/dist; if it isn't built yet the API still runs.
+app.include_router(surface_router)   # POST /api/surface — see server/surface.py
+
 _web = os.environ.get("DOORWAY_WEB", "web/dist")
 if os.path.isdir(_web):
     app.mount("/", StaticFiles(directory=_web, html=True), name="web")

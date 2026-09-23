@@ -217,3 +217,88 @@ WAV, 24 kHz mono 16-bit. Regenerate with `pipeline/synth_speech.py --lang de`
 
 **Playback order is cached WAV → `/api/speak` → `speechSynthesis`.** Runtime TTS is
 for unpredictable text only; it must never sit in the walking loop.
+
+---
+
+## Surface segments (v1) — answers BRIEF-FLOOR
+
+For wheelchair users the floor decides as much as the door: a step-free entrance at the
+end of thirty metres of cobblestone is not accessible. Surface data is a **fourth
+source**, and it sits under the same asymmetry as the tier ladder.
+
+### The asymmetry, restated as a rule
+
+**Surface analysis may never upgrade. It may only downgrade.**
+
+- It cannot make a door step-free, cannot raise a tier, cannot create an arrow.
+- A **confirmed** `step`, `kerb`, or `steep` slope on the only route marks that entrance
+  unsuitable for step-free profiles: text, no arrow, until an owner edit or a survey says
+  otherwise.
+- Confidence below 0.6 renders as `unknown`. Never as `smooth`.
+- Unconfirmed results are labelled as unconfirmed in the UI, always.
+
+### Where it lives
+
+On the **route**, not the door. One entrance may be approached from several directions with
+different surfaces, so `surface` hangs off a route record keyed by `entranceId`, and the door
+card shows the summary of the route the user is actually on (or the worst case when unknown).
+
+```json
+{
+  "entranceId": "node/10795939972",
+  "approachId": "approach/1",
+  "segments": [
+    { "t0": 3.2, "t1": 9.8,
+      "type": "smooth|paving|cobblestone|gravel|grass|carpet|tiles|metal_grate|unknown",
+      "condition": "good|uneven|damaged|wet_slippery|unknown",
+      "slope": "flat|gentle|steep|unknown",
+      "obstacles": ["threshold","step","kerb","narrow_passage","door_mat","ramp"],
+      "note": "one short sentence, plain language",
+      "confidence": 0.0,
+      "startM": 12.4, "endM": 31.7 }
+  ],
+  "summary": "smooth|mixed|difficult|unknown",
+  "source": "gemini_video",
+  "confirmed": false
+}
+```
+
+### `startM` / `endM` — the piece BRIEF-FLOOR is missing
+
+Segments come back keyed by **video time**. The arrow works in **geography**. Speaking a
+warning ten metres before cobblestones therefore needs a time → distance join, and without
+it a segment can be shown on a card but never announced at the right moment.
+
+The recorder must write a GPS track **alongside** the video, sharing one clock. Then:
+
+```
+startM(t) = cumulative walked distance along the track at video time t
+```
+
+`pipeline/surface_align.py` (pure, testable) integrates haversine over the track samples and
+resolves each `t0`/`t1` to `startM`/`endM`. Rules:
+
+- Track and video must share a start timestamp; if they do not, `startM`/`endM` are `null`
+  and the segment is **card-only** — never spoken, because a warning at the wrong moment is
+  worse than no warning.
+- Track gaps longer than 3 s make the segments they span `null` as well.
+- Distances are measured from the **start of the walk**, so live guidance compares against
+  distance-still-to-go, not absolute position.
+
+### Derived warnings
+
+Added to the entrance `warnings` array **only when `confirmed` is true**:
+`uneven-surface` · `cobblestones` · `gravel` · `steep-slope` · `threshold` · `slippery`
+
+### Endpoint
+
+    POST /api/surface     multipart: video (mp4/mov, <= 60 s, <= 50 MB) + optional track JSON
+    -> { segments: [...], summary, source: "gemini_video", confirmed: false }
+
+Lives in `server/surface.py` with its own router, not in `app.py`: multipart upload, size
+caps and temp-file handling are a different shape from the JSON endpoints.
+
+**The video is deleted as soon as analysis returns.** At most three keyframes are retained.
+People walk through station entrances without consenting to be filmed.
+
+The prompt must forbid guessing: if the floor is not clearly visible, the answer is `unknown`.

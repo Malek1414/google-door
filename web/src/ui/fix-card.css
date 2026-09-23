@@ -39,3 +39,6 @@
 /* info card: x 22-420, starts 18 below tips, bg #1c2224, radius 20 (measured) */
 .gm-facts { margin-top: 18px; padding: 4px 20px; border-radius: 20px; background: #1c2224; }
 .gm-fact { min-height: 52px; gap: 20px; font-size: 16px; border-bottom-color: rgba(255,255,255,0.08); }
+
+/* designer review: sparkle icon is saturated blue in Maps (rgb 60,127,248) */
+.gm-tips-head .ms { color: #3c7ff8; }

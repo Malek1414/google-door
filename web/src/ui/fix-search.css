@@ -58,3 +58,6 @@
   font-weight: 500;
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
 }
+
+/* designer review: measured Google profile purple */
+.gm-avatar { background: #807fc7; }

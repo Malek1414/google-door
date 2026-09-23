@@ -1,0 +1,50 @@
+/* "Unternehmen" tab. Reuses the gm-* tokens (sheet #151316, teal #62c4cb, tonal #063c40). */
+.bz { display: flex; flex-direction: column; padding-bottom: 24px; }
+.bz-edit { width: 44px; height: 44px; }
+.bz-label { display: block; margin: 14px 0 6px; font-size: 15px; font-weight: 500; color: var(--fg); }
+.bz-input { width: 100%; box-sizing: border-box; min-height: 50px; padding: 0 16px; border-radius: 14px; border: 1px solid var(--line);
+  background: var(--search); color: var(--fg); font: 400 17px/1.2 'Google Sans Flex', Roboto, sans-serif; }
+.bz-input::placeholder { color: var(--fg2); opacity: 0.8; }
+.bz-input:focus { outline: 3px solid var(--teal); outline-offset: 1px; border-color: transparent; }
+.bz-wide { width: 100%; justify-content: center; height: 48px; margin-top: 4px; }
+.bz-submit { margin-top: 20px; }
+.bz-loc-text { font-size: 14px; margin: 8px 0 0; }
+.bz-status { min-height: 1.2em; margin: 10px 0 0; color: var(--teal); font-size: 15px; }
+.bz-status:empty { margin: 0; min-height: 0; }
+
+.bz-card { display: block; margin-top: 14px; padding: 16px 18px; border-radius: 20px; background: var(--nav); }
+.bz-score-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.bz-h3 { margin: 0; font: 500 18px/1.3 'Google Sans Flex', Roboto, sans-serif; color: #fff; }
+.bz-score { font: 500 44px/1 'Google Sans Flex', Roboto, sans-serif; color: var(--teal); }
+.bz-bar { height: 4px; margin: 12px 0 4px; border-radius: 2px; background: var(--tonal); overflow: hidden; }
+.bz-bar-fill { height: 100%; background: var(--teal); border-radius: 2px; transition: width 0.3s ease; }
+.bz-small { font-size: 14px; margin-bottom: 0; }
+
+.bz-toggle { display: flex; align-items: center; gap: 16px; min-height: 56px; cursor: pointer; }
+.bz-toggle-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bz-toggle-text .gm-row-title { white-space: normal; }
+.bz-switch { appearance: none; -webkit-appearance: none; flex: none; position: relative; width: 52px; height: 32px; margin: 0; border-radius: 16px;
+  background: var(--chip); border: 2px solid var(--fg2); cursor: pointer; transition: background 0.2s ease, border-color 0.2s ease; }
+.bz-switch::after { content: ''; position: absolute; top: 50%; left: 6px; width: 16px; height: 16px; border-radius: 50%; background: var(--fg2);
+  transform: translateY(-50%); transition: left 0.2s ease, width 0.2s ease, height 0.2s ease, background 0.2s ease; }
+.bz-switch:checked { background: var(--teal); border-color: var(--teal); }
+.bz-switch:checked::after { left: 24px; width: 22px; height: 22px; background: var(--teal-ink); }
+.bz-switch:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
+
+.bz-section { margin-top: 22px; }
+.bz-list { margin-top: 6px; }
+.bz-section > .gm-p { margin-top: 8px; }
+.bz-dot { width: 40px; height: 40px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--circle); color: var(--fg2); }
+.bz-dot-ok { background: var(--tonal); color: var(--teal); }
+
+.bz-tasks { list-style: none; margin: 8px 0 0; padding: 4px 18px; border-radius: 20px; background: var(--nav); }
+.bz-task { display: flex; align-items: center; gap: 12px; min-height: 56px; border-bottom: 1px solid var(--line); }
+.bz-task:last-child { border-bottom: 0; }
+.bz-task-label { flex: 1; min-width: 0; display: flex; align-items: center; gap: 14px; min-height: 48px; cursor: pointer; font-size: 16px; }
+.bz-task-done .bz-task-label > span { color: var(--fg2); text-decoration: line-through; }
+.bz-check { appearance: none; -webkit-appearance: none; flex: none; width: 26px; height: 26px; margin: 0; border-radius: 7px; border: 2px solid var(--fg2);
+  background: transparent; display: grid; place-items: center; cursor: pointer; }
+.bz-check:checked { background: var(--teal); border-color: var(--teal); }
+.bz-check:checked::after { content: ''; width: 7px; height: 13px; border: solid var(--teal-ink); border-width: 0 3px 3px 0; transform: translateY(-2px) rotate(45deg); }
+.bz-check:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
+.bz-task-btn { height: 44px; padding: 0 16px 0 12px; }

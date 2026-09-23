@@ -16,6 +16,16 @@ import { mapsKey } from '../config'
 import { bboxAround, fetchEntrances, fetchLived, findEntrance, type BBox } from '../data'
 import { announce } from '../session'
 import { unlockAll } from './Start'
+import type { FeatureCtx, Panel } from './ctx'
+import { businessPanel } from './Business'
+import { contributePanel } from './Contribute'
+import { forYouPanel, rememberRecent } from './ForYou'
+import { renderPlaceCard, renderPlaceList } from './PlaceCard'
+import { modeSwitch } from './ModeSwitch'
+import { loadMode, saveMode, showDoorMarkers, type Mode } from '../core/mode'
+import { loadSurvey, mergeSurvey } from '../core/survey'
+import { NORMAL_CHIPS, PlacesUnavailable, searchCategory, searchText, type PlaceHit } from '../places'
+import { lang } from '../strings'
 import { t } from '../strings'
 import { h, mount, s } from './dom'
 
@@ -73,7 +83,7 @@ export function warningsBlock(e: Entrance): HTMLElement | null {
 
 type SheetState = 'peek' | 'half' | 'full'
 type Filter = 'stepFree' | 'withSteps' | 'automatic' | 'noRevolving'
-type Tab = 'explore' | 'saved' | 'business'
+type Tab = 'explore' | 'saved' | 'contribute' | 'business'
 
 const SAVED_KEY = 'doorway.saved'
 const loadSaved = (): string[] => {
@@ -130,6 +140,12 @@ export function MapView(opts: {
   let saved = loadSaved()
   // A step-free profile starts with only step-free doors shown; the chips turn the rest on.
   const filters = new Set<Filter>(opts.profile.stepFreeRequired ? ['stepFree'] : [])
+  let mode: Mode = loadMode()
+  let panelCleanup: (() => void) | null = null
+  let placeMarkers: google.maps.Marker[] = []
+  let placeHits: PlaceHit[] = []
+  let placeTitle = ''
+  let activePlaceChip: string | null = null
 
   // ---- top: search bar, chips, layers ----
   const status = h('p', { class: 'gm-status', role: 'status' }, '')
@@ -147,10 +163,7 @@ export function MapView(opts: {
     ['automatic', 'door_sliding', t.chipAutomatic],
     ['noRevolving', 'block', t.chipNoRevolving],
   ]
-  const chips = h(
-    'div',
-    { class: 'gm-chips', role: 'group', 'aria-label': t.filterLabel },
-    ...chipDefs.map(([key, ic, label]) => {
+  const accessChips = chipDefs.map(([key, ic, label]) => {
       const b = h('button', { class: 'gm-chip', type: 'button', 'aria-pressed': String(filters.has(key)) }, icon(ic), label)
       b.addEventListener('click', () => {
         if (filters.has(key)) filters.delete(key)
@@ -160,8 +173,28 @@ export function MapView(opts: {
         renderSheet()
       })
       return b
-    }),
-  )
+    })
+  const placeChips = NORMAL_CHIPS.map((c) => {
+    const b = h('button', { class: 'gm-chip', type: 'button', 'aria-pressed': 'false', 'data-chip': c.id }, icon(c.icon), lang === 'de' ? c.labelDe : c.labelEn)
+    b.addEventListener('click', () => void runCategory(c.id, lang === 'de' ? c.labelDe : c.labelEn))
+    return b
+  })
+  const modeChip = modeSwitch(mode, (m) => {
+    mode = m
+    saveMode(m)
+    clearPlaces()
+    selected = null
+    renderChips()
+    renderMarkers()
+    renderSheet()
+    announce(m === 'access' ? t.modeOn : t.modeOff)
+  })
+  const chips = h('div', { class: 'gm-chips', role: 'group', 'aria-label': t.filterLabel })
+  function renderChips() {
+    chips.replaceChildren(modeChip, ...(mode === 'access' ? accessChips : placeChips))
+    placeChips.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.chip === activePlaceChip)))
+  }
+  renderChips()
   const morePill = h('button', { class: 'gm-more', type: 'button', hidden: true, onclick: () => closeCard() }, t.moreDoors)
   const layersBtn = h('button', { class: 'gm-round gm-layers', type: 'button', 'aria-label': t.layers }, icon('layers'))
 
@@ -188,12 +221,7 @@ export function MapView(opts: {
   nav.addEventListener('click', (ev) => {
     const b = (ev.target as HTMLElement).closest<HTMLButtonElement>('.gm-tab')
     if (!b) return
-    const id = b.dataset.tab as Tab | 'contribute'
-    if (id === 'contribute') {
-      teardown()
-      opts.onContribute()
-      return
-    }
+    const id = b.dataset.tab as Tab
     tab = id
     nav.querySelectorAll<HTMLButtonElement>('.gm-tab').forEach((x) => {
       const on = x.dataset.tab === tab
@@ -202,9 +230,10 @@ export function MapView(opts: {
       x.querySelector('.ms')?.classList.toggle('ms-fill', on)
     })
     selected = null
+    clearPlaces()
     renderMarkers()
     renderSheet()
-    setSheet(tab === 'explore' ? 'peek' : 'half')
+    setSheet(tab === 'explore' ? 'peek' : 'full')
   })
 
   const root = h(
@@ -227,6 +256,28 @@ export function MapView(opts: {
     sheet.style.removeProperty('--drag')
   }
   setSheet('peek')
+  const featureCtx: FeatureCtx = {
+    get map() {
+      return map
+    },
+    entrances: () => entrances,
+    buildings: () => buildings,
+    origin: () => origin(),
+    profile: opts.profile,
+    openDoor: (e) => openEntrance(e),
+    setSheet: (st) => setSheet(st),
+    refresh: () => {
+      lastBox = ''
+      const bb = map?.getBounds()
+      if (bb) void load({ south: bb.getSouthWest().lat(), west: bb.getSouthWest().lng(), north: bb.getNorthEast().lat(), east: bb.getNorthEast().lng() })
+      else void load(bboxAround(origin().lat, origin().lon, 500))
+    },
+    openRecorder: () => {
+      teardown()
+      opts.onContribute()
+    },
+    announce: (text) => announce(text),
+  }
   const order: SheetState[] = ['peek', 'half', 'full']
   let dragY0: number | null = null
   let dragged = false
@@ -278,7 +329,13 @@ export function MapView(opts: {
     lastBox = key
     try {
       const r = await fetchEntrances(b)
-      entrances = r.entrances
+      let survey: ReturnType<typeof loadSurvey> = []
+      try {
+        survey = loadSurvey()
+      } catch {
+        survey = []
+      }
+      entrances = mergeSurvey(r.entrances, survey)
       buildings = r.buildings
       status.textContent = r.source === 'static' ? t.offlineData : ''
       renderMarkers()
@@ -307,25 +364,36 @@ export function MapView(opts: {
     )
   }
 
+  function mountPanel(panel: Panel) {
+    panelCleanup?.()
+    panelCleanup = null
+    try {
+      panelCleanup = panel(sheetBody, featureCtx)
+    } catch (err) {
+      console.error('[doorway] panel failed', err)
+      sheetBody.replaceChildren(h('p', { class: 'gm-p', role: 'alert' }, t.panelError))
+    }
+  }
+
   function renderSheet() {
     if (selected) return
+    panelCleanup?.()
+    panelCleanup = null
     morePill.hidden = true
     chips.hidden = false
     viewBtn.hidden = true
     goBtn.hidden = false
-    if (tab === 'saved') {
-      const list = saved.map((id) => entrances.find((e) => e.id === id)).filter((e): e is Entrance => !!e)
-      sheetBody.replaceChildren(
-        h('div', { class: 'gm-sheet-head' }, h('h2', { id: 'sheet-title', class: 'gm-sheet-title' }, t.savedTitle)),
-        h('ul', { class: 'gm-list' }, ...(list.length ? list.map((e) => doorRow(e, haversineM(origin(), e))) : [h('li', { class: 'gm-empty' }, saved.length ? t.savedElsewhere : t.savedNone)])),
-      )
+    if (tab === 'saved') return mountPanel(forYouPanel)
+    if (tab === 'contribute') return mountPanel(contributePanel)
+    if (tab === 'business') return mountPanel(businessPanel)
+    if (placeHits.length) {
+      panelCleanup = renderPlaceList(sheetBody, featureCtx, placeHits, placeTitle, (p) => openPlace(p))
       return
     }
-    if (tab === 'business') {
+    if (!showDoorMarkers(mode)) {
       sheetBody.replaceChildren(
-        h('div', { class: 'gm-sheet-head' }, h('h2', { id: 'sheet-title', class: 'gm-sheet-title' }, t.businessTitle)),
-        h('p', { class: 'gm-p' }, t.businessText),
-        h('div', { class: 'gm-actions' }, h('button', { class: 'gm-pill gm-pill-primary', type: 'button', onclick: () => { teardown(); opts.onContribute() } }, icon('videocam'), t.recordTitle)),
+        h('div', { class: 'gm-sheet-head' }, h('h2', { id: 'sheet-title', class: 'gm-sheet-title' }, t.inThisArea)),
+        h('p', { class: 'gm-p' }, t.standardHint),
       )
       return
     }
@@ -347,7 +415,7 @@ export function MapView(opts: {
     markers.forEach((m) => m.setMap(null))
     markers = []
     for (const e of entrances) {
-      if (!visible(e) && selected !== e) continue
+      if ((!visible(e) || !showDoorMarkers(mode)) && selected !== e) continue
       const big = markerKind(e) === 'step-free'
       const size = (big ? BASE_PIN * 1.4 : BASE_PIN) * (selected === e ? 1.25 : 1)
       const m = new google.maps.Marker({
@@ -423,6 +491,8 @@ export function MapView(opts: {
     sheetBody.querySelector<HTMLElement>('h2')?.focus()
   }
   function closeCard() {
+    panelCleanup?.()
+    panelCleanup = null
     selected = null
     routeLine?.setMap(null)
     routeLine = null
@@ -485,6 +555,11 @@ export function MapView(opts: {
   }
 
   function openEntrance(e: Entrance) {
+    try {
+      rememberRecent(e.id)
+    } catch {
+      /* storage unavailable */
+    }
     const g = guidanceFor(e, opts.profile)
     const b = e.buildingId ? buildings.find((x) => x.id === e.buildingId) : undefined
     const unknownNearby = entrances.filter((x) => x.id !== e.id && x.tier === 0 && haversineM(x, e) <= NEARBY_UNKNOWN_M).length
@@ -581,6 +656,74 @@ export function MapView(opts: {
     return h('div', { class: 'gm-section' }, btn, out)
   }
 
+  // ---- Google places (standard mode chips, text search) ----
+  function clearPlaces() {
+    placeMarkers.forEach((m) => m.setMap(null))
+    placeMarkers = []
+    placeHits = []
+    activePlaceChip = null
+    placeChips.forEach((b) => b.setAttribute('aria-pressed', 'false'))
+  }
+  function showPlaces(hits: PlaceHit[], title: string) {
+    placeMarkers.forEach((m) => m.setMap(null))
+    placeMarkers = []
+    placeHits = hits
+    placeTitle = title
+    if (map) {
+      const bounds = new google.maps.LatLngBounds()
+      for (const p of hits) {
+        const m = new google.maps.Marker({ map, position: { lat: p.lat, lng: p.lon }, title: p.name, zIndex: 5 })
+        m.addListener('click', () => openPlace(p))
+        placeMarkers.push(m)
+        bounds.extend({ lat: p.lat, lng: p.lon })
+      }
+      if (hits.length > 1) map.fitBounds(bounds, { top: 170, bottom: 280, left: 30, right: 30 })
+    }
+    selected = null
+    renderSheet()
+    setSheet('half')
+  }
+  function openPlace(p: PlaceHit) {
+    selected = null
+    panelCleanup?.()
+    chips.hidden = true
+    morePill.hidden = false
+    goBtn.hidden = true
+    map?.panTo({ lat: p.lat, lng: p.lon })
+    try {
+      panelCleanup = renderPlaceCard(sheetBody, featureCtx, p, () => {
+        chips.hidden = false
+        morePill.hidden = true
+        goBtn.hidden = false
+        renderSheet()
+      })
+    } catch (err) {
+      console.error('[doorway] place card failed', err)
+      sheetBody.replaceChildren(h('p', { class: 'gm-p', role: 'alert' }, t.panelError))
+    }
+    setSheet('half')
+  }
+  async function runCategory(id: string, label: string) {
+    if (!map) return
+    if (activePlaceChip === id) {
+      clearPlaces()
+      renderSheet()
+      return
+    }
+    activePlaceChip = id
+    placeChips.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.chip === id)))
+    status.textContent = t.loading
+    try {
+      const hits = await searchCategory(map, id)
+      status.textContent = hits.length ? '' : t.searchNoResults
+      showPlaces(hits, label)
+    } catch (err) {
+      activePlaceChip = null
+      placeChips.forEach((b) => b.setAttribute('aria-pressed', 'false'))
+      status.textContent = err instanceof PlacesUnavailable ? err.message : t.placesError
+    }
+  }
+
   // ---- search: known places plus named doors in the loaded data, no Places API needed ----
   function flyTo(lat: number, lon: number) {
     if (map) {
@@ -628,7 +771,22 @@ export function MapView(opts: {
   }
   searchInput.addEventListener('input', renderResults)
   searchInput.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Enter') results.querySelector<HTMLButtonElement>('button')?.click()
+    if (ev.key === 'Enter') {
+      const first = results.querySelector<HTMLButtonElement>('button')
+      if (first) first.click()
+      else if (map && searchInput.value.trim()) {
+        const q = searchInput.value.trim()
+        results.hidden = true
+        searchInput.blur()
+        status.textContent = t.loading
+        searchText(map, q)
+          .then((hits) => {
+            status.textContent = hits.length ? '' : t.searchNoResults
+            showPlaces(hits, q)
+          })
+          .catch((err) => (status.textContent = err instanceof PlacesUnavailable ? err.message : t.placesError))
+      }
+    }
     if (ev.key === 'Escape') results.hidden = true
   })
 
@@ -750,6 +908,12 @@ export function MapView(opts: {
   announce(t.mapTitle)
 
   function teardown() {
+    try {
+      panelCleanup?.()
+    } catch {
+      /* ignore */
+    }
+    placeMarkers.forEach((m) => m.setMap(null))
     if (geoWatch !== null) navigator.geolocation.clearWatch(geoWatch)
     markers.forEach((m) => m.setMap(null))
     meMarker?.setMap(null)

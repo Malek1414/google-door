@@ -1,0 +1,33 @@
+/* Place sheet and result list (PlaceCard.ts). Builds on the gm-* Google Maps clone tokens in style.css. */
+.pc-rating { display: flex; align-items: center; gap: 6px; margin: 2px 0 2px; font-size: 15px; color: var(--fg2, #c9c5ca); }
+.pc-rating-num { color: var(--fg, #e6e1e5); }
+.pc-stars { display: inline-flex; gap: 0; }
+.pc-star { font-size: 17px; color: #fbbc04; }
+.pc-star-off { color: #5d5b5f; }
+.pc-meta { margin-top: 2px; }
+.pc-open { color: #81c995; font-weight: 500; }
+.pc-closed { color: #f28b82; font-weight: 500; }
+.pc-photo-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pc-tips { margin-top: 12px; }
+.pc-tips[hidden] { display: none; }
+.pc-quotes { list-style: none; margin: 0; padding: 0; }
+.pc-quotes > li { margin: 0 0 10px; }
+.pc-quote { margin: 0; padding: 0 0 0 12px; border-left: 3px solid var(--teal, #62c4cb); }
+.pc-quote p { margin: 0 0 4px; font-size: 16px; color: var(--fg, #e6e1e5); }
+.pc-quote footer { font-size: 14px; color: var(--fg2, #c9c5ca); }
+.pc-quote-src { margin: 6px 0 0; font-size: 13px; color: var(--fg2, #c9c5ca); }
+.pc-reviews { padding-top: 8px; }
+.pc-h3 { margin: 18px 0 4px; font-size: 18px; font-weight: 500; color: #fff; }
+.pc-doors { margin-top: 4px; }
+.pc-guide { flex: none; display: inline-flex; align-items: center; height: 36px; padding: 0 14px; border-radius: 18px; background: var(--tonal, #063c40); color: var(--tonal-ink, #cdeef0); font-size: 15px; font-weight: 500; }
+.pc-access { gap: 14px; }
+.pc-access-label { flex: 1; min-width: 0; }
+.pc-access-val { flex: none; color: var(--fg2, #c9c5ca); font-weight: 500; }
+.pc-access-yes > .ms { color: #81c995; }
+.pc-access-no > .ms { color: #f28b82; }
+.pc-access-unknown > .ms { color: var(--fg2, #c9c5ca); }
+.pc-row { align-items: flex-start; }
+.pc-row .pc-rating { font-size: 14px; margin: 0; }
+.pc-row .pc-star { font-size: 15px; }
+.pc-a11y { flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: #1a3a6b; color: #a8c7fa; margin-top: 4px; }
+.pc-a11y .ms { font-size: 20px; }

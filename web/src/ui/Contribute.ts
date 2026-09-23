@@ -8,7 +8,7 @@ import type { Entrance } from '../core/types'
 import { loadSurvey, type SurveyEntrance } from '../core/survey'
 import { lang } from '../strings'
 import type { FeatureCtx, Panel } from './ctx'
-import { h, s } from './dom'
+import { h, s, revealInSheet } from './dom'
 import { openEntranceEditor } from './EntranceEditor'
 
 const S = {
@@ -214,7 +214,7 @@ export const contributePanel: Panel = (el, ctx) => {
     const focusSel = extra.focusPhoto ? '.ee-file' : extra.focusNote ? '.ee-textarea' : null
     if (focusSel) {
       const target = el.querySelector<HTMLElement>(focusSel)
-      target?.scrollIntoView({ block: 'center' })
+      if (target) revealInSheet(target, 'center')
       target?.focus({ preventScroll: true })
     }
   }
@@ -401,7 +401,7 @@ export const contributePanel: Panel = (el, ctx) => {
     const mineEl = mineSection(mine)
     const showMine = () => {
       ctx.setSheet('full')
-      mineEl.scrollIntoView({ block: 'start', behavior: 'smooth' })
+      revealInSheet(mineEl, 'start', true)
       mineEl.focus({ preventScroll: true })
     }
     el.replaceChildren(

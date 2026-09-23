@@ -310,3 +310,6 @@ html.ios-gap .gm-nav { padding-bottom: 0; }
 .gm-sheet { touch-action: pan-x; }
 .gm[data-sheet='full'] .gm-sheet-body { touch-action: pan-y; }
 .gm-handle { height: 28px; }
+
+/* The sheet is never a scroll container itself: only its body scrolls. */
+.gm-sheet { overflow: clip; }

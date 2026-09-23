@@ -1,7 +1,8 @@
 // Top of the "Unternehmen" page, 1:1 after the Google Maps "Mein Unternehmen" screen:
 // centred title with a bell, business row (letter avatar, name, address, profile link,
-// chevron menu), the "Profilstärke" card with a progress ring, a 4-column grid of round
-// tonal actions with a Weniger/Mehr toggle and "Leistung" with plain numbers.
+// chevron menu), the "Profilstärke" card with a progress ring, Google's 4-column grid of
+// round tonal actions (plus "Inklusion" first) with a Mehr/Weniger toggle after two rows,
+// and "Leistung" with plain numbers.
 // Real local counts only, nothing is estimated. Pure view: it never writes business data.
 
 import './business-home.css'
@@ -13,17 +14,19 @@ import { h } from './dom'
 
 export interface BusinessHomeActions {
   onEdit(): void
-  onEntrances(): void
-  onRecord(): void
+  /** Opens the "Inklusion" page (all accessibility settings). */
+  onInclusion(): void
+  /** Foto hinzufügen, Logo, Titelbild: the photos part of the profile editor. */
   onPhotos(): void
   onHours(): void
-  onAccess(): void
+  /** Google-only features (Werben, Angebot, Veranstaltung, Beitrag): a short note, no fake screen. */
+  onGoogleOnly(): void
   onPreview(): void
   /** Opens the ranking explanation (tap on "Profilstärke"). */
   onScore(): void
   onNewBusiness(): void
   onSwitch(id: string): void
-  /** Opens "Gesammelte Daten". The info button and grid entry are only shown when set. */
+  /** Opens "Gesammelte Daten". The info button is only shown when set. */
   onData?(): void
 }
 
@@ -52,18 +55,24 @@ const S = {
     strengthSub: 'So lässt sich die Punktzahl verbessern',
     strengthAria: (n: number) => `Profilstärke ${n} Prozent. So lässt sich die Punktzahl verbessern`,
     actionsLabel: 'Aktionen',
+    inclusion: 'Inklusion',
     edit: 'Profil bearbeiten',
-    entrances: 'Eingänge',
-    record: 'Weg filmen',
+    promote: 'Werben',
     photos: 'Foto hinzufügen',
     hours: 'Öffnungszeiten',
-    access: 'Barrierefreiheit',
-    preview: 'Vorschau',
-    data: 'Gesammelte Daten',
+    offer: 'Angebot hinzufügen',
+    event: 'Veranstaltung',
+    post: 'Beitrag hinzufügen',
+    logo: 'Logo',
+    cover: 'Titelbild',
     less: 'Weniger',
     more: 'Mehr',
     perf: 'Leistung',
     range: (a: string, b: string) => (a === b ? a : `Von ${a} bis ${b}`),
+    statViews: 'Aufrufe',
+    statInteractions: 'Interaktionen',
+    statSearches: 'Suchanfragen',
+    noData: 'Noch keine Daten',
     statEntrances: 'Eingänge',
     statPhotos: 'mit Foto',
     statAnswered: 'Fragen beantwortet',
@@ -85,18 +94,24 @@ const S = {
     strengthSub: 'How to improve the score',
     strengthAria: (n: number) => `Profile strength ${n} percent. How to improve the score`,
     actionsLabel: 'Actions',
+    inclusion: 'Inclusion',
     edit: 'Edit profile',
-    entrances: 'Entrances',
-    record: 'Film the way',
+    promote: 'Promote',
     photos: 'Add photo',
     hours: 'Opening hours',
-    access: 'Accessibility',
-    preview: 'Preview',
-    data: 'Collected data',
+    offer: 'Add offer',
+    event: 'Event',
+    post: 'Add update',
+    logo: 'Logo',
+    cover: 'Cover photo',
     less: 'Less',
     more: 'More',
     perf: 'Performance',
     range: (a: string, b: string) => (a === b ? a : `From ${a} to ${b}`),
+    statViews: 'Views',
+    statInteractions: 'Interactions',
+    statSearches: 'Searches',
+    noData: 'No data yet',
     statEntrances: 'Entrances',
     statPhotos: 'with photo',
     statAnswered: 'questions answered',
@@ -175,15 +190,11 @@ export function popover(btn: HTMLButtonElement, panel: HTMLElement): void {
   })
 }
 
-function monthYear(d: Date): string {
-  return d.toLocaleDateString(lang === 'en' ? 'en-GB' : 'de-DE', { month: 'short', year: 'numeric' })
-}
-
 function readCollapsed(): boolean {
   try {
-    return localStorage.getItem(GRID_KEY) === '1'
+    return localStorage.getItem(GRID_KEY) !== '0'
   } catch {
-    return false
+    return true
   }
 }
 
@@ -293,30 +304,34 @@ export function businessHomeHeader(_ctx: FeatureCtx, business: BusinessProfile, 
   )
 
   // ---------- 4-column grid of round tonal actions ----------
-  const action = (name: string, label: string, onclick: () => void) =>
-    h('li', { class: 'bzh-action' },
+  const action = (name: string, label: string, onclick: () => void, featured = false) =>
+    h('li', { class: `bzh-action${featured ? ' bzh-action-featured' : ''}` },
       h('button', { class: 'bzh-action-btn', type: 'button', onclick },
         h('span', { class: 'bzh-action-circle', 'aria-hidden': 'true' }, icon(name, true)),
         h('span', { class: 'bzh-action-label' }, label),
       ),
     )
+  // Google's items in Google's order. Doorway adds one quiet item, "Inklusion", right after
+  // Google's first row: same look as the others, visible without expanding the grid.
   const items = [
     action('edit', L.edit, actions.onEdit),
-    action('door_front', L.entrances, actions.onEntrances),
-    action('videocam', L.record, actions.onRecord),
-    action('add_photo_alternate', L.photos, actions.onPhotos),
+    action('trending_up', L.promote, actions.onGoogleOnly),
+    action('image', L.photos, actions.onPhotos),
     action('schedule', L.hours, actions.onHours),
-    action('accessible', L.access, actions.onAccess),
-    action('visibility', L.preview, actions.onPreview),
-    actions.onData ? action('database', L.data, actions.onData) : null,
-  ].filter((x): x is HTMLLIElement => x !== null)
+    action('accessible', L.inclusion, actions.onInclusion),
+    action('sell', L.offer, actions.onGoogleOnly),
+    action('event', L.event, actions.onGoogleOnly),
+    action('campaign', L.post, actions.onGoogleOnly),
+    action('account_circle', L.logo, actions.onPhotos),
+    action('add_photo_alternate', L.cover, actions.onPhotos),
+  ]
   let collapsed = readCollapsed()
   const grid = h('ul', { class: 'bzh-grid', id: `${id}-grid`, 'aria-label': L.actionsLabel }, ...items)
   const toggleLabel = h('span', {})
   const toggleIcon = icon('keyboard_arrow_up')
   const toggle = h('button', { class: 'bzh-more', type: 'button', 'aria-controls': `${id}-grid` }, toggleIcon, toggleLabel)
   const apply = () => {
-    items.forEach((li, i) => { li.hidden = collapsed && i >= 4 })
+    items.forEach((li, i) => { li.hidden = collapsed && i >= 8 })
     toggle.setAttribute('aria-expanded', String(!collapsed))
     toggleLabel.textContent = collapsed ? L.more : L.less
     toggleIcon.textContent = collapsed ? 'keyboard_arrow_down' : 'keyboard_arrow_up'
@@ -329,19 +344,18 @@ export function businessHomeHeader(_ctx: FeatureCtx, business: BusinessProfile, 
   apply()
 
   // ---------- "Leistung": plain numbers ----------
-  const stat = (value: number, label: string) =>
+  const statDash = (label: string) =>
     h('li', { class: 'bzh-stat' },
-      h('span', { class: 'bzh-stat-value' }, String(value)),
+      h('span', { class: 'bzh-stat-value', 'aria-label': L.noData }, '–'),
       h('span', { class: 'bzh-stat-label' }, label),
     )
-  const range = stats.since && stats.until ? L.range(monthYear(stats.since), monthYear(stats.until)) : ''
   const perf = h('section', { class: 'bzh-sec', 'aria-labelledby': `${id}-perf` },
     h('h3', { class: 'bzh-h3', id: `${id}-perf` }, L.perf),
-    range ? h('p', { class: 'bzh-sub' }, range) : null,
+    // Google's own metrics. Doorway has no view data, so it shows a dash, never a made-up number.
     h('ul', { class: 'bzh-stats' },
-      stat(stats.entrances, L.statEntrances),
-      stat(stats.withPhoto, L.statPhotos),
-      stat(stats.answered, L.statAnswered),
+      statDash(L.statViews),
+      statDash(L.statInteractions),
+      statDash(L.statSearches),
     ),
   )
 

@@ -23,7 +23,8 @@ import { openBusinessEdit } from './BusinessEdit'
 import { keepOneMain, openEntrancesManager } from './BusinessEntrances'
 import { businessHomeHeader, popover } from './BusinessHome'
 import { openBusinessData } from './BusinessData'
-import { ACCESS_ATTRS, emptyDetails, loadDetails, saveDetails, type Tri } from '../core/businessDetails'
+import { ACCESS_ATTRS, loadDetails } from '../core/businessDetails'
+import { openInclusion } from './Inclusion'
 
 const S = {
   de: {
@@ -77,6 +78,15 @@ const S = {
     introText: 'Beantworte die Fragen zur Barrierefreiheit und trag deine Eingänge ein. Dann zeigt die Suche dich weiter oben.',
     introOk: 'Verstanden',
     tasksDone: (d: number, n: number) => `${d} von ${n} erledigt`,
+    recPhotos: 'Mehr Klicks für Unternehmen mit Fotos',
+    recPhotosLine: 'Fotos zeigen Kunden, was sie erwartet.',
+    recPhotosAct: 'Fotos hinzufügen',
+    recHours: 'Öffnungszeiten',
+    recHoursLine: 'Kunden über die Öffnungszeiten informieren.',
+    recHoursAct: 'Öffnungszeiten angeben',
+    recAccess: 'Barrierefreiheit angeben',
+    recAccessLine: 'Zeig Rollstuhlfahrern, welcher Eingang passt.',
+    recAccessAct: 'Inklusion öffnen',
     taskRoute: 'Weg vom Haupteingang zur Toilette filmen',
     taskPhoto: 'Foto vom barrierefreien Eingang',
     taskWidth: 'Türbreite messen',
@@ -102,6 +112,7 @@ const S = {
     more: (l: string) => `Weitere Optionen: ${l}`,
     switched: (n: string) => `Gewechselt zu ${n}.`,
     cancel: 'Abbrechen',
+    googleOnly: 'Diese Funktion gibt es in Google Maps. Doorway ergänzt nur die Inklusion.',
   },
   en: {
     title: 'Business',
@@ -153,6 +164,15 @@ const S = {
     introText: 'Answer the accessibility questions and add your entrances. Search then shows you higher up.',
     introOk: 'Got it',
     tasksDone: (d: number, n: number) => `${d} of ${n} done`,
+    recPhotos: 'More clicks for businesses with photos',
+    recPhotosLine: 'Photos show customers what to expect.',
+    recPhotosAct: 'Add photos',
+    recHours: 'Opening hours',
+    recHoursLine: 'Tell customers when you are open.',
+    recHoursAct: 'Add opening hours',
+    recAccess: 'Add accessibility',
+    recAccessLine: 'Show wheelchair users which entrance works.',
+    recAccessAct: 'Open Inclusion',
     taskRoute: 'Film the way from the main entrance to the toilet',
     taskPhoto: 'Photo of the accessible entrance',
     taskWidth: 'Measure the door width',
@@ -178,13 +198,24 @@ const S = {
     more: (l: string) => `More options: ${l}`,
     switched: (n: string) => `Switched to ${n}.`,
     cancel: 'Cancel',
+    googleOnly: 'This feature lives in Google Maps. Doorway only adds inclusion.',
   },
 }
 const L = S[lang === 'en' ? 'en' : 'de']
 
 const PHOTO_TASK_ID = 'photo'
 const WIDTH_TASK_ID = 'width'
+const GPHOTOS_TASK_ID = 'g-photos'
+const GHOURS_TASK_ID = 'g-hours'
+const ACCESS_TASK_ID = 'access'
+// Google's usual recommendations plus one for accessibility. The inclusion tasks themselves
+// (route, entrance photo, door width) live on the Inklusion page and still count for the score.
 const TASKS: { id: string; label: string; line: string }[] = [
+  { id: GPHOTOS_TASK_ID, label: L.recPhotos, line: L.recPhotosLine },
+  { id: GHOURS_TASK_ID, label: L.recHours, line: L.recHoursLine },
+  { id: ACCESS_TASK_ID, label: L.recAccess, line: L.recAccessLine },
+]
+const INCLUSION_TASKS: { id: string; label: string; line: string }[] = [
   { id: ROUTE_TASK_ID, label: L.taskRoute, line: L.lineRoute },
   { id: PHOTO_TASK_ID, label: L.taskPhoto, line: L.linePhoto },
   { id: WIDTH_TASK_ID, label: L.taskWidth, line: L.lineWidth },
@@ -251,8 +282,9 @@ function mapCentre(ctx: FeatureCtx): LatLon {
 
 /** Make sure the three standard tasks exist, keeping stored done flags. */
 function withTasks(b: BusinessProfile): BusinessProfile {
-  const tasks: BusinessTask[] = TASKS.map((t) => ({ id: t.id, label: t.label, done: b.tasks.find((x) => x.id === t.id)?.done === true }))
-  const extra = b.tasks.filter((x) => !TASKS.some((t) => t.id === x.id))
+  const all = [...TASKS, ...INCLUSION_TASKS]
+  const tasks: BusinessTask[] = all.map((t) => ({ id: t.id, label: t.label, done: b.tasks.find((x) => x.id === t.id)?.done === true }))
+  const extra = b.tasks.filter((x) => !all.some((t) => t.id === x.id))
   return { ...b, tasks: [...tasks, ...extra] }
 }
 
@@ -263,8 +295,20 @@ function withTasks(b: BusinessProfile): BusinessProfile {
 function autoDone(b: BusinessProfile, linked: SurveyEntrance[]): BusinessProfile {
   const hasPhoto = linked.some((e) => typeof e.photo === 'string' && e.photo.length > 0)
   const hasWidth = linked.some((e) => typeof (e as { widthCm?: unknown }).widthCm === 'number')
+  const d = loadDetails(b.id)
+  const hasProfilePhotos = !!d && d.photos.length > 0
+  const hasHours = !!d && d.hoursSet
+  const answered = d ? ACCESS_ATTRS.filter((a) => d.access[a.id] !== 'unbekannt').length : 0
+  const accessDone = answered >= 5 || linked.some((e) => e.stepFree === true || e.stepFree === false)
   const tasks = b.tasks.map((t) =>
-    !t.done && ((t.id === PHOTO_TASK_ID && hasPhoto) || (t.id === WIDTH_TASK_ID && hasWidth)) ? { ...t, done: true } : t)
+    !t.done &&
+    ((t.id === PHOTO_TASK_ID && hasPhoto) ||
+      (t.id === WIDTH_TASK_ID && hasWidth) ||
+      (t.id === GPHOTOS_TASK_ID && hasProfilePhotos) ||
+      (t.id === GHOURS_TASK_ID && hasHours) ||
+      (t.id === ACCESS_TASK_ID && accessDone))
+      ? { ...t, done: true }
+      : t)
   return { ...b, tasks }
 }
 
@@ -283,7 +327,7 @@ function newBusinessId(): string {
 
 export const businessPanel: Panel = (el, ctx) => {
   let editorCleanup: (() => void) | null = null
-  let bizTab: 'overview' | 'access' = 'overview'
+  let noteTimer: ReturnType<typeof setTimeout> | undefined
   const id = `bz${++uid}`
 
   const closeEditor = () => {
@@ -377,7 +421,6 @@ export const businessPanel: Panel = (el, ctx) => {
     const b = keepScroll ? withTasks(stored) : autoDone(withTasks(stored), linkedEntrances(stored, survey))
     if (JSON.stringify(b) !== JSON.stringify(stored)) saveBusiness(b)
     rememberBusiness(b)
-    const linked = linkedEntrances(b, survey)
     const answeredShare = (() => {
       const d = loadDetails(b.id)
       return d ? ACCESS_ATTRS.filter((a) => d.access[a.id] !== 'unbekannt').length / ACCESS_ATTRS.length : 0
@@ -394,34 +437,6 @@ export const businessPanel: Panel = (el, ctx) => {
       return false
     }
 
-    // accessibility toggle card
-    const toggle = h('input', { id: `${id}-offer`, class: 'bz-switch', type: 'checkbox', role: 'switch', checked: b.accessibility, 'aria-describedby': `${id}-offer-sub` })
-    toggle.addEventListener('change', () => {
-      if (!persist({ ...b, accessibility: toggle.checked })) {
-        toggle.checked = !toggle.checked
-        return
-      }
-      ctx.announce(toggle.checked ? L.offerOn : L.offerOff)
-      renderDashboard(true)
-    })
-    const offer = h(
-      'label',
-      { class: 'bz-card bz-toggle', for: `${id}-offer` },
-      h('span', { class: 'bz-toggle-text' }, h('span', { class: 'gm-row-title' }, L.offerLabel), h('span', { class: 'gm-row-meta', id: `${id}-offer-sub` }, L.offerSub)),
-      toggle,
-    )
-
-    // entrances
-    const entranceRow = (e: SurveyEntrance) => {
-      const verdict = e.stepFree === true ? L.stepFree : e.stepFree === false ? L.notStepFree : L.unknown
-      const meta = [verdict, e.photo ? L.withPhoto : ''].filter(Boolean).join(' · ')
-      return h('li', {},
-        h('button', { class: 'gm-row', type: 'button', onclick: () => ctx.openDoor(e) },
-          h('span', { class: `bz-dot${e.stepFree === true ? ' bz-dot-ok' : ''}`, 'aria-hidden': 'true' }, icon(e.stepFree === true ? 'accessible' : 'door_front', true)),
-          h('span', { class: 'gm-row-text' }, h('span', { class: 'gm-row-title' }, e.name ?? L.unnamed), h('span', { class: 'gm-row-meta' }, meta)),
-        ),
-      )
-    }
     const addEntrance = () => {
       closeEditor()
       const start = validLatLon(b.lat, b.lon) ? { lat: b.lat, lon: b.lon } : mapCentre(ctx)
@@ -457,6 +472,9 @@ export const businessPanel: Panel = (el, ctx) => {
       renderDashboard()
     }
     const taskAction = (taskId: string): { label: string; aria: string; icon: string; run: () => void } | null => {
+      if (taskId === GPHOTOS_TASK_ID) return { label: L.recPhotosAct, aria: L.recPhotosAct, icon: 'image', run: () => editAt(b.id, back, 'mehr') }
+      if (taskId === GHOURS_TASK_ID) return { label: L.recHoursAct, aria: L.recHoursAct, icon: 'schedule', run: () => editAt(b.id, back, 'zeiten') }
+      if (taskId === ACCESS_TASK_ID) return { label: L.recAccessAct, aria: L.recAccessAct, icon: 'accessible', run: () => inclusion(b, back) }
       if (taskId === ROUTE_TASK_ID) return { label: L.film, aria: L.filmLabel, icon: 'videocam', run: () => ctx.openRecorder() }
       if (taskId === PHOTO_TASK_ID) return { label: L.addPhoto, aria: L.addPhotoLabel, icon: 'photo_camera', run: addEntrance }
       if (taskId === WIDTH_TASK_ID) return { label: L.measure, aria: L.measureLabel, icon: 'straighten', run: () => sub(() => openEntrancesManager(el, ctx, b.id, back)) }
@@ -464,7 +482,7 @@ export const businessPanel: Panel = (el, ctx) => {
     }
     const doneCount = TASKS.filter((t) => b.tasks.find((x) => x.id === t.id)?.done).length
     const hiddenIds = loadHidden(b.id)
-    const thumbIcon: Record<string, string> = { [ROUTE_TASK_ID]: 'videocam', [PHOTO_TASK_ID]: 'photo_camera', [WIDTH_TASK_ID]: 'straighten' }
+    const thumbIcon: Record<string, string> = { [GPHOTOS_TASK_ID]: 'image', [GHOURS_TASK_ID]: 'schedule', [ACCESS_TASK_ID]: 'accessible',  [ROUTE_TASK_ID]: 'videocam', [PHOTO_TASK_ID]: 'photo_camera', [WIDTH_TASK_ID]: 'straighten' }
     const setDone = (t: { id: string; label: string }, done: boolean) => {
       const next = { ...b, tasks: b.tasks.map((x) => (x.id === t.id ? { ...x, done } : x)) }
       if (!persist(next)) return
@@ -525,22 +543,6 @@ export const businessPanel: Panel = (el, ctx) => {
         )
       : null
 
-    const entrances = h(
-      'section',
-      { class: 'bz-sec', 'aria-labelledby': `${id}-ent` },
-      h('h3', { class: 'bz-h3', id: `${id}-ent` }, L.entrancesHead),
-      linked.length
-        ? h('ul', { class: 'gm-list bz-list' }, ...linked.map(entranceRow))
-        : h('p', { class: 'gm-p' }, L.entrancesEmpty),
-      h('button', { class: 'gm-pill gm-pill-primary bz-wide', type: 'button', onclick: addEntrance }, icon('add'), L.addEntrance),
-    )
-
-    const visibility = h(
-      'section',
-      { class: 'bz-sec', 'aria-label': L.offerHead },
-      offer,
-    )
-
     // Ranking explanation: the "Profilstärke" card on top jumps here.
     const rank = h(
       'section',
@@ -578,54 +580,8 @@ export const businessPanel: Panel = (el, ctx) => {
           }, L.introOk),
         )
 
-    // Barrierefreiheit tab: every question can be answered directly, no video needed.
-    const details = loadDetails(b.id) ?? { ...emptyDetails(), name: b.name, address: b.address ?? '', lat: b.lat, lon: b.lon }
-    const answered = ACCESS_ATTRS.filter((a) => details.access[a.id] !== 'unbekannt').length
-    const question = (a: (typeof ACCESS_ATTRS)[number]) => {
-      const cur = details.access[a.id]
-      const opt = (v: Tri, label: string) =>
-        h('button', {
-          class: `bz-seg-btn${cur === v ? ' is-on' : ''}`, type: 'button', 'aria-pressed': String(cur === v),
-          onclick: () => {
-            const next = { ...details, access: { ...details.access, [a.id]: v }, updatedAt: new Date().toISOString() }
-            if (!saveDetails(b.id, next)) {
-              msg.textContent = L.saveFailed
-              return
-            }
-            ctx.announce(L.answerSaved)
-            renderDashboard(true)
-          },
-        }, label)
-      return h('li', { class: 'bz-q' },
-        h('span', { class: 'bz-q-label', id: `${id}-q-${a.id}` }, a.label),
-        h('div', { class: 'bz-seg', role: 'group', 'aria-labelledby': `${id}-q-${a.id}` }, opt('ja', L.yes), opt('nein', L.no), opt('unbekannt', L.unsure)),
-      )
-    }
-    const questions = h(
-      'section',
-      { class: 'bz-sec', 'aria-labelledby': `${id}-q` },
-      h('div', { class: 'bz-sec-head' },
-        h('h3', { class: 'bz-h3', id: `${id}-q` }, L.questionsHead),
-        h('span', { class: 'bz-sec-meta' }, L.questionsMeta(answered, ACCESS_ATTRS.length)),
-      ),
-      h('ul', { class: 'bz-qs' }, ...ACCESS_ATTRS.map(question)),
-    )
-
-    const tabBtn = (key: 'overview' | 'access', label: string) =>
-      h('button', {
-        class: 'gm-tabbtn', type: 'button', role: 'tab', 'aria-selected': String(bizTab === key),
-        onclick: () => {
-          bizTab = key
-          renderDashboard()
-        },
-      }, label)
-    const tabs = h('div', { class: 'gm-tabs bz-tabs', id: `${id}-tabs`, role: 'tablist' }, tabBtn('overview', L.tabOverview), tabBtn('access', L.tabAccess))
-
-    const body =
-      bizTab === 'overview'
-        ? [intro, rank, recs]
-        : [visibility, questions, entrances]
-    el.replaceChildren(h('div', { class: 'bz bz-page' }, home(b), tabs, ...body.filter((x): x is HTMLElement => x !== null), msg))
+    const body = [intro, recs, rank].filter((x): x is HTMLElement => x !== null)
+    el.replaceChildren(h('div', { class: 'bz bz-page' }, home(b), ...body, msg))
     if (!keepScroll) el.scrollTop = 0
     ctx.setSheet('full')
   }
@@ -642,15 +598,52 @@ export const businessPanel: Panel = (el, ctx) => {
       renderDashboard()
     }
   }
-  // Switch tab, re-render in place and bring the target into view with focus on it.
-  function jumpTo(tab: 'overview' | 'access', targetId: string) {
-    bizTab = tab
-    renderDashboard(true)
-    const target = document.getElementById(targetId)
-    if (!target) return
-    target.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
-    const focusEl = target.matches('[tabindex]') ? target : target.querySelector<HTMLElement>('[aria-selected="true"]')
-    focusEl?.focus({ preventScroll: true })
+  // Scroll the sheet body (the scroll container) so the target sits below `offset` px of
+  // sticky header. Never scrollIntoView: it also scrolls ancestors and shifts the sheet.
+  function scrollToEl(target: HTMLElement, offset = 0, smooth = true) {
+    const top = el.scrollTop + target.getBoundingClientRect().top - el.getBoundingClientRect().top - offset
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
+    el.scrollTo({ top: Math.max(0, top), behavior: smooth && !reduce ? 'smooth' : 'auto' })
+  }
+  // Profile editor opened at one of its sections ("zeiten", "mehr").
+  function editAt(bizId: string, back: () => void, section: string) {
+    sub(() => openBusinessEdit(el, ctx, bizId, back))
+    const s = el.querySelector<HTMLElement>(`section[data-tab="${section}"]`)
+    if (!s) return
+    const header = el.querySelector<HTMLElement>('.be-top')
+    scrollToEl(s, header?.offsetHeight ?? 0, false)
+    const hd = s.querySelector<HTMLElement>('h3')
+    if (hd) {
+      hd.tabIndex = -1
+      hd.focus({ preventScroll: true })
+    }
+  }
+  // One-line note for Google-only features. Hides by itself.
+  function googleOnly() {
+    let note = el.querySelector<HTMLElement>('.bz-note')
+    if (!note) {
+      note = h('p', { class: 'bz-note', role: 'status' })
+      el.querySelector('.bz-page')?.append(note)
+    }
+    note.textContent = L.googleOnly
+    note.hidden = false
+    ctx.announce(L.googleOnly)
+    clearTimeout(noteTimer)
+    const n = note
+    noteTimer = setTimeout(() => { n.hidden = true }, 3500)
+  }
+  function inclusion(b: BusinessProfile, back: () => void) {
+    sub(() => openInclusion(el, ctx, b.id, {
+      onBack: back,
+      setOffer: (on) => {
+        const cur = loadBusiness()
+        if (!cur || cur.id !== b.id) return false
+        const next = { ...cur, accessibility: on }
+        if (!saveBusiness(next)) return false
+        rememberBusiness(next)
+        return true
+      },
+    }))
   }
   function home(b: BusinessProfile): HTMLElement {
     const back = () => {
@@ -661,13 +654,17 @@ export const businessPanel: Panel = (el, ctx) => {
     try {
       return businessHomeHeader(ctx, b, {
         onEdit: () => sub(() => openBusinessEdit(el, ctx, b.id, back)),
-        onEntrances: () => sub(() => openEntrancesManager(el, ctx, b.id, back)),
-        onRecord: () => ctx.openRecorder(),
+        onInclusion: () => inclusion(b, back),
         onData: () => sub(() => openBusinessData(el, ctx, b.id, back)),
-        onPhotos: () => sub(() => openBusinessEdit(el, ctx, b.id, back)),
-        onHours: () => sub(() => openBusinessEdit(el, ctx, b.id, back)),
-        onAccess: () => jumpTo('access', `${id}-tabs`),
-        onScore: () => jumpTo('overview', `${id}-rank`),
+        onPhotos: () => editAt(b.id, back, 'mehr'),
+        onHours: () => editAt(b.id, back, 'zeiten'),
+        onGoogleOnly: googleOnly,
+        onScore: () => {
+          const target = document.getElementById(`${id}-rank`)
+          if (!target) return
+          scrollToEl(target, 16)
+          target.focus({ preventScroll: true })
+        },
         onPreview: () => {
           const list = linkedEntrances(b, loadSurvey())
           const main = list.find((e) => e.kind === 'main') ?? list[0]
@@ -704,6 +701,7 @@ export const businessPanel: Panel = (el, ctx) => {
   renderDashboard()
 
   return () => {
+    clearTimeout(noteTimer)
     closeEditor()
     el.replaceChildren()
   }

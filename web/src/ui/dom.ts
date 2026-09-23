@@ -44,3 +44,21 @@ export function glyphPaths(stroke: string): SVGElement[] {
     s('path', { d: 'M11 14.5 A6.5 6.5 0 1 0 20.5 22.5', fill: 'none', stroke, 'stroke-width': 2.4, 'stroke-linecap': 'round' }),
   ]
 }
+
+/**
+ * Scroll an element into view inside the bottom sheet only. Element.scrollIntoView also
+ * scrolls every ancestor that can scroll, which can shift the whole sheet off its place.
+ */
+export function revealInSheet(el: Element, block: 'start' | 'center' | 'nearest' = 'nearest', smooth = false): void {
+  const box = el.closest<HTMLElement>('.gm-sheet-body')
+  if (!box) return
+  const r = el.getBoundingClientRect()
+  const b = box.getBoundingClientRect()
+  let top = box.scrollTop
+  if (block === 'start') top += r.top - b.top
+  else if (block === 'center') top += r.top - b.top - (b.height - r.height) / 2
+  else if (r.top < b.top) top += r.top - b.top
+  else if (r.bottom > b.bottom) top += r.bottom - b.bottom
+  else return
+  box.scrollTo({ top: Math.max(0, top), behavior: smooth ? 'smooth' : 'auto' })
+}

@@ -17,7 +17,7 @@ import {
 } from '../core/businessDetails'
 import { loadBusiness, saveBusiness } from '../core/survey'
 import type { FeatureCtx } from './ctx'
-import { h } from './dom'
+import { h, revealInSheet } from './dom'
 
 const TRI: { v: Tri; label: string }[] = [
   { v: 'ja', label: 'Ja' },
@@ -199,7 +199,7 @@ export function openBusinessEdit(el: HTMLElement, ctx: FeatureCtx, businessId: s
       )
       item.replaceChildren(form)
       ed.focus.focus({ preventScroll: true })
-      form.scrollIntoView({ block: 'nearest' })
+      revealInSheet(form, 'nearest')
     })
     item.append(btn)
     return item

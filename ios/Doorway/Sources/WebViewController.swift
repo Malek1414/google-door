@@ -4,26 +4,37 @@ import CoreLocation
 
 /// Doorway wrapped in a WKWebView.
 ///
-/// This wrapper exists for one reason that matters more than the app icon:
+/// This wrapper exists for one reason beyond the app icon:
 ///
 ///   Since iOS 15, WKWebView only delivers deviceorientation events when the host app
 ///   implements the WKUIDelegate permission callback. Without it WebKit denies outright —
 ///   no prompt, requestPermission() resolves to "denied", and the compass never fires.
-///   That is why Doorway must be opened in Safari and not from inside another app.
+///   That is why the web app has to be opened in Safari and never from inside another app.
 ///
 /// Implementing that callback here is what makes the arrow work inside a webview at all.
-/// The same goes for camera capture, which is denied by default in a webview.
+/// The same goes for camera capture, which a webview also denies by default.
 final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDelegate, CLLocationManagerDelegate {
 
-    /// The dev server. Override at launch with -DoorwayURL <url>.
-    private var startURL: URL {
-        if let s = UserDefaults.standard.string(forKey: "DoorwayURL"), let u = URL(string: s) { return u }
-        return URL(string: "http://100.101.164.23:8090/")!
+    /// Tried in order until one answers.
+    ///
+    /// A public tunnel leads because it is the only address that survives leaving the
+    /// flat: the phone's Tailscale has been offline for months and a LAN address only
+    /// works on one network. Override at launch with -DoorwayURL <url>.
+    private static let candidates: [String] = [
+        "https://88ba75ad3a167d.lhr.life",
+        "http://192.168.12.158:8090/",
+    ]
+
+    private var urls: [URL] {
+        if let s = UserDefaults.standard.string(forKey: "DoorwayURL"), let u = URL(string: s) { return [u] }
+        return Self.candidates.compactMap(URL.init(string:))
     }
 
+    private var attempt = 0
     private var webView: WKWebView!
     private let location = CLLocationManager()
-    private lazy var retryButton: UIButton = makeRetryButton()
+    private lazy var status: UILabel = makeStatus()
+    private lazy var retry: UIButton = makeRetry()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -31,7 +42,7 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
 
         let cfg = WKWebViewConfiguration()
         cfg.allowsInlineMediaPlayback = true
-        cfg.mediaTypesRequiringUserActionForPlayback = []   // the beacon starts on the Start tap
+        cfg.mediaTypesRequiringUserActionForPlayback = []   // the beacon unlocks on the Start tap
         cfg.defaultWebpagePreferences.allowsContentJavaScript = true
 
         webView = WKWebView(frame: .zero, configuration: cfg)
@@ -43,37 +54,45 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
         webView.backgroundColor = view.backgroundColor
         webView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(webView)
+        view.addSubview(status)
+        view.addSubview(retry)
         NSLayoutConstraint.activate([
             webView.topAnchor.constraint(equalTo: view.topAnchor),
             webView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             webView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            status.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            status.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -30),
+            status.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 24),
+            status.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -24),
+            retry.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            retry.topAnchor.constraint(equalTo: status.bottomAnchor, constant: 18),
         ])
 
-        view.addSubview(retryButton)
-        NSLayoutConstraint.activate([
-            retryButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            retryButton.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-        ])
-
-        // Ask for location up front: the web layer's request is what actually gates the
-        // fix, but the native prompt has to have been answered first inside a webview.
+        // The web layer's request is what gates the fix, but inside a webview the native
+        // prompt has to have been answered first.
         location.delegate = self
         location.requestWhenInUseAuthorization()
 
-        load()
+        load(from: 0)
     }
 
-    override var prefersStatusBarHidden: Bool { false }
     override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
     override var prefersHomeIndicatorAutoHidden: Bool { true }
 
-    private func load() {
-        retryButton.isHidden = true
-        webView.load(URLRequest(url: startURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20))
+    private func load(from index: Int) {
+        guard index < urls.count else {
+            status.text = "Kein Server erreichbar.\nLäuft Doorway auf dem Mac?"
+            retry.isHidden = false
+            return
+        }
+        attempt = index
+        retry.isHidden = true
+        status.text = "Verbinde …"
+        webView.load(URLRequest(url: urls[index], cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 12))
     }
 
-    @objc private func retry() { load() }
+    @objc private func retryTapped() { load(from: 0) }
 
     // MARK: - WKUIDelegate: the permissions that make Doorway work in a webview
 
@@ -87,7 +106,7 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
     }
 
     /// DeviceOrientation. THE reason this wrapper exists: without this callback WebKit
-    /// resolves requestPermission() to "denied" with no prompt, and the arrow never moves.
+    /// resolves requestPermission() to "denied" with no prompt and the arrow never moves.
     func webView(_ webView: WKWebView,
                  requestDeviceOrientationAndMotionPermissionFor origin: WKSecurityOrigin,
                  initiatedByFrame frame: WKFrameInfo,
@@ -104,30 +123,50 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
 
     // MARK: - WKNavigationDelegate
 
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        status.text = nil
+        retry.isHidden = true
+    }
+
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        showRetry(error)
+        next(error)
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        showRetry(error)
+        next(error)
     }
 
-    private func showRetry(_ error: Error) {
-        retryButton.setTitle("  Server nicht erreichbar — erneut versuchen  ", for: .normal)
-        retryButton.isHidden = false
-        NSLog("[doorway] load failed: \(error.localizedDescription)")
+    /// Fall through to the next candidate rather than stopping at the first failure.
+    private func next(_ error: Error) {
+        NSLog("[doorway] %@ failed: %@", urls[safe: attempt]?.absoluteString ?? "?", error.localizedDescription)
+        load(from: attempt + 1)
     }
 
-    private func makeRetryButton() -> UIButton {
+    private func makeStatus() -> UILabel {
+        let l = UILabel()
+        l.translatesAutoresizingMaskIntoConstraints = false
+        l.textColor = UIColor(white: 0.78, alpha: 1)
+        l.font = .systemFont(ofSize: 16, weight: .medium)
+        l.numberOfLines = 0
+        l.textAlignment = .center
+        return l
+    }
+
+    private func makeRetry() -> UIButton {
         let b = UIButton(type: .system)
         b.translatesAutoresizingMaskIntoConstraints = false
+        b.setTitle("  Erneut versuchen  ", for: .normal)
         b.setTitleColor(UIColor(red: 0.659, green: 0.780, blue: 0.980, alpha: 1), for: .normal) // #a8c7fa
         b.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
         b.backgroundColor = UIColor(white: 0.14, alpha: 1)
         b.layer.cornerRadius = 22
         b.isHidden = true
-        b.addTarget(self, action: #selector(retry), for: .touchUpInside)
+        b.addTarget(self, action: #selector(retryTapped), for: .touchUpInside)
         b.heightAnchor.constraint(equalToConstant: 44).isActive = true
         return b
     }
+}
+
+private extension Array {
+    subscript(safe i: Int) -> Element? { indices.contains(i) ? self[i] : nil }
 }

@@ -6,6 +6,7 @@
 import { arrowPulseHz, ARRIVE_M, beaconFor, cuePan, hapticFor, HAPTIC_ARRIVED, ON_BEARING_DEG, shouldAnnounceApproach, shouldSpeakArrival } from '../core/beacon'
 import { bearingDeg, haversineM, relativeBearing } from '../core/geo'
 import { distanceKey } from '../core/speech'
+import { HeadingSmoother } from '../core/smooth'
 import { startHeading, type Heading } from '../core/heading'
 import { snapToGraph } from '../core/match'
 import type { OutputConfig } from '../core/profile'
@@ -213,6 +214,10 @@ export function LiveView(opts: {
   let lastWord = ''
   let calloutIdx = 0
   let lookBusy = false
+  // A magnetometer jitters several degrees at rest and fires ~60 Hz, so the raw
+  // heading is fed through a circular low-pass with a deadband. Without it the
+  // arrow renders sensor noise and visibly vibrates.
+  const smoother = new HeadingSmoother({ tau: 0.2, deadbandDeg: 1.5 })
   const beacon = cfg.beacon && session.audio ? new BeaconAudio(session.audio) : null
   let beaconOn = false
 
@@ -223,7 +228,8 @@ export function LiveView(opts: {
     dist = haversineM(pos, target)
     const toDoor = bearingDeg(pos, target)
     const hasHeading = heading !== null && heading.source !== 'none'
-    rel = hasHeading ? relativeBearing(toDoor, heading!.deg) : 0
+    const smoothedDeg = hasHeading ? smoother.push(heading!.deg) : 0
+    rel = hasHeading ? relativeBearing(toDoor, smoothedDeg) : 0
     const cone = heading?.source === 'gps-course' || (fix.accuracy ?? 0) > CONE_ACCURACY_M
     const now = performance.now()
 
@@ -254,6 +260,9 @@ export function LiveView(opts: {
       const word = cone ? `${t.roughly}. ${directionWord(rel)}` : directionWord(rel)
       dirEl.textContent = word
       turnIcon.textContent = turnGlyph(rel)
+      // Attribute, not CSS transform: the rotor sits inside a translated+scaled
+      // group, and CSS rotate() would spin it about its bounding-box centre
+      // instead of its local origin. Smoothness comes from the filter above.
       rotor.setAttribute('transform', `rotate(${rel.toFixed(1)})`)
       if (cone) {
         const half = Math.min(60, Math.max(20, (Math.atan2(fix.accuracy ?? CONE_ACCURACY_M, Math.max(dist, 1)) * 180) / Math.PI))

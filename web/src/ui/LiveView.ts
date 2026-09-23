@@ -7,6 +7,8 @@ import { arrowPulseHz, ARRIVE_M, beaconFor, cuePan, hapticFor, HAPTIC_ARRIVED, O
 import { bearingDeg, haversineM, relativeBearing } from '../core/geo'
 import { distanceKey } from '../core/speech'
 import { HeadingSmoother } from '../core/smooth'
+import { chevronStack, destinationPin, stackTransform, type ArPhase } from './ar'
+import './ar.css'
 import { startHeading, type Heading } from '../core/heading'
 import { snapToGraph } from '../core/match'
 import type { OutputConfig } from '../core/profile'
@@ -15,7 +17,7 @@ import { BeaconAudio, playApproachChime } from '../audio'
 import { postLook } from '../data'
 import { announce, session, speak, vibrate } from '../session'
 import { lang, t } from '../strings'
-import { glyphPaths, h, mount, s } from './dom'
+import { h, mount, s } from './dom'
 import './arrival.css'
 
 export interface Fix {
@@ -132,13 +134,6 @@ export function arrowShape(): SVGElement {
   })
 }
 
-function coneShape(halfDeg: number): SVGElement {
-  const r = 38
-  const a = (halfDeg * Math.PI) / 180
-  const x = r * Math.sin(a)
-  const y = -r * Math.cos(a)
-  return s('path', { class: 'cone-shape', d: `M0 8 L${-x} ${y + 8} A${r} ${r} 0 0 1 ${x} ${y + 8} Z`, 'stroke-linejoin': 'round' })
-}
 
 export function directionWord(rel: number): string {
   const a = Math.abs(rel)
@@ -216,48 +211,69 @@ export function LiveView(opts: {
     mediaEl = h('img', { class: 'cam', src: opts.sensors.media.url, alt: '', 'aria-hidden': 'true' }) as HTMLImageElement
   }
 
-  const arrowG = s('g', { class: 'arrow' }, arrowShape())
+  // ── Live View, measured from a Google Maps Live View recording ─────────────
+  // Phases: scanning -> ready -> guiding -> approach -> arrived.
+  // Chevrons are extruded solids (see ui/ar.ts); the red pin replaces them close in.
+  const stack = chevronStack()
+  const stackG = s('g', { class: 'ar-stack-wrap' }, stack)
+  const pinG = s('g', { class: 'ar-pin-wrap', visibility: 'hidden' }, destinationPin())
   const coneG = s('g', { class: 'cone' })
-  const rotor = s('g', {}, coneG, arrowG)
-  const scaler = s('g', { transform: `translate(0 16) scale(${cfg.arrowScale * 0.55})` }, rotor)
-  // Destination glyph: +40% over the standard 12-unit pin, heavy dark outline over bright fill.
-  const PIN = 12 * 1.4
-  const destG = s(
-    'g',
-    { class: 'dest', visibility: 'hidden' },
-    s('circle', { r: PIN / 2 + 1.5, class: 'dest-outline' }),
-    s('circle', { r: PIN / 2, class: 'dest-fill' }),
-    s('g', { transform: `translate(${-PIN / 2} ${-PIN / 2}) scale(${PIN / 32})` }, ...(e.stepFree === true ? glyphPaths('#000') : [s('rect', { x: 10, y: 6, width: 12, height: 20, fill: 'none', stroke: '#000', 'stroke-width': 3 })])),
-  )
-  const svg = s('svg', { class: 'overlay', viewBox: '-50 -50 100 100', preserveAspectRatio: 'xMidYMid meet', 'aria-hidden': 'true' }, destG, scaler)
+  const svg = s('svg', { class: 'ar-svg', viewBox: '0 0 393 760', preserveAspectRatio: 'xMidYMid slice', 'aria-hidden': 'true' }, coneG, stackG, pinG)
 
-  const distEl = h('p', { class: 'distance' }, '')
-  const dirEl = h('p', { class: 'direction' }, t.waitingGps)
-  const accEl = h('p', { class: 'accuracy' }, '')
+  const ms = (n: string) => h('span', { class: 'ms', 'aria-hidden': 'true' }, n)
+
+  // scanning
+  const scanText = h('p', { class: 'ar-scan-text' }, t.arScan ?? 'Richte die Kamera auf Gebäude, Geschäfte und Schilder um dich herum.')
+  const scanArt = s('svg', { class: 'ar-scan-art', viewBox: '0 0 120 120', 'aria-hidden': 'true' },
+    s('rect', { x: '44', y: '18', width: '32', height: '58', rx: '6', fill: 'none', stroke: '#a8c7fa', 'stroke-width': '4' }),
+    s('rect', { x: '50', y: '26', width: '20', height: '38', rx: '2', fill: '#a8c7fa', opacity: '0.35' }),
+    s('path', { d: 'M28 92 q32 -16 64 0', fill: 'none', stroke: '#a8c7fa', 'stroke-width': '4', 'stroke-linecap': 'round' }),
+  ) as unknown as HTMLElement
+  const pill = h('div', { class: 'ar-pill' }, t.arScanning ?? 'Scanning …')
+  const follow = h('p', { class: 'ar-follow', hidden: true }, t.arFollow ?? 'Folge dem Pfeil')
+
+  // destination strip
+  const distEl = h('span', { class: 'ar-dest-m' }, '')
+  const dirEl = h('span', { class: 'sr-only' }, t.waitingGps)
+  const destStrip = h('div', { class: 'ar-dest' },
+    h('div', { class: 'ar-dest-pin' }, ms('location_on'), distEl),
+    h('span', { class: 'ar-dest-name' }, name),
+  )
+
+  // safety interstitial
+  const safeEl = h('div', { class: 'ar-safe', hidden: true, role: 'note' },
+    ms('warning'),
+    h('p', { class: 'ar-safe-t' }, t.arSafe ?? 'Pass auf dich auf'),
+    h('p', { class: 'ar-safe-s' }, t.arSafeSub ?? 'Achte beim Gehen auf deine Umgebung.'),
+  )
+
+  const accEl = h('p', { class: 'ar-meta' }, '')
+  const lookOut = h('p', { class: 'ar-look-out', 'aria-live': 'polite' }, '')
+  const lookBtn = h('button', { class: 'ar-look', type: 'button' }, ms('visibility'), t.look)
+  const stopBtn = h('button', { class: 'ar-round', type: 'button', 'aria-label': t.stop }, ms('close'))
+  const fbBtn = h('button', { class: 'ar-round', type: 'button', 'aria-label': 'Feedback' }, ms('feedback'))
+  const endRow = h('div', { class: 'ar-endrow' })
+  const turnIcon = h('span', { class: 'sr-only' }, '')
+
   const warnEl =
     e.warnings.length > 0
       ? h('div', { class: 'warning', role: 'note' }, ...e.warnings.map((w) => h('p', {}, h('strong', {}, `${t.warningPrefix}: `), t.warning[w] ?? w)))
       : null
-  const lookOut = h('p', { class: 'look-out', 'aria-live': 'polite' }, '')
-  const lookBtn = h('button', { class: 'gm-pill', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'visibility'), t.look)
-  const stopBtn = h('button', { class: 'nav-exit', type: 'button', 'aria-label': t.stop }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'close'))
-  const endRow = h('div', { class: 'nav-row' })
-  const turnIcon = h('span', { class: 'ms', 'aria-hidden': 'true' }, 'navigation')
 
   const root = h(
     'section',
-    { class: `screen screen-live${cfg.dimScreen ? ' dim' : ''}`, 'aria-labelledby': 'live-title' },
+    { class: `ar${cfg.dimScreen ? ' dim' : ''}`, 'aria-labelledby': 'live-title' },
+    h('h1', { id: 'live-title', class: 'sr-only' }, `${t.liveTitle}: ${name}`),
     mediaEl,
     svg,
-    h(
-      'div',
-      { class: 'nav-top' },
-      h('div', { class: 'nav-card' }, turnIcon, h('div', {}, h('h1', { id: 'live-title' }, `${t.liveTitle}: ${name}`), distEl, dirEl)),
-      opts.sensors.banner ? h('p', { class: 'banner' }, opts.sensors.banner) : null,
-      warnEl,
-    ),
-    h('div', { class: 'nav-bottom' }, accEl, lookOut, endRow, h('div', { class: 'nav-row' }, stopBtn, lookBtn)),
+    h('div', { class: 'ar-top' }, fbBtn, stopBtn),
+    scanText, scanArt, pill, follow,
+    opts.sensors.banner ? h('p', { class: 'banner' }, opts.sensors.banner) : null,
+    warnEl,
+    accEl, lookOut, lookBtn, endRow,
+    destStrip, safeEl, dirEl,
   )
+
   mount(root)
 
   // ---- state ----
@@ -276,6 +292,14 @@ export function LiveView(opts: {
   // A magnetometer jitters several degrees at rest and fires ~60 Hz, so the raw
   // heading is fed through a circular low-pass with a deadband. Without it the
   // arrow renders sensor noise and visibly vibrates.
+  // The red Maps pin takes over from the chevrons this close in, as Google's does.
+  const APPROACH_PIN_M = 25
+  // Google re-shows a safety reminder periodically while you walk.
+  const SAFE_EVERY_MS = 45000
+  const SAFE_SHOW_MS = 4000
+  let arPhase: ArPhase = 'scanning'
+  let lastSafe = 0
+
   const smoother = new HeadingSmoother({ tau: 0.2, deadbandDeg: 1.5 })
   const beacon = cfg.beacon && session.audio ? new BeaconAudio(session.audio) : null
   let beaconOn = false
@@ -291,6 +315,41 @@ export function LiveView(opts: {
     countdown = 0
   }
 
+  /** scanning -> ready -> guiding, then approach once the pin takes over. */
+  function setPhase(next: ArPhase) {
+    if (next === arPhase) return
+    arPhase = next
+    root.dataset.phase = next
+    const scanning = next === 'scanning'
+    const ready = next === 'ready'
+    scanText.hidden = !scanning
+    // scanArt is an SVGElement: .hidden is not reflected there, so set the attribute.
+    if (scanning) scanArt.removeAttribute('hidden')
+    else scanArt.setAttribute('hidden', '')
+    pill.hidden = !(scanning || ready)
+    pill.textContent = ready ? (t.arReady ?? 'Bereit') : (t.arScanning ?? 'Wird gescannt …')
+    pill.classList.toggle('ar-pill-ready', ready)
+    follow.hidden = !ready
+    destStrip.hidden = scanning
+    if (ready) {
+      // "Ready" holds briefly, then the chevrons take the screen, as in the recording.
+      timers.push(window.setTimeout(() => setPhase('guiding'), 1400))
+    }
+  }
+
+  /** Google re-surfaces a safety reminder every so often; it dims everything behind it. */
+  function maybeSafety(now: number) {
+    if (arPhase !== 'guiding' || safeEl.hidden === false) return
+    if (now - lastSafe < SAFE_EVERY_MS) return
+    lastSafe = now
+    safeEl.hidden = false
+    root.dataset.safe = '1'
+    timers.push(window.setTimeout(() => {
+      safeEl.hidden = true
+      delete root.dataset.safe
+    }, SAFE_SHOW_MS))
+  }
+
   function arrive() {
     arrived = true
     if (cfg.haptics || cfg.beacon) vibrate(HAPTIC_ARRIVED) // one long cue; iOS gets the sound
@@ -298,9 +357,10 @@ export function LiveView(opts: {
     beaconOn = false
     dirEl.textContent = t.arrived
     turnIcon.textContent = 'where_to_vote'
-    arrowG.style.visibility = 'hidden'
+    stackG.setAttribute('visibility', 'hidden')
     coneG.replaceChildren()
-    destG.setAttribute('visibility', 'hidden')
+    pinG.setAttribute('visibility', 'hidden')
+    root.dataset.phase = 'arrived'
     if (!spokeArrival && cfg.speak) speak(t.arrived, { interrupt: true })
     spokeArrival = true
     announce(t.arrived)
@@ -389,6 +449,11 @@ export function LiveView(opts: {
     const now = performance.now()
     if (dist > LEAVE_M) spokeArrival = false
 
+    if (arPhase === 'scanning' && hasHeading) setPhase('ready')
+    if (arPhase === 'guiding' && dist <= APPROACH_PIN_M) setPhase('approach')
+    else if (arPhase === 'approach' && dist > APPROACH_PIN_M * 1.3) setPhase('guiding')
+    maybeSafety(now)
+
     distEl.textContent = t.metres(dist)
     accEl.textContent = fix.accuracy !== null ? t.accuracy(fix.accuracy) : ''
 
@@ -404,30 +469,33 @@ export function LiveView(opts: {
 
     if (!hasHeading) {
       dirEl.textContent = t.noCompass
-      arrowG.style.visibility = 'hidden'
+      stackG.setAttribute('visibility', 'hidden')
       coneG.replaceChildren()
       beacon?.update(beaconFor(dist, 0))
     } else {
       const word = cone ? `${t.roughly}. ${directionWord(rel)}` : directionWord(rel)
       dirEl.textContent = word
       turnIcon.textContent = turnGlyph(rel)
-      // Attribute, not CSS transform: the rotor sits inside a translated+scaled
-      // group, and CSS rotate() would spin it about its bounding-box centre
-      // instead of its local origin. Smoothness comes from the filter above.
-      rotor.setAttribute('transform', `rotate(${rel.toFixed(1)})`)
+      // Chevrons foreshorten as they swing away, the way an extruded plate would.
+      // Attribute rather than CSS transform: the group lives in the SVG user space.
+      stackG.setAttribute('transform', stackTransform(rel, 393, 760))
       if (cone) {
-        const half = Math.min(60, Math.max(20, (Math.atan2(fix.accuracy ?? CONE_ACCURACY_M, Math.max(dist, 1)) * 180) / Math.PI))
-        coneG.replaceChildren(coneShape(half))
-        arrowG.style.visibility = 'hidden'
+        // Poor localisation dims the chevrons rather than hiding them: Google keeps
+        // guidance on screen and softens the wording, and an empty screen tells a
+        // partially-sighted user nothing at all.
+        coneG.replaceChildren()
+        stackG.setAttribute('visibility', arPhase === 'approach' ? 'hidden' : 'visible')
+        stackG.setAttribute('opacity', '0.88')
       } else {
         coneG.replaceChildren()
-        arrowG.style.visibility = 'visible'
+        stackG.setAttribute('opacity', '1')
+        stackG.setAttribute('visibility', arPhase === 'approach' ? 'hidden' : 'visible')
       }
       // Destination glyph where the door should be in the camera frame (about 70 degree FOV).
-      if (Math.abs(rel) <= 35 && !cone) {
-        destG.setAttribute('visibility', 'visible')
-        destG.setAttribute('transform', `translate(${((rel / 35) * 38).toFixed(1)} -27)`)
-      } else destG.setAttribute('visibility', 'hidden')
+      if (Math.abs(rel) <= 35) {
+        pinG.setAttribute('visibility', arPhase === 'approach' ? 'visible' : 'hidden')
+        pinG.setAttribute('transform', `translate(${(196 + (rel / 35) * 150).toFixed(0)} 300) scale(${(0.6 + Math.max(0, (APPROACH_PIN_M - dist)) / APPROACH_PIN_M).toFixed(2)})`)
+      } else pinG.setAttribute('visibility', 'hidden')
 
       if (beacon) {
         if (!beaconOn) {
@@ -486,7 +554,7 @@ export function LiveView(opts: {
     last = now
     phase = (phase + dt * arrowPulseHz(rel)) % 1
     const k = 1 + 0.12 * Math.sin(phase * Math.PI * 2) ** 2
-    arrowG.setAttribute('transform', `scale(${k.toFixed(3)})`)
+    stack.setAttribute('transform', `scale(${k.toFixed(3)})`)
     coneG.setAttribute('opacity', (0.65 + 0.35 * Math.sin(phase * Math.PI) ** 2).toFixed(2))
     raf = requestAnimationFrame(frame)
   }

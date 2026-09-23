@@ -1,3 +1,4 @@
+@import './ui/ar.css';
 /* High contrast by default. Contrast mode comes from the profile (data-contrast on <html>).
    Meaning never rides on colour alone: every state also has text or shape. */
 :root {

@@ -186,6 +186,17 @@ export const en = {
   recordDownload: 'Download track JSON',
   recordCopy: 'Copy track JSON',
   copied: 'Copied.',
+  arScan: 'Point your camera at buildings, shops and signs around you.',
+  arScanning: 'Scanning …',
+  arReady: 'Ready',
+  arFollow: 'Follow the arrow',
+  arSafe: 'Be safe',
+  arSafeSub: 'Pay attention to your surroundings while walking.',
+  arSafeCross: 'Pay attention around intersections.',
+  arStepFree: 'Step-free entrance',
+  arEntrance: 'Entrance',
+  arDone: 'Done',
+  arArrived: 'You have arrived',
 }
 
 export type Strings = typeof en
@@ -368,6 +379,17 @@ export const de: Strings = {
   recordDownload: 'Weg als JSON laden',
   recordCopy: 'Weg als JSON kopieren',
   copied: 'Kopiert.',
+  arScan: 'Richte die Kamera auf Gebäude, Geschäfte und Schilder um dich herum.',
+  arScanning: 'Wird gescannt …',
+  arReady: 'Bereit',
+  arFollow: 'Folge dem Pfeil',
+  arSafe: 'Pass auf dich auf',
+  arSafeSub: 'Achte beim Gehen auf deine Umgebung.',
+  arSafeCross: 'Achte besonders an Kreuzungen.',
+  arStepFree: 'Stufenloser Eingang',
+  arEntrance: 'Eingang',
+  arDone: 'Fertig',
+  arArrived: 'Du bist angekommen',
 }
 
 /** German unless ?lang=en or the phone is set to another language. */

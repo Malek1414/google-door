@@ -51,9 +51,22 @@ export function bandText(band: Band, lang = 'de'): string {
   return (lang.startsWith('de') ? DE : EN)[band]
 }
 
-/** Pre-synthesised clip key, so the common phrases never wait on the network. */
+/**
+ * Pre-synthesised clip key, so the common phrases never wait on the network.
+ *
+ * Three bands reuse clips the Live View bank already has, because the German wording
+ * is identical. That is not a micro-optimisation: Gemini TTS is capped at 100 requests
+ * PER DAY on this tier, so every clip that does not need generating is one left for
+ * the demo.
+ */
+const REUSED: Partial<Record<Band, string>> = {
+  straight: 'straight',   // "Geradeaus."
+  left: 'turn_left',      // "Links."
+  right: 'turn_right',    // "Rechts."
+}
+
 export function bandClipKey(band: Band): string {
-  return `band_${band.replace(/-/g, '_')}`
+  return REUSED[band] ?? `band_${band.replace(/-/g, '_')}`
 }
 
 /** Metres, spoken only at these steps so the voice is not a running commentary. */

@@ -36,6 +36,21 @@ PHRASES = {
         "warn_steps":       "Achtung: Stufen.",
         "door_automatic":   "Die Tür öffnet automatisch.",
         "low_accuracy":     "Ungefähr in diese Richtung. Das Signal ist ungenau.",
+        # ── last 10 metres ── keys match core/instruct.ts bandClipKey().
+        # straight/left/right are NOT here: they reuse the Live View clips, whose
+        # German is word-for-word identical. TTS is capped at 100 calls a day.
+        "band_slight_left":     "Leicht links.",
+        "band_slight_right":    "Leicht rechts.",
+        "band_sharp_left":      "Scharf links.",
+        "band_sharp_right":     "Scharf rechts.",
+        "band_turn_around":     "Dreh dich um.",
+        "ap_safety":            "Ich führe dich nur zur Tür. Achte weiter selbst auf deine Umgebung.",
+        "ap_fallback":          "Ich sehe den Eingang nicht. Laut Karte liegt er in dieser Richtung.",
+        "ap_unsure":            "Ich bin mir gerade unsicher.",
+        "ap_orient":            "Dreh dich, bis der Ton hoch und gleichmäßig ist.",
+        "ap_walk":              "Gut. Geh jetzt geradeaus.",
+        "ap_threshold":         "Die Tür ist direkt vor dir.",
+        "ap_through":           "Du müsstest jetzt drin sein.",
     },
     "en": {
         "turn_left":        "Left.",
@@ -50,9 +65,24 @@ PHRASES = {
         "warn_steps":       "Careful: steps.",
         "door_automatic":   "The door opens automatically.",
         "low_accuracy":     "Roughly this way. The signal is imprecise.",
+        # ── last 10 metres ──
+        "band_slight_left":     "Slightly left.",
+        "band_slight_right":    "Slightly right.",
+        "band_sharp_left":      "Sharp left.",
+        "band_sharp_right":     "Sharp right.",
+        "band_turn_around":     "Turn around.",
+        "ap_safety":            "I'll guide you to the door only. Keep paying attention to your surroundings.",
+        "ap_fallback":          "I can't see the entrance. According to the map it's in this direction.",
+        "ap_unsure":            "I'm not certain right now.",
+        "ap_orient":            "Turn until the tone is high and steady.",
+        "ap_walk":              "Good. Now walk straight ahead.",
+        "ap_threshold":         "The door is right in front of you.",
+        "ap_through":           "You should be inside now.",
     },
 }
-DISTANCES = [5, 10, 15, 20, 30, 40, 50, 75, 100]
+# 1,2,3,8 are the approach ladder (core/instruct.ts DISTANCE_STEPS); the rest are
+# Live View's (core/speech.ts). Union of both so neither waits on the network.
+DISTANCES = [1, 2, 3, 5, 8, 10, 15, 20, 30, 40, 50, 75, 100]
 
 
 def wav(pcm: bytes, rate=24000, ch=1, width=2) -> bytes:
@@ -108,10 +138,14 @@ def main():
         jobs[f"dist_{m}"] = (f"{m} Meter." if lang == "de" else f"{m} metres.")
 
     # Per-entrance descriptions, if the Gemini description pass has run.
-    doc = json.load(open("data/berlin-mitte.json"))
-    described = [e for e in doc["entrances"] if e.get("description")]
-    for e in described:
-        jobs["ent_" + e["id"].replace("/", "_")] = e["description"]
+    # --phrases skips them: there are ~300, they are the slow part, and the phrase bank
+    # is what the walking loop actually waits on.
+    described = []
+    if "--phrases" not in sys.argv:
+        doc = json.load(open("data/berlin-mitte.json"))
+        described = [e for e in doc["entrances"] if e.get("description")]
+        for e in described:
+            jobs["ent_" + e["id"].replace("/", "_")] = e["description"]
     print(f"{len(jobs)} clips ({len(described)} entrance descriptions) -> {outdir}")
 
     manifest, done, failed = {}, 0, 0

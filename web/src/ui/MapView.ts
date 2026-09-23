@@ -27,6 +27,7 @@ import { loadSurvey, mergeSurvey } from '../core/survey'
 import { NORMAL_CHIPS, PlacesUnavailable, searchCategory, searchText, type PlaceHit } from '../places'
 import { lang } from '../strings'
 import { openSearchScreen } from './SearchScreen'
+import { exploreFeed } from './ExploreFeed'
 import { t } from '../strings'
 import { h, mount, s } from './dom'
 
@@ -392,10 +393,19 @@ export function MapView(opts: {
       return
     }
     if (!showDoorMarkers(mode)) {
-      sheetBody.replaceChildren(
-        h('div', { class: 'gm-sheet-head' }, h('h2', { id: 'sheet-title', class: 'gm-sheet-title' }, t.inThisArea), weatherChip()),
-        h('p', { class: 'gm-p' }, t.standardHint),
-      )
+      // Pulled-up Erkunden sheet like Maps: photo cards, entrances nearby, tips.
+      try {
+        panelCleanup = exploreFeed(sheetBody, featureCtx, { onPlace: (p) => openPlace(p), onDoor: (e) => openEntrance(e), mode })
+        const slot = sheetBody.querySelector('.gm-weather')
+        if (slot) slot.replaceWith(weatherChip())
+        else sheetBody.querySelector('.gm-sheet-head')?.append(weatherChip())
+      } catch (err) {
+        console.error('[doorway] explore feed failed', err)
+        sheetBody.replaceChildren(
+          h('div', { class: 'gm-sheet-head' }, h('h2', { id: 'sheet-title', class: 'gm-sheet-title' }, t.inThisArea), weatherChip()),
+          h('p', { class: 'gm-p' }, t.standardHint),
+        )
+      }
       return
     }
     const doors = nearby()

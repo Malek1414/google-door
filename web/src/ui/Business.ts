@@ -59,7 +59,7 @@ const S = {
     unknown: 'stufenlos unbekannt',
     withPhoto: 'mit Foto',
     entranceSaved: 'Eingang gespeichert.',
-    tasksHead: 'Aufgaben',
+    tasksHead: 'Empfohlene Maßnahmen',
     tasksDone: (d: number, n: number) => `${d} von ${n} erledigt`,
     taskRoute: 'Weg vom Haupteingang zur Toilette filmen',
     taskPhoto: 'Foto vom barrierefreien Eingang',
@@ -69,6 +69,18 @@ const S = {
     taskDone: (l: string) => `Erledigt: ${l}`,
     taskOpen: (l: string) => `Offen: ${l}`,
     edit: 'Unternehmen bearbeiten',
+    offerHead: 'Barrierefreiheit',
+    lineRoute: 'Besucher sehen vorher, wie sie zur Toilette kommen.',
+    linePhoto: 'Ein Foto zeigt, welcher Eingang stufenlos ist.',
+    lineWidth: 'Rollstühle brauchen mindestens 90 cm Durchgang.',
+    doneLine: 'Erledigt',
+    addPhoto: 'Foto hinzufügen',
+    addPhotoLabel: 'Eingang mit Foto hinzufügen',
+    measure: 'Messen',
+    measureLabel: 'Türbreite bei den Eingängen eintragen',
+    markDone: (l: string) => `Als erledigt markieren: ${l}`,
+    switched: (n: string) => `Gewechselt zu ${n}.`,
+    cancel: 'Abbrechen',
   },
   en: {
     title: 'Business',
@@ -105,7 +117,7 @@ const S = {
     unknown: 'step-free unknown',
     withPhoto: 'with photo',
     entranceSaved: 'Entrance saved.',
-    tasksHead: 'Tasks',
+    tasksHead: 'Recommended actions',
     tasksDone: (d: number, n: number) => `${d} of ${n} done`,
     taskRoute: 'Film the way from the main entrance to the toilet',
     taskPhoto: 'Photo of the accessible entrance',
@@ -115,17 +127,61 @@ const S = {
     taskDone: (l: string) => `Done: ${l}`,
     taskOpen: (l: string) => `Open: ${l}`,
     edit: 'Edit business',
+    offerHead: 'Accessibility',
+    lineRoute: 'Visitors see in advance how to reach the toilet.',
+    linePhoto: 'A photo shows which entrance is step-free.',
+    lineWidth: 'Wheelchairs need at least 90 cm of clear width.',
+    doneLine: 'Done',
+    addPhoto: 'Add photo',
+    addPhotoLabel: 'Add an entrance with a photo',
+    measure: 'Measure',
+    measureLabel: 'Enter the door width at the entrances',
+    markDone: (l: string) => `Mark as done: ${l}`,
+    switched: (n: string) => `Switched to ${n}.`,
+    cancel: 'Cancel',
   },
 }
 const L = S[lang === 'en' ? 'en' : 'de']
 
 const PHOTO_TASK_ID = 'photo'
 const WIDTH_TASK_ID = 'width'
-const TASKS: { id: string; label: string }[] = [
-  { id: ROUTE_TASK_ID, label: L.taskRoute },
-  { id: PHOTO_TASK_ID, label: L.taskPhoto },
-  { id: WIDTH_TASK_ID, label: L.taskWidth },
+const TASKS: { id: string; label: string; line: string }[] = [
+  { id: ROUTE_TASK_ID, label: L.taskRoute, line: L.lineRoute },
+  { id: PHOTO_TASK_ID, label: L.taskPhoto, line: L.linePhoto },
+  { id: WIDTH_TASK_ID, label: L.taskWidth, line: L.lineWidth },
 ]
+
+/** All businesses of this device. The active one stays under loadBusiness/saveBusiness. */
+const BUSINESSES_KEY = 'doorway.businesses'
+
+function loadBusinessList(): BusinessProfile[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(BUSINESSES_KEY) ?? '[]') as unknown
+    if (!Array.isArray(raw)) return []
+    return raw.filter((o): o is BusinessProfile =>
+      !!o && typeof o === 'object' && typeof (o as BusinessProfile).id === 'string' && typeof (o as BusinessProfile).name === 'string'
+      && Array.isArray((o as BusinessProfile).entranceIds) && Array.isArray((o as BusinessProfile).tasks))
+  } catch {
+    return []
+  }
+}
+
+/** Insert or update a business in the device list. Storage failures are ignored here. */
+function rememberBusiness(b: BusinessProfile): void {
+  const list = loadBusinessList()
+  const i = list.findIndex((x) => x.id === b.id)
+  if (i >= 0) list[i] = b
+  else list.push(b)
+  try {
+    localStorage.setItem(BUSINESSES_KEY, JSON.stringify(list))
+  } catch {
+    /* blocked or full: the active business is still saved */
+  }
+}
+
+function isDone(b: BusinessProfile, taskId: string): boolean {
+  return b.tasks.find((x) => x.id === taskId)?.done === true
+}
 
 let uid = 0
 const icon = (name: string, filled = false) => h('span', { class: `ms${filled ? ' ms-fill' : ''}`, 'aria-hidden': 'true' }, name)
@@ -212,6 +268,7 @@ export const businessPanel: Panel = (el, ctx) => {
         msg.textContent = L.saveFailed
         return
       }
+      rememberBusiness(b)
       ctx.announce(L.created)
       renderDashboard()
     }
@@ -228,44 +285,36 @@ export const businessPanel: Panel = (el, ctx) => {
       h('label', { class: 'bz-label', for: `${id}-addr` }, L.addrLabel),
       addrIn,
       h('button', { class: 'gm-pill gm-pill-primary bz-wide bz-submit', type: 'submit' }, icon('check'), L.save),
+      loadBusiness()
+        ? h('button', { class: 'gm-pill bz-wide bz-cancel', type: 'button', onclick: () => renderDashboard() }, L.cancel)
+        : null,
       msg,
     )
     el.replaceChildren(form)
     ctx.setSheet('full')
   }
 
-  // ---------- steps 2 to 5: dashboard ----------
+  // ---------- steps 2 to 5: dashboard as a full-height page ----------
   function renderDashboard(): void {
     const stored = loadBusiness()
     if (!stored) return renderCreate()
     const b = withTasks(stored)
+    rememberBusiness(b)
     const survey = loadSurvey()
     const linked = linkedEntrances(b, survey)
     const score = visibilityScore(b, survey)
     const msg = status()
 
     const persist = (next: BusinessProfile): boolean => {
-      if (saveBusiness(next)) return true
+      if (saveBusiness(next)) {
+        rememberBusiness(next)
+        return true
+      }
       msg.textContent = L.saveFailed
       return false
     }
 
-    // score
-    const scoreBlock = h(
-      'section',
-      { class: 'bz-card', 'aria-labelledby': `${id}-score` },
-      h('div', { class: 'bz-score-row' },
-        h('h3', { class: 'bz-h3', id: `${id}-score` }, L.scoreLabel),
-        h('span', { class: 'bz-score', 'aria-hidden': 'true' }, String(score)),
-      ),
-      h('div', {
-        class: 'bz-bar', role: 'progressbar', 'aria-label': L.scoreLabel,
-        'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': score, 'aria-valuetext': L.scoreOf(score),
-      }, h('div', { class: 'bz-bar-fill', style: `width:${score}%` })),
-      h('p', { class: 'gm-p bz-small' }, L.scoreText),
-    )
-
-    // accessibility toggle
+    // accessibility toggle card
     const toggle = h('input', { id: `${id}-offer`, class: 'bz-switch', type: 'checkbox', role: 'switch', checked: b.accessibility, 'aria-describedby': `${id}-offer-sub` })
     toggle.addEventListener('change', () => {
       if (!persist({ ...b, accessibility: toggle.checked })) {
@@ -306,7 +355,8 @@ export const businessPanel: Panel = (el, ctx) => {
           const cur = withTasks(loadBusiness() ?? b)
           const ids = cur.entranceIds.includes(e.id) ? cur.entranceIds : [...cur.entranceIds, e.id]
           const tasks = e.photo ? cur.tasks.map((t) => (t.id === PHOTO_TASK_ID ? { ...t, done: true } : t)) : cur.tasks
-          saveBusiness({ ...cur, entranceIds: ids, tasks })
+          const next = { ...cur, entranceIds: ids, tasks }
+          if (saveBusiness(next)) rememberBusiness(next)
           ctx.refresh()
           ctx.announce(L.entranceSaved)
           renderDashboard()
@@ -317,21 +367,23 @@ export const businessPanel: Panel = (el, ctx) => {
         },
       })
     }
-    const entrances = h(
-      'section',
-      { class: 'bz-section', 'aria-labelledby': `${id}-ent` },
-      h('h3', { class: 'bz-h3', id: `${id}-ent` }, L.entrancesHead),
-      linked.length
-        ? h('ul', { class: 'gm-list bz-list' }, ...linked.map(entranceRow))
-        : h('p', { class: 'gm-p' }, L.entrancesEmpty),
-      h('button', { class: 'gm-pill gm-pill-primary bz-wide', type: 'button', onclick: addEntrance }, icon('add'), L.addEntrance),
-    )
 
-    // tasks
+    // "Empfohlene Maßnahmen": one card per task, title, one line, action pill, done check
+    const back = () => {
+      closeEditor()
+      ctx.refresh()
+      renderDashboard()
+    }
+    const taskAction = (taskId: string): { label: string; aria: string; icon: string; run: () => void } | null => {
+      if (taskId === ROUTE_TASK_ID) return { label: L.film, aria: L.filmLabel, icon: 'videocam', run: () => ctx.openRecorder() }
+      if (taskId === PHOTO_TASK_ID) return { label: L.addPhoto, aria: L.addPhotoLabel, icon: 'photo_camera', run: addEntrance }
+      if (taskId === WIDTH_TASK_ID) return { label: L.measure, aria: L.measureLabel, icon: 'straighten', run: () => sub(() => openEntrancesManager(el, ctx, b.id, back)) }
+      return null
+    }
     const doneCount = TASKS.filter((t) => b.tasks.find((x) => x.id === t.id)?.done).length
-    const taskRow = (t: { id: string; label: string }) => {
+    const taskCard = (t: { id: string; label: string; line: string }) => {
       const done = b.tasks.find((x) => x.id === t.id)?.done === true
-      const box = h('input', { id: `${id}-t-${t.id}`, class: 'bz-check', type: 'checkbox', checked: done })
+      const box = h('input', { id: `${id}-t-${t.id}`, class: 'bz-check', type: 'checkbox', checked: done, 'aria-label': L.markDone(t.label) })
       box.addEventListener('change', () => {
         const next = { ...b, tasks: b.tasks.map((x) => (x.id === t.id ? { ...x, done: box.checked } : x)) }
         if (!persist(next)) {
@@ -341,39 +393,56 @@ export const businessPanel: Panel = (el, ctx) => {
         ctx.announce(box.checked ? L.taskDone(t.label) : L.taskOpen(t.label))
         renderDashboard()
       })
-      return h('li', { class: `bz-task${done ? ' bz-task-done' : ''}` },
-        h('label', { class: 'bz-task-label', for: `${id}-t-${t.id}` }, box, h('span', {}, t.label)),
-        t.id === ROUTE_TASK_ID
-          ? h('button', { class: 'gm-pill bz-task-btn', type: 'button', 'aria-label': L.filmLabel, onclick: () => ctx.openRecorder() }, icon('videocam'), L.film)
-          : null,
+      const act = done ? null : taskAction(t.id)
+      return h('li', { class: `bz-rec${done ? ' bz-rec-done' : ''}` },
+        h('div', { class: 'bz-rec-text' },
+          h('h4', { class: 'bz-rec-title' }, t.label),
+          h('p', { class: 'bz-rec-line' }, done ? L.doneLine : t.line),
+          act
+            ? h('button', { class: 'bz-rec-pill', type: 'button', 'aria-label': act.aria, onclick: act.run }, icon(act.icon), act.label)
+            : null,
+        ),
+        box,
       )
     }
-    const tasks = h(
+    const ordered = [...TASKS].sort((a, c) => Number(isDone(b, a.id)) - Number(isDone(b, c.id)))
+    const recs = h(
       'section',
-      { class: 'bz-section', 'aria-labelledby': `${id}-tasks` },
-      h('div', { class: 'bz-score-row' },
+      { class: 'bz-sec', 'aria-labelledby': `${id}-tasks` },
+      h('div', { class: 'bz-sec-head' },
         h('h3', { class: 'bz-h3', id: `${id}-tasks` }, L.tasksHead),
-        h('span', { class: 'gm-row-meta' }, L.tasksDone(doneCount, TASKS.length)),
+        h('span', { class: 'bz-sec-meta' }, L.tasksDone(doneCount, TASKS.length)),
       ),
-      h('ul', { class: 'bz-tasks' }, ...TASKS.map(taskRow)),
+      h('ul', { class: 'bz-recs' }, ...ordered.map(taskCard)),
     )
 
-    el.replaceChildren(
-      h(
-        'div',
-        { class: 'bz' },
-        home(b),
-        scoreBlock,
-        offer,
-        entrances,
-        tasks,
-        msg,
-      ),
+    const entrances = h(
+      'section',
+      { class: 'bz-sec', 'aria-labelledby': `${id}-ent` },
+      h('h3', { class: 'bz-h3', id: `${id}-ent` }, L.entrancesHead),
+      linked.length
+        ? h('ul', { class: 'gm-list bz-list' }, ...linked.map(entranceRow))
+        : h('p', { class: 'gm-p' }, L.entrancesEmpty),
+      h('button', { class: 'gm-pill gm-pill-primary bz-wide', type: 'button', onclick: addEntrance }, icon('add'), L.addEntrance),
     )
+
+    const visibility = h(
+      'section',
+      { class: 'bz-sec', 'aria-labelledby': `${id}-vis` },
+      h('h3', { class: 'bz-h3', id: `${id}-vis` }, L.offerHead),
+      offer,
+      h('p', { class: 'gm-p bz-small' }, `${L.scoreLabel}: ${L.scoreOf(score)}. ${L.scoreText}`),
+    )
+
+    const divider = () => h('div', { class: 'bz-divider', 'aria-hidden': 'true' })
+    el.replaceChildren(
+      h('div', { class: 'bz bz-page' }, home(b), divider(), recs, divider(), visibility, divider(), entrances, msg),
+    )
+    ctx.setSheet('full')
   }
 
-  // Google Business Profile style header with the round action buttons. Each sub-screen
-  // renders into the sheet and comes back to the dashboard; a failing one never kills the tab.
+  // Page top with the round action buttons. Each sub-screen renders into the sheet and
+  // comes back to the dashboard; a failing one never kills the tab.
   function sub(open: () => () => void) {
     closeEditor()
     try {
@@ -400,6 +469,23 @@ export const businessPanel: Panel = (el, ctx) => {
           if (main) ctx.openDoor(main)
           else ctx.announce(L.entrancesEmpty)
         },
+        onNewBusiness: () => {
+          closeEditor()
+          renderCreate()
+        },
+        onSwitch: (otherId) => {
+          const other = loadBusinessList().find((x) => x.id === otherId)
+          if (!other || !saveBusiness(other)) {
+            ctx.announce(L.saveFailed)
+            return
+          }
+          ctx.refresh()
+          ctx.announce(L.switched(other.name))
+          renderDashboard()
+        },
+      }, {
+        others: loadBusinessList().filter((x) => x.id !== b.id).map((x) => ({ id: x.id, name: x.name })),
+        openTasks: TASKS.filter((t) => !isDone(b, t.id)).map((t) => t.label),
       })
     } catch (err) {
       console.error('[doorway] business header failed', err)

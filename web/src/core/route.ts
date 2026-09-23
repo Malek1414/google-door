@@ -22,6 +22,8 @@ export interface RouteStep {
 export interface Route {
   found: boolean
   distanceM: number | null
+  /** Google's duration string, e.g. "72s". */
+  duration?: string | null
   path: [number, number][]
   steps: RouteStep[]
 }

@@ -9,11 +9,12 @@
 //   tier 0 / 3            no marker; surfaced as text in the detail sheet
 
 import { haversineM, type LatLon } from '../core/geo'
+import type { Route } from '../core/route'
 import type { Profile } from '../core/profile'
 import { guidanceFor, markerKind, type ArrowTarget } from '../core/target'
 import type { Building, Entrance } from '../core/types'
 import { mapsKey } from '../config'
-import { bboxAround, fetchEntrances, fetchLived, findEntrance, type BBox } from '../data'
+import { bboxAround, fetchEntrances, fetchLived, fetchRoute, findEntrance, type BBox } from '../data'
 import { announce } from '../session'
 import { unlockAll } from './Start'
 import type { FeatureCtx, Panel } from './ctx'
@@ -311,6 +312,8 @@ export function MapView(opts: {
       opts.onContribute()
     },
     announce: (text) => announce(text),
+    showRoute: (to) => drawRoute(to),
+    clearRoute: () => clearRoute(),
   }
   const order: SheetState[] = ['peek', 'half', 'full']
   // Sheet drag like Maps: the whole sheet follows the finger until it is fully open; only
@@ -649,23 +652,70 @@ export function MapView(opts: {
     setSheet('peek')
   }
 
-  function drawRoute(e: Entrance) {
-    if (!map) return
-    const from = origin()
+  let routeCasing: google.maps.Polyline | null = null
+
+  function clearRoute() {
     routeLine?.setMap(null)
-    routeLine = new google.maps.Polyline({
-      map,
-      path: [{ lat: from.lat, lng: from.lon }, { lat: e.lat, lng: e.lon }],
-      strokeOpacity: 0,
-      icons: [{ icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: '#62c4cb', fillOpacity: 1, strokeColor: '#00363a', strokeWeight: 1.5, scale: 4 }, offset: '0', repeat: '14px' }],
-    })
+    routeCasing?.setMap(null)
+    routeLine = null
+    routeCasing = null
+  }
+
+  /**
+   * Draw the way to a point. Real walking directions when the Routes API answers;
+   * a dotted straight line only as a fallback, and that case is announced as
+   * "direkt" so nobody reads a crow-flight hint as a route.
+   */
+  async function drawRoute(to: LatLon, label?: string): Promise<Route | null> {
+    if (!map) return null
+    const from = origin()
+    clearRoute()
+
+    let r: Route | null = null
+    try {
+      r = await fetchRoute(from, to)
+    } catch {
+      r = null
+    }
+
     const bounds = new google.maps.LatLngBounds()
-    bounds.extend({ lat: from.lat, lng: from.lon })
-    bounds.extend({ lat: e.lat, lng: e.lon })
+    if (r?.found && r.path.length > 1) {
+      const coords = r.path.map(([lat, lng]) => ({ lat, lng }))
+      // Maps draws a dark casing under the blue line so it survives light tiles and
+      // satellite alike.
+      routeCasing = new google.maps.Polyline({
+        map, path: coords, strokeColor: '#0b1a33', strokeOpacity: 0.9, strokeWeight: 11, zIndex: 4,
+      })
+      routeLine = new google.maps.Polyline({
+        map, path: coords, strokeColor: '#4285f4', strokeOpacity: 1, strokeWeight: 6, zIndex: 5,
+      })
+      coords.forEach((c) => bounds.extend(c))
+      const mins = Math.max(1, Math.round(Number(String(r.duration ?? '0').replace('s', '')) / 60))
+      const first = r.steps[0]?.text?.split('\n')[0] ?? ''
+      announce(`${t.metres(r.distanceM ?? 0)}, ${mins} min. ${label ?? ''} ${first}`.trim())
+    } else {
+      // No walkable route: dotted straight line, and say so.
+      routeLine = new google.maps.Polyline({
+        map,
+        path: [{ lat: from.lat, lng: from.lon }, { lat: to.lat, lng: to.lon }],
+        strokeOpacity: 0,
+        icons: [{ icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: '#62c4cb', fillOpacity: 1, strokeColor: '#00363a', strokeWeight: 1.5, scale: 4 }, offset: '0', repeat: '14px' }],
+      })
+      bounds.extend({ lat: from.lat, lng: from.lon })
+      bounds.extend({ lat: to.lat, lng: to.lon })
+      announce(`${t.roughly}. ${t.metres(haversineM(from, to))}. ${label ?? ''}`.trim())
+    }
+
     map.fitBounds(bounds, { top: 140, bottom: 260, left: 40, right: 40 })
     setSheet('peek')
-    announce(`${t.metres(haversineM(from, e))}. ${e.name ?? t.unnamedEntrance}`)
+    return r
   }
+
+  /** Door cards still call this with an Entrance. */
+  function drawRouteToEntrance(e: Entrance) {
+    void drawRoute({ lat: e.lat, lon: e.lon }, e.name ?? t.unnamedEntrance)
+  }
+
 
   function streetView(e: Entrance): HTMLElement | null {
     if (!map) return null
@@ -727,7 +777,7 @@ export function MapView(opts: {
     const pills = h(
       'div',
       { class: 'gm-actions' },
-      h('button', { class: 'gm-pill gm-pill-primary', type: 'button', onclick: () => drawRoute(e) }, icon('assistant_direction', true), t.route),
+      h('button', { class: 'gm-pill gm-pill-primary', type: 'button', onclick: () => drawRouteToEntrance(e) }, icon('assistant_direction', true), t.route),
       g.kind === 'arrow' ? h('button', { class: 'gm-pill', type: 'button', onclick: () => void start() }, icon('navigation', true), t.guideMe) : null,
       h('button', { class: 'gm-pill', type: 'button', onclick: () => void share(e) }, icon('ios_share'), t.share),
     )

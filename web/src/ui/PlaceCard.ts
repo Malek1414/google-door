@@ -302,9 +302,18 @@ export function renderPlaceCard(el: HTMLElement, ctx: FeatureCtx, p: PlaceHit, o
       {
         class: 'gm-pill gm-pill-primary',
         type: 'button',
-        onclick: () => {
-          ctx.setSheet('peek')
-          panTo()
+        onclick: async (ev: Event) => {
+          // This used to collapse the sheet and pan the map, which looked like
+          // directions and computed none. Now it fetches the real walking route.
+          const btn = ev.currentTarget as HTMLButtonElement
+          btn.disabled = true
+          btn.setAttribute('aria-busy', 'true')
+          try {
+            await ctx.showRoute({ lat: p.lat, lon: p.lon })
+          } finally {
+            btn.disabled = false
+            btn.removeAttribute('aria-busy')
+          }
         },
       },
       icon('assistant_direction', true),

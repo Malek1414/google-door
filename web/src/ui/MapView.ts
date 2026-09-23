@@ -281,26 +281,93 @@ export function MapView(opts: {
     announce: (text) => announce(text),
   }
   const order: SheetState[] = ['peek', 'half', 'full']
+  // Sheet drag like Maps: the whole sheet follows the finger until it is fully open; only
+  // then does its content scroll. Pulling down on content that is scrolled to the top moves
+  // the sheet again. Horizontal swipes (carousels, chips) are left to the browser.
   let dragY0: number | null = null
-  let dragged = false
+  let dragX0 = 0
+  let dragT0 = 0
+  let dragging = false
+  let decided = false
+  const stateIdx = () => order.indexOf(sheet.dataset.state as SheetState)
+  const snap = (dy: number, dt: number) => {
+    const v = dy / Math.max(dt, 1) // px per ms, negative = up
+    const i = stateIdx()
+    let step = 0
+    if (v < -0.5 || dy < -60) step = dy < -420 && i === 0 ? 2 : 1
+    else if (v > 0.5 || dy > 60) step = dy > 420 && i === 2 ? -2 : -1
+    setSheet(order[Math.max(0, Math.min(order.length - 1, i + step))])
+  }
+  sheet.addEventListener(
+    'touchstart',
+    (ev) => {
+      const tt = ev.touches[0]
+      dragY0 = tt.clientY
+      dragX0 = tt.clientX
+      dragT0 = performance.now()
+      dragging = false
+      decided = false
+    },
+    { passive: true },
+  )
+  sheet.addEventListener(
+    'touchmove',
+    (ev) => {
+      if (dragY0 === null) return
+      const tt = ev.touches[0]
+      const dy = tt.clientY - dragY0
+      const dx = tt.clientX - dragX0
+      if (!decided) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return
+        decided = true
+        if (Math.abs(dx) > Math.abs(dy)) {
+          dragY0 = null // horizontal: carousel or chips
+          return
+        }
+        const full = sheet.dataset.state === 'full'
+        const atTop = sheetBody.scrollTop <= 0
+        // Not full: every vertical swipe moves the sheet. Full: only a pull-down at the top.
+        dragging = !full || (dy > 0 && atTop)
+      }
+      if (!dragging) return
+      ev.preventDefault()
+      sheet.style.transition = 'none'
+      sheet.style.setProperty('--drag', `${dy}px`)
+    },
+    { passive: false },
+  )
+  const endDrag = (ev: TouchEvent) => {
+    if (dragY0 === null) return
+    const tt = ev.changedTouches[0]
+    const dy = tt.clientY - dragY0
+    dragY0 = null
+    sheet.style.transition = ''
+    if (dragging) snap(dy, performance.now() - dragT0)
+    // A plain tap on the handle cycles peek, half, full.
+    else if (!decided && handle.contains(ev.target as Node)) setSheet(stateIdx() === order.length - 1 ? 'peek' : order[stateIdx() + 1])
+    dragging = false
+  }
+  sheet.addEventListener('touchend', endDrag)
+  sheet.addEventListener('touchcancel', endDrag)
+
+  // Mouse / pen on the handle (desktop preview), tap on the handle cycles the states.
+  let mouseY0: number | null = null
   handle.addEventListener('pointerdown', (ev) => {
-    dragY0 = ev.clientY
-    dragged = false
+    if (ev.pointerType === 'touch') return
+    mouseY0 = ev.clientY
+    dragT0 = performance.now()
     handle.setPointerCapture(ev.pointerId)
   })
   handle.addEventListener('pointermove', (ev) => {
-    if (dragY0 === null) return
-    const dy = ev.clientY - dragY0
-    if (Math.abs(dy) > 6) dragged = true
-    sheet.style.setProperty('--drag', `${dy}px`)
+    if (mouseY0 === null) return
+    sheet.style.setProperty('--drag', `${ev.clientY - mouseY0}px`)
   })
   handle.addEventListener('pointerup', (ev) => {
-    if (dragY0 === null) return
-    const dy = ev.clientY - dragY0
-    dragY0 = null
-    const i = order.indexOf(sheet.dataset.state as SheetState)
-    if (!dragged) setSheet(i === order.length - 1 ? 'peek' : order[i + 1])
-    else setSheet(order[Math.max(0, Math.min(order.length - 1, i + (dy < -40 ? 1 : dy > 40 ? -1 : 0)))])
+    if (mouseY0 === null) return
+    const dy = ev.clientY - mouseY0
+    mouseY0 = null
+    if (Math.abs(dy) < 6) setSheet(stateIdx() === order.length - 1 ? 'peek' : order[stateIdx() + 1])
+    else snap(dy, performance.now() - dragT0)
   })
   handle.addEventListener('keydown', (ev) => {
     if (ev.key !== 'Enter' && ev.key !== ' ') return

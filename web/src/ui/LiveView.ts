@@ -3,13 +3,13 @@
 // Accepts only an ArrowTarget (core/target.ts), which can only be minted for tier 1.
 // Everything in the hot path is arithmetic. /api/look is called ONLY from the button.
 
-import { arrowPulseHz, ARRIVE_M, beaconFor, hapticFor, HAPTIC_ARRIVED, ON_BEARING_DEG, shouldSpeakArrival } from '../core/beacon'
+import { arrowPulseHz, ARRIVE_M, beaconFor, cuePan, hapticFor, HAPTIC_ARRIVED, ON_BEARING_DEG, shouldAnnounceApproach, shouldSpeakArrival } from '../core/beacon'
 import { bearingDeg, haversineM, relativeBearing } from '../core/geo'
 import { startHeading, type Heading } from '../core/heading'
 import { snapToGraph } from '../core/match'
 import type { OutputConfig } from '../core/profile'
 import type { ArrowTarget } from '../core/target'
-import { BeaconAudio } from '../audio'
+import { BeaconAudio, playApproachChime } from '../audio'
 import { postLook } from '../data'
 import { announce, session, speak, vibrate } from '../session'
 import { t } from '../strings'
@@ -34,7 +34,8 @@ export interface Sensors {
 export const CONE_ACCURACY_M = 25
 const HAPTIC_EVERY_MS = 3000
 const SPEAK_EVERY_MS = 4000
-const DISTANCE_CALLOUTS = [50, 30, 20, 10]
+// 10 m is covered by the one-off approach line (core/beacon.ts APPROACH_M).
+const DISTANCE_CALLOUTS = [50, 30, 20]
 
 export function realSensors(): Sensors {
   return {
@@ -191,6 +192,7 @@ export function LiveView(opts: {
   let dist = NaN
   let arrived = false
   let spokeArrival = false
+  let spokeApproach = false
   let lastHaptic = 0
   let lastSpoken = 0
   let lastWord = ''
@@ -260,7 +262,7 @@ export function LiveView(opts: {
       if (cfg.haptics && now - lastHaptic > HAPTIC_EVERY_MS) {
         const pat = hapticFor(dist, rel)
         if (pat) {
-          vibrate(pat)
+          vibrate(pat, cuePan(pat))
           lastHaptic = now
         }
       }
@@ -278,6 +280,14 @@ export function LiveView(opts: {
       crossed = true
     }
     if (crossed && cfg.speak && !shouldSpeakArrival(dist)) speak(t.metres(dist))
+
+    // One-off at 10 m: he is in the vicinity of the entrance.
+    if (!spokeApproach && shouldAnnounceApproach(dist)) {
+      spokeApproach = true
+      if ((cfg.beacon || cfg.haptics) && session.audio) playApproachChime(session.audio)
+      if (cfg.speak) speak(t.approaching, { interrupt: true })
+      announce(t.approaching)
+    }
 
     // Spoken arrival line fires 2.5 m early to hide speech latency.
     if (!spokeArrival && shouldSpeakArrival(dist)) {

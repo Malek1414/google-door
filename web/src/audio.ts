@@ -77,6 +77,43 @@ export class BeaconAudio {
   }
 }
 
+/**
+ * Short sound cue, the audible stand-in for vibration where there is none (iOS).
+ * `pattern` uses the Vibration API format: on, off, on, ... in milliseconds.
+ * Separate oscillator per cue, so it never disturbs the running beacon.
+ */
+export function playCue(ctx: AudioContext, pattern: number[], pan: number, hz = 880, volume = 0.8): void {
+  if (ctx.state === 'suspended') void ctx.resume()
+  const osc = ctx.createOscillator()
+  osc.type = 'triangle'
+  osc.frequency.value = hz
+  const gain = ctx.createGain()
+  gain.gain.value = 0
+  const panner = ctx.createStereoPanner()
+  panner.pan.value = Math.max(-1, Math.min(1, pan))
+  osc.connect(gain).connect(panner).connect(ctx.destination)
+  let t = ctx.currentTime + 0.02
+  pattern.forEach((ms, i) => {
+    const d = ms / 1000
+    if (i % 2 === 0) {
+      gain.gain.setValueAtTime(0, t)
+      gain.gain.linearRampToValueAtTime(volume, t + RAMP_S)
+      gain.gain.setValueAtTime(volume, t + d - RAMP_S)
+      gain.gain.linearRampToValueAtTime(0, t + d)
+    }
+    t += d
+  })
+  osc.start()
+  osc.stop(t + 0.05)
+  osc.onended = () => osc.disconnect()
+}
+
+/** Rising two-note chime for "you are near the entrance". */
+export function playApproachChime(ctx: AudioContext): void {
+  playCue(ctx, [140], 0, 660, 0.7)
+  window.setTimeout(() => playCue(ctx, [220], 0, 990, 0.7), 170)
+}
+
 /** Play one silent buffer: iOS unlocks the AudioContext only from inside a gesture. */
 export function unlockAudio(ctx: AudioContext): void {
   const buf = ctx.createBuffer(1, 1, 22050)

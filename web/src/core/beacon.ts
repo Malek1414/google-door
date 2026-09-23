@@ -18,9 +18,10 @@ export const ON_BEARING_DEG = 15
 export const VOLUME_FAR = 0.25
 export const VOLUME_NEAR = 0.6 // secondary channel: modest range on purpose
 
-/** Arrival radius, and how far before it the spoken line fires. */
+/** Arrival radius, how far before it the spoken line fires, and the "near the entrance" line. */
 export const ARRIVE_M = 3
 export const SPEAK_EARLY_M = 2.5
+export const APPROACH_M = 10
 
 const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x))
 
@@ -57,6 +58,18 @@ export function hapticFor(distanceM: number, relBearingDeg: number): number[] | 
   if (Number.isFinite(distanceM) && distanceM <= ARRIVE_M) return HAPTIC_ARRIVED
   if (!Number.isFinite(relBearingDeg) || Math.abs(relBearingDeg) <= ON_BEARING_DEG) return null
   return relBearingDeg < 0 ? HAPTIC_LEFT : HAPTIC_RIGHT
+}
+
+/** Stereo position of a cue: left pattern hard left, right pattern hard right, arrival centred. */
+export function cuePan(pattern: number[]): number {
+  if (pattern === HAPTIC_LEFT) return -1
+  if (pattern === HAPTIC_RIGHT) return 1
+  return 0
+}
+
+/** One-off "you are near the entrance" line at 10 m, unless the arrival line already covers it. */
+export function shouldAnnounceApproach(distanceM: number): boolean {
+  return Number.isFinite(distanceM) && distanceM <= APPROACH_M && !shouldSpeakArrival(distanceM)
 }
 
 /** The arrival line fires 2.5 m before the arrival radius to hide speech latency. */

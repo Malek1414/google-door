@@ -393,17 +393,31 @@ export function MapView(opts: {
     dragT0 = performance.now()
     handle.setPointerCapture(ev.pointerId)
   })
+  // Ends a mouse drag in every way it can end: button released, released outside the window
+  // (lost capture), cancelled. A drag that never ends would leave the sheet shifted for good.
+  const endMouse = (clientY: number | null) => {
+    if (mouseY0 === null) return
+    const dy = clientY === null ? 0 : clientY - mouseY0
+    mouseY0 = null
+    if (Math.abs(dy) < 6) {
+      if (clientY !== null) setSheet(stateIdx() === order.length - 1 ? 'peek' : order[stateIdx() + 1])
+      else setSheet(order[stateIdx()])
+    } else snap(dy, performance.now() - dragT0)
+  }
   handle.addEventListener('pointermove', (ev) => {
     if (mouseY0 === null) return
+    if (ev.buttons === 0) return endMouse(ev.clientY)
     sheet.style.setProperty('--drag', `${ev.clientY - mouseY0}px`)
   })
-  handle.addEventListener('pointerup', (ev) => {
-    if (mouseY0 === null) return
-    const dy = ev.clientY - mouseY0
-    mouseY0 = null
-    if (Math.abs(dy) < 6) setSheet(stateIdx() === order.length - 1 ? 'peek' : order[stateIdx() + 1])
-    else snap(dy, performance.now() - dragT0)
-  })
+  handle.addEventListener('pointerup', (ev) => endMouse(ev.clientY))
+  handle.addEventListener('pointercancel', () => endMouse(null))
+  handle.addEventListener('lostpointercapture', (ev) => endMouse(ev.clientY))
+  // Safety net: any scroll or wheel on the sheet without an active gesture clears a stale offset.
+  const clearStale = () => {
+    if (mouseY0 === null && dragY0 === null && sheet.style.getPropertyValue('--drag')) setSheet(order[stateIdx()])
+  }
+  sheetBody.addEventListener('scroll', clearStale, { passive: true })
+  sheet.addEventListener('wheel', clearStale, { passive: true })
   handle.addEventListener('keydown', (ev) => {
     if (ev.key !== 'Enter' && ev.key !== ' ') return
     ev.preventDefault()

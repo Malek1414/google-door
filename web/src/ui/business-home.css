@@ -67,3 +67,15 @@
 @media (prefers-reduced-motion: reduce) {
   .bzh-action-circle { transition: none; }
 }
+
+/* "Gesammelte Daten" info button, mirroring Google's own data pages: a quiet
+   affordance in the header rather than a prominent action. */
+.bzh-top-info { position: relative; }
+.bzh-info {
+  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 40px; height: 40px; border: 0; border-radius: 50%;
+  background: transparent; color: var(--fg2, #c4c7c5);
+  display: grid; place-items: center; cursor: pointer;
+}
+.bzh-info:active { background: rgb(255 255 255 / 0.08); }
+.bzh-info .ms { font-size: 22px; }

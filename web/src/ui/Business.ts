@@ -19,6 +19,7 @@ import { lang } from '../strings'
 import type { FeatureCtx, Panel } from './ctx'
 import { h } from './dom'
 import { openEntranceEditor } from './EntranceEditor'
+import { openBusinessData } from './BusinessData'
 import { openBusinessEdit } from './BusinessEdit'
 import { openEntrancesManager } from './BusinessEntrances'
 import { businessHomeHeader } from './BusinessHome'
@@ -461,6 +462,7 @@ export const businessPanel: Panel = (el, ctx) => {
     try {
       return businessHomeHeader(ctx, b, {
         onEdit: () => sub(() => openBusinessEdit(el, ctx, b.id, back)),
+        onData: () => sub(() => openBusinessData(el, ctx, b.id, back)),
         onEntrances: () => sub(() => openEntrancesManager(el, ctx, b.id, back)),
         onRecord: () => ctx.openRecorder(),
         onPhotos: () => sub(() => openBusinessEdit(el, ctx, b.id, back)),

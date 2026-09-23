@@ -17,7 +17,7 @@ import { bboxAround, fetchEntrances, fetchLived, findEntrance, type BBox } from 
 import { announce } from '../session'
 import { unlockAll } from './Start'
 import { t } from '../strings'
-import { h, mount } from './dom'
+import { h, mount, s } from './dom'
 
 const DEFAULT_CENTER: LatLon = { lat: 52.5251, lon: 13.3694 } // Berlin Hauptbahnhof
 const BASE_PIN = 32
@@ -72,10 +72,41 @@ export function warningsBlock(e: Entrance): HTMLElement | null {
 }
 
 type SheetState = 'peek' | 'half' | 'full'
-type Filter = { stepFree: boolean; withSteps: boolean }
+type Filter = 'stepFree' | 'withSteps' | 'automatic' | 'noRevolving'
+type Tab = 'explore' | 'saved' | 'business'
 
-/** Material Symbols glyph. Decorative: the text next to it carries the meaning. */
-const icon = (name: string) => h('span', { class: 'ms', 'aria-hidden': 'true' }, name)
+const SAVED_KEY = 'doorway.saved'
+const loadSaved = (): string[] => {
+  try {
+    const v = JSON.parse(localStorage.getItem(SAVED_KEY) ?? '[]')
+    return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+const storeSaved = (ids: string[]) => {
+  try {
+    localStorage.setItem(SAVED_KEY, JSON.stringify(ids))
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+/** Material Symbols glyph. Decorative: the text or aria-label next to it carries the meaning. */
+const icon = (name: string, filled = false) => h('span', { class: `ms${filled ? ' ms-fill' : ''}`, 'aria-hidden': 'true' }, name)
+
+/** Four-colour map pin in the search bar, drawn here (no logo asset). */
+function pinLogo(): SVGElement {
+  return s(
+    'svg',
+    { class: 'gm-logo', viewBox: '0 0 24 34', 'aria-hidden': 'true' },
+    s('path', { d: 'M12 0C5.4 0 0 5.3 0 11.9c0 2.4.7 4.6 1.9 6.5L12 34l10.1-15.6c1.2-1.9 1.9-4.1 1.9-6.5C24 5.3 18.6 0 12 0z', fill: '#34a853' }),
+    s('path', { d: 'M12 0C8.3 0 5 1.7 2.8 4.3l6 5A4.3 4.3 0 0 1 16 9.6l6.2-4.9C20 1.8 16.3 0 12 0z', fill: '#4285f4' }),
+    s('path', { d: 'M2.8 4.3A11.8 11.8 0 0 0 0 11.9c0 2.4.7 4.6 1.9 6.5l6.9-9.1-6-5z', fill: '#ea4335' }),
+    s('path', { d: 'M22.2 4.7L16 9.6c.3.7.4 1.5.2 2.3L22.1 18.4c1.2-1.9 1.9-4.1 1.9-6.5 0-2.7-.7-5.2-1.8-7.2z', fill: '#fbbc04' }),
+    s('circle', { cx: 12, cy: 11.9, r: 4.3, fill: '#fff' }),
+  )
+}
 
 export function MapView(opts: {
   profile: Profile
@@ -90,69 +121,113 @@ export function MapView(opts: {
   let map: google.maps.Map | null = null
   let markers: google.maps.Marker[] = []
   let meMarker: google.maps.Marker | null = null
+  let routeLine: google.maps.Polyline | null = null
   let geoWatch: number | null = null
   let lastBox = ''
   let selected: Entrance | Building | null = null
   let opened = false
-  // A step-free profile starts with only step-free doors shown; the chip turns the rest on.
-  const filter: Filter = { stepFree: true, withSteps: !opts.profile.stepFreeRequired }
+  let tab: Tab = 'explore'
+  let saved = loadSaved()
+  // A step-free profile starts with only step-free doors shown; the chips turn the rest on.
+  const filters = new Set<Filter>(opts.profile.stepFreeRequired ? ['stepFree'] : [])
 
-  // ---- shell ----
-  const status = h('p', { class: 'gm-status', role: 'status' }, t.loading)
+  // ---- top: search bar, chips, layers ----
+  const status = h('p', { class: 'gm-status', role: 'status' }, '')
   const mapEl = h('div', { class: 'gm-map', role: 'region', 'aria-label': t.mapTitle })
-
   const searchInput = h('input', { class: 'gm-search-input', type: 'search', placeholder: t.searchPlaceholder, 'aria-label': t.searchLabel, autocomplete: 'off', enterkeyhint: 'search' }) as HTMLInputElement
   const results = h('ul', { class: 'gm-results', role: 'listbox', 'aria-label': t.searchLabel, hidden: true })
-  const avatar = h('button', { class: 'gm-avatar', type: 'button', 'aria-label': t.profileButton, onclick: opts.onSettings }, icon('accessible'))
-  const search = h('div', { class: 'gm-search' }, icon('search'), searchInput, avatar)
+  const micBtn = h('button', { class: 'gm-search-btn', type: 'button', 'aria-label': t.voiceSearch }, icon('mic'))
+  const lensBtn = h('button', { class: 'gm-search-btn', type: 'button', 'aria-label': t.look }, icon('photo_camera'))
+  const avatar = h('button', { class: 'gm-avatar', type: 'button', 'aria-label': t.profileButton, onclick: opts.onSettings }, 'S')
+  const search = h('div', { class: 'gm-search' }, pinLogo(), searchInput, micBtn, lensBtn, avatar)
 
-  const chip = (label: string, key: keyof Filter, shape: string) => {
-    const b = h('button', { class: 'gm-chip', type: 'button', 'aria-pressed': String(filter[key]) }, h('span', { class: `gm-chip-shape ${shape}`, 'aria-hidden': 'true' }), label)
-    b.addEventListener('click', () => {
-      filter[key] = !filter[key]
-      b.setAttribute('aria-pressed', String(filter[key]))
-      renderMarkers()
-      renderList()
-    })
-    return b
-  }
-  const chips = h('div', { class: 'gm-chips', role: 'group', 'aria-label': t.filterLabel }, chip(t.chipStepFree, 'stepFree', 'shape-step-free'), chip(t.chipWithSteps, 'withSteps', 'shape-not-step-free'))
+  const chipDefs: [Filter, string, string][] = [
+    ['stepFree', 'accessible', t.chipStepFree],
+    ['withSteps', 'stairs', t.chipWithSteps],
+    ['automatic', 'door_sliding', t.chipAutomatic],
+    ['noRevolving', 'block', t.chipNoRevolving],
+  ]
+  const chips = h(
+    'div',
+    { class: 'gm-chips', role: 'group', 'aria-label': t.filterLabel },
+    ...chipDefs.map(([key, ic, label]) => {
+      const b = h('button', { class: 'gm-chip', type: 'button', 'aria-pressed': String(filters.has(key)) }, icon(ic), label)
+      b.addEventListener('click', () => {
+        if (filters.has(key)) filters.delete(key)
+        else filters.add(key)
+        b.setAttribute('aria-pressed', String(filters.has(key)))
+        renderMarkers()
+        renderSheet()
+      })
+      return b
+    }),
+  )
+  const morePill = h('button', { class: 'gm-more', type: 'button', hidden: true, onclick: () => closeCard() }, t.moreDoors)
+  const layersBtn = h('button', { class: 'gm-round gm-layers', type: 'button', 'aria-label': t.layers }, icon('layers'))
 
-  const locateBtn = h('button', { class: 'gm-fab', type: 'button', 'aria-label': t.myLocation }, icon('my_location'))
+  // ---- right column above the sheet ----
+  const locateBtn = h('button', { class: 'gm-round', type: 'button', 'aria-label': t.myLocation }, icon('near_me'))
+  const goBtn = h('button', { class: 'gm-go', type: 'button', 'aria-label': t.nearestDoor }, icon('assistant_direction', true))
+  const viewBtn = h('button', { class: 'gm-round gm-view', type: 'button', hidden: true }, icon('photo_camera'), h('span', {}, t.view))
+  const rightCol = h('div', { class: 'gm-right' }, locateBtn, goBtn, viewBtn)
 
+  // ---- sheet + nav ----
   const sheetBody = h('div', { class: 'gm-sheet-body' })
   const handle = h('button', { class: 'gm-handle', type: 'button', 'aria-label': t.sheetHandle }, h('span', { 'aria-hidden': 'true' }))
-  const sheet = h('section', { class: 'gm-sheet', 'data-state': 'half', 'aria-labelledby': 'sheet-title' }, handle, sheetBody)
-
-  mount(
-    h(
-      'section',
-      { class: 'gm', 'aria-labelledby': 'map-title' },
-      h('h1', { id: 'map-title', class: 'sr-only' }, t.mapTitle),
-      mapEl,
-      h('div', { class: 'gm-top' }, search, results, chips, status),
-      locateBtn,
-      sheet,
-      h(
-        'nav',
-        { class: 'gm-nav', 'aria-label': t.navLabel },
-        h('button', { class: 'gm-tab', type: 'button', 'aria-current': 'page' }, icon('location_on'), h('span', {}, t.tabExplore)),
-        h('button', { class: 'gm-tab', type: 'button', onclick: () => { teardown(); opts.onContribute() } }, icon('add_circle'), h('span', {}, t.tabContribute)),
-        h('button', { class: 'gm-tab', type: 'button', onclick: opts.onSettings }, icon('accessibility_new'), h('span', {}, t.tabSettings)),
-      ),
-    ),
+  const sheet = h('section', { class: 'gm-sheet', 'data-state': 'peek', 'aria-labelledby': 'sheet-title' }, handle, sheetBody)
+  const navTab = (id: Tab | 'contribute', ic: string, label: string, dot = false) =>
+    h('button', { class: 'gm-tab', type: 'button', 'data-tab': id, 'aria-current': id === tab ? 'page' : false }, h('span', { class: 'gm-tab-ic' }, icon(ic, id === tab), dot ? h('span', { class: 'gm-dot', 'aria-hidden': 'true' }) : null), h('span', {}, label))
+  const nav = h(
+    'nav',
+    { class: 'gm-nav', 'aria-label': t.navLabel },
+    navTab('explore', 'location_on', t.tabExplore),
+    navTab('saved', 'bookmark', t.tabSaved, saved.length > 0),
+    navTab('contribute', 'add_circle', t.tabContribute),
+    navTab('business', 'storefront', t.tabBusiness),
   )
+  nav.addEventListener('click', (ev) => {
+    const b = (ev.target as HTMLElement).closest<HTMLButtonElement>('.gm-tab')
+    if (!b) return
+    const id = b.dataset.tab as Tab | 'contribute'
+    if (id === 'contribute') {
+      teardown()
+      opts.onContribute()
+      return
+    }
+    tab = id
+    nav.querySelectorAll<HTMLButtonElement>('.gm-tab').forEach((x) => {
+      const on = x.dataset.tab === tab
+      x.toggleAttribute('aria-current', on)
+      if (on) x.setAttribute('aria-current', 'page')
+      x.querySelector('.ms')?.classList.toggle('ms-fill', on)
+    })
+    selected = null
+    renderMarkers()
+    renderSheet()
+    setSheet(tab === 'explore' ? 'peek' : 'half')
+  })
 
-  // ---- bottom sheet: three snap states, drag or tap the handle ----
+  const root = h(
+    'section',
+    { class: 'gm', 'aria-labelledby': 'map-title' },
+    h('h1', { id: 'map-title', class: 'sr-only' }, t.mapTitle),
+    mapEl,
+    h('div', { class: 'gm-top' }, search, results, chips, morePill, status),
+    layersBtn,
+    rightCol,
+    sheet,
+    nav,
+  )
+  mount(root)
+
+  // ---- sheet snap states: drag or tap the handle ----
   const setSheet = (st: SheetState) => {
     sheet.dataset.state = st
+    root.dataset.sheet = st
     sheet.style.removeProperty('--drag')
   }
+  setSheet('peek')
   const order: SheetState[] = ['peek', 'half', 'full']
-  handle.addEventListener('click', () => {
-    const i = order.indexOf(sheet.dataset.state as SheetState)
-    setSheet(i === order.length - 1 ? 'peek' : order[i + 1])
-  })
   let dragY0: number | null = null
   let dragged = false
   handle.addEventListener('pointerdown', (ev) => {
@@ -170,19 +245,32 @@ export function MapView(opts: {
     if (dragY0 === null) return
     const dy = ev.clientY - dragY0
     dragY0 = null
-    if (!dragged) return
+    const i = order.indexOf(sheet.dataset.state as SheetState)
+    if (!dragged) setSheet(i === order.length - 1 ? 'peek' : order[i + 1])
+    else setSheet(order[Math.max(0, Math.min(order.length - 1, i + (dy < -40 ? 1 : dy > 40 ? -1 : 0)))])
+  })
+  handle.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return
     ev.preventDefault()
     const i = order.indexOf(sheet.dataset.state as SheetState)
-    setSheet(order[Math.max(0, Math.min(order.length - 1, i + (dy < -40 ? 1 : dy > 40 ? -1 : 0)))])
+    setSheet(i === order.length - 1 ? 'peek' : order[i + 1])
   })
-  // A drag ends with a click event too; swallow it so the state does not jump twice.
-  handle.addEventListener('click', (ev) => { if (dragged) { ev.stopImmediatePropagation(); dragged = false } }, true)
 
   const origin = () => me ?? (map?.getCenter() ? { lat: map.getCenter()!.lat(), lon: map.getCenter()!.lng() } : DEFAULT_CENTER)
   const visible = (e: Entrance) => {
     const k = markerKind(e)
-    return (k === 'step-free' && filter.stepFree) || (k === 'not-step-free' && filter.withSteps)
+    if (k === 'no-marker') return false
+    if (filters.has('stepFree') && !filters.has('withSteps') && k !== 'step-free') return false
+    if (filters.has('withSteps') && !filters.has('stepFree') && k !== 'not-step-free') return false
+    if (filters.has('automatic') && !e.automatic) return false
+    if (filters.has('noRevolving') && (e.door === 'revolving' || e.warnings.includes('revolving'))) return false
+    return true
   }
+  const nearby = () =>
+    entrances
+      .filter(visible)
+      .map((e) => ({ e, d: haversineM(origin(), e) }))
+      .sort((a, b) => a.d - b.d)
 
   async function load(b: BBox) {
     const key = [b.south, b.west, b.north, b.east].map((x) => x.toFixed(4)).join(',')
@@ -193,19 +281,18 @@ export function MapView(opts: {
       entrances = r.entrances
       buildings = r.buildings
       status.textContent = r.source === 'static' ? t.offlineData : ''
-      if (r.source === 'static') console.warn('[doorway] /api/entrances unreachable, using static data/berlin-mitte.json')
       renderMarkers()
       const want = opts.openDoor ? entrances.find((x) => x.id === opts.openDoor) : undefined
       if (want && !opened) {
         opened = true
         openEntrance(want)
-      } else if (!selected) renderList()
+      } else if (!selected) renderSheet()
     } catch {
       status.textContent = t.noDoors
     }
   }
 
-  // ---- list view (default sheet content) ----
+  // ---- sheet content per tab ----
   function doorRow(e: Entrance, d: number) {
     const meta = [stepFreeLabel(e.stepFree), t.metresShort(d), ...e.warnings.map((w) => t.door[w] ?? w)].join(' · ')
     return h(
@@ -216,21 +303,41 @@ export function MapView(opts: {
         { class: `gm-row door-${markerKind(e)}`, type: 'button', onclick: () => openEntrance(e) },
         h('span', { class: 'gm-row-shape', 'aria-hidden': 'true' }),
         h('span', { class: 'gm-row-text' }, h('span', { class: 'gm-row-title' }, e.name ?? t.unnamedEntrance), h('span', { class: 'gm-row-meta' }, meta)),
-        icon('chevron_right'),
       ),
     )
   }
 
-  function renderList() {
+  function renderSheet() {
     if (selected) return
-    const o = origin()
-    const doors = entrances
-      .filter(visible)
-      .map((e) => ({ e, d: haversineM(o, e) }))
-      .sort((a, b) => a.d - b.d)
+    morePill.hidden = true
+    chips.hidden = false
+    viewBtn.hidden = true
+    goBtn.hidden = false
+    if (tab === 'saved') {
+      const list = saved.map((id) => entrances.find((e) => e.id === id)).filter((e): e is Entrance => !!e)
+      sheetBody.replaceChildren(
+        h('div', { class: 'gm-sheet-head' }, h('h2', { id: 'sheet-title', class: 'gm-sheet-title' }, t.savedTitle)),
+        h('ul', { class: 'gm-list' }, ...(list.length ? list.map((e) => doorRow(e, haversineM(origin(), e))) : [h('li', { class: 'gm-empty' }, saved.length ? t.savedElsewhere : t.savedNone)])),
+      )
+      return
+    }
+    if (tab === 'business') {
+      sheetBody.replaceChildren(
+        h('div', { class: 'gm-sheet-head' }, h('h2', { id: 'sheet-title', class: 'gm-sheet-title' }, t.businessTitle)),
+        h('p', { class: 'gm-p' }, t.businessText),
+        h('div', { class: 'gm-actions' }, h('button', { class: 'gm-pill gm-pill-primary', type: 'button', onclick: () => { teardown(); opts.onContribute() } }, icon('videocam'), t.recordTitle)),
+      )
+      return
+    }
+    const doors = nearby()
+    const stepFreeCount = doors.filter(({ e }) => e.stepFree === true).length
     sheetBody.replaceChildren(
-      h('h2', { id: 'sheet-title', class: 'gm-sheet-title' }, t.mapTitle),
-      h('p', { class: 'gm-sheet-sub' }, t.doorsCount(doors.length)),
+      h(
+        'div',
+        { class: 'gm-sheet-head' },
+        h('h2', { id: 'sheet-title', class: 'gm-sheet-title' }, t.inThisArea),
+        h('span', { class: 'gm-badge', title: t.doorsCount(doors.length) }, icon('accessible'), h('span', {}, String(stepFreeCount)), h('span', { class: 'sr-only' }, t.doorsCount(doors.length))),
+      ),
       h('ul', { class: 'gm-list' }, ...(doors.length ? doors.slice(0, LIST_MAX).map(({ e, d }) => doorRow(e, d)) : [h('li', { class: 'gm-empty' }, t.noDoors)])),
     )
   }
@@ -240,9 +347,8 @@ export function MapView(opts: {
     markers.forEach((m) => m.setMap(null))
     markers = []
     for (const e of entrances) {
-      if (!visible(e)) continue
-      const k = markerKind(e)
-      const big = k === 'step-free'
+      if (!visible(e) && selected !== e) continue
+      const big = markerKind(e) === 'step-free'
       const size = (big ? BASE_PIN * 1.4 : BASE_PIN) * (selected === e ? 1.25 : 1)
       const m = new google.maps.Marker({
         map,
@@ -269,6 +375,193 @@ export function MapView(opts: {
     }
   }
 
+  // ---- place card ----
+  const roundIcon = (ic: string, label: string, onclick: () => void, extra = '') => h('button', { class: `gm-circle ${extra}`, type: 'button', 'aria-label': label, onclick }, icon(ic, extra.includes('on')))
+
+  function cardHead(title: string, e: Entrance | null) {
+    const isSaved = !!e && saved.includes(e.id)
+    const save = e
+      ? roundIcon('bookmark', isSaved ? t.unsave : t.save, () => {
+          saved = isSaved ? saved.filter((x) => x !== e.id) : [...saved, e.id]
+          storeSaved(saved)
+          nav.querySelector('[data-tab="saved"] .gm-tab-ic')?.replaceChildren(icon('bookmark', tab === 'saved'), ...(saved.length ? [h('span', { class: 'gm-dot', 'aria-hidden': 'true' })] : []))
+          openEntrance(e)
+        }, isSaved ? 'gm-circle-on' : '')
+      : null
+    return h(
+      'div',
+      { class: 'gm-card-title' },
+      h('h2', { id: 'sheet-title', class: 'gm-sheet-title', tabindex: '-1' }, title),
+      save,
+      e ? roundIcon('ios_share', t.share, () => void share(e)) : null,
+      roundIcon('close', t.close, closeCard),
+    )
+  }
+
+  async function share(e: Entrance) {
+    const url = `${location.origin}${location.pathname}?door=${encodeURIComponent(e.id)}`
+    try {
+      if (navigator.share) await navigator.share({ title: e.name ?? t.unnamedEntrance, url })
+      else {
+        await navigator.clipboard.writeText(url)
+        announce(t.copied)
+      }
+    } catch {
+      /* share sheet dismissed */
+    }
+  }
+
+  function showCard(item: Entrance | Building, ...children: (Node | null)[]) {
+    selected = item
+    renderMarkers()
+    chips.hidden = true
+    morePill.hidden = false
+    goBtn.hidden = true
+    sheetBody.replaceChildren(...children.filter((c): c is Node => c !== null))
+    setSheet('half')
+    sheetBody.scrollTop = 0
+    sheetBody.querySelector<HTMLElement>('h2')?.focus()
+  }
+  function closeCard() {
+    selected = null
+    routeLine?.setMap(null)
+    routeLine = null
+    renderMarkers()
+    renderSheet()
+    setSheet('peek')
+  }
+
+  function drawRoute(e: Entrance) {
+    if (!map) return
+    const from = origin()
+    routeLine?.setMap(null)
+    routeLine = new google.maps.Polyline({
+      map,
+      path: [{ lat: from.lat, lng: from.lon }, { lat: e.lat, lng: e.lon }],
+      strokeOpacity: 0,
+      icons: [{ icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: '#62c4cb', fillOpacity: 1, strokeColor: '#00363a', strokeWeight: 1.5, scale: 4 }, offset: '0', repeat: '14px' }],
+    })
+    const bounds = new google.maps.LatLngBounds()
+    bounds.extend({ lat: from.lat, lng: from.lon })
+    bounds.extend({ lat: e.lat, lng: e.lon })
+    map.fitBounds(bounds, { top: 140, bottom: 260, left: 40, right: 40 })
+    setSheet('peek')
+    announce(`${t.metres(haversineM(from, e))}. ${e.name ?? t.unnamedEntrance}`)
+  }
+
+  function streetView(e: Entrance): HTMLElement | null {
+    if (!map) return null
+    const box = h('div', { class: 'gm-photo', role: 'img', 'aria-label': t.streetViewAlt })
+    new google.maps.StreetViewService().getPanorama({ location: { lat: e.lat, lng: e.lon }, radius: 40 }, (data, st) => {
+      if (st !== google.maps.StreetViewStatus.OK || !data?.location?.latLng) {
+        box.remove()
+        return
+      }
+      const from = data.location.latLng
+      const heading = google.maps.geometry?.spherical ? google.maps.geometry.spherical.computeHeading(from, { lat: e.lat, lng: e.lon }) : bearingFromTo(from.lat(), from.lng(), e.lat, e.lon)
+      new google.maps.StreetViewPanorama(box, { pano: data.location.pano, pov: { heading, pitch: 5 }, disableDefaultUI: true, clickToGo: false, linksControl: false, motionTracking: false })
+    })
+    return box
+  }
+
+  function tipsCard(e: Entrance): HTMLElement {
+    const tips: string[] = []
+    if (e.stepFree === true) tips.push(t.tipStepFree)
+    if (e.stepFree === false) tips.push(t.tipNotStepFree)
+    if (e.door) tips.push(`${t.door[e.door] ?? e.door}${e.automatic ? `, ${t.automatic}` : ''}.`)
+    for (const w of e.warnings) tips.push(t.warning[w] ?? w)
+    if (e.approachBearing !== null) tips.push(t.faceToEnter(t.compass[Math.round(e.approachBearing / 45) % 8]))
+    if (e.description) tips.unshift(e.description)
+    return h(
+      'div',
+      { class: 'gm-tips' },
+      h('div', { class: 'gm-tips-head' }, icon('auto_awesome', true), h('h3', {}, t.tipsTitle), h('span', { class: 'gm-new' }, t.newBadge)),
+      h('ul', {}, ...tips.slice(0, 4).map((x) => h('li', {}, x))),
+    )
+  }
+
+  function fact(ic: string, value: string) {
+    return h('li', { class: 'gm-fact' }, icon(ic), h('span', {}, value))
+  }
+
+  function openEntrance(e: Entrance) {
+    const g = guidanceFor(e, opts.profile)
+    const b = e.buildingId ? buildings.find((x) => x.id === e.buildingId) : undefined
+    const unknownNearby = entrances.filter((x) => x.id !== e.id && x.tier === 0 && haversineM(x, e) <= NEARBY_UNKNOWN_M).length
+    map?.panTo({ lat: e.lat, lng: e.lon })
+
+    const start = async () => {
+      if (g.kind !== 'arrow') return
+      // The Start pill is the one gesture that unlocks compass, camera and sound.
+      // unlockAll must be the first await so iOS still sees the tap.
+      await unlockAll({ camera: true })
+      teardown()
+      opts.onGuide(g.target)
+    }
+    viewBtn.hidden = g.kind !== 'arrow'
+    viewBtn.onclick = () => void start()
+
+    const pills = h(
+      'div',
+      { class: 'gm-actions' },
+      h('button', { class: 'gm-pill gm-pill-primary', type: 'button', onclick: () => drawRoute(e) }, icon('assistant_direction', true), t.route),
+      g.kind === 'arrow' ? h('button', { class: 'gm-pill', type: 'button', onclick: () => void start() }, icon('navigation', true), t.guideMe) : null,
+      h('button', { class: 'gm-pill', type: 'button', onclick: () => void share(e) }, icon('ios_share'), t.share),
+    )
+
+    const overview = h(
+      'div',
+      { class: 'gm-tabpanel' },
+      tipsCard(e),
+      g.kind === 'arrow' ? null : h('p', { class: 'reason' }, reasonText[g.reason]),
+      warningsBlock(e),
+      h(
+        'ul',
+        { class: 'gm-facts' },
+        fact('accessible', stepFreeLabel(e.stepFree)),
+        e.door ? fact('door_front', `${t.door[e.door] ?? e.door}${e.automatic ? `, ${t.automatic}` : ''}`) : null,
+        e.level !== null ? fact('stairs', `${t.levelLabel} ${e.level}`) : null,
+        e.approachBearing !== null ? fact('explore', t.faceToEnter(t.compass[Math.round(e.approachBearing / 45) % 8])) : null,
+        fact('verified', t.confidence[e.confidence] ?? e.confidence),
+      ),
+      unknownNearby ? h('p', { class: 'gm-p' }, t.nearbyUnknown(unknownNearby)) : null,
+    )
+    const reviews = h('div', { class: 'gm-tabpanel', hidden: true }, livedSection(b) ?? h('p', { class: 'gm-p' }, t.livedNone))
+    const photos = h('div', { class: 'gm-tabpanel', hidden: true })
+    const panels = [overview, reviews, photos]
+    const tabs = h(
+      'div',
+      { class: 'gm-tabs', role: 'tablist' },
+      ...[t.tabOverview, t.tabReviews, t.tabPhotos].map((label, i) => {
+        const b2 = h('button', { class: 'gm-tabbtn', type: 'button', role: 'tab', 'aria-selected': String(i === 0) }, label)
+        b2.addEventListener('click', () => {
+          tabs.querySelectorAll('.gm-tabbtn').forEach((x, j) => x.setAttribute('aria-selected', String(j === i)))
+          panels.forEach((p, j) => (p.hidden = j !== i))
+          if (i === 2 && !photos.childElementCount) {
+            const sv = streetView(e)
+            photos.append(sv ?? h('p', { class: 'gm-p' }, t.noPhotos))
+          }
+        })
+        return b2
+      }),
+    )
+
+    showCard(e, cardHead(e.name ?? t.unnamedEntrance, e), h('p', { class: 'gm-sheet-sub' }, [stepFreeLabel(e.stepFree), t.metresShort(haversineM(origin(), e)), b?.name ?? b?.addr ?? null].filter(Boolean).join(' · ')), pills, streetView(e), tabs, ...panels)
+  }
+
+  function openBuilding(b: Building) {
+    map?.panTo({ lat: b.centroid[0], lng: b.centroid[1] })
+    viewBtn.hidden = true
+    showCard(
+      b,
+      cardHead(b.name ?? b.addr ?? t.unnamedEntrance, null),
+      b.addr ? h('p', { class: 'gm-sheet-sub' }, b.addr) : null,
+      h('p', { class: 'gm-p' }, t.buildingReported),
+      h('p', { class: 'reason' }, t.reasonNotTier1),
+      livedSection(b),
+    )
+  }
+
   function livedSection(b: Building | undefined): HTMLElement | null {
     if (!b?.placeId) return null
     const out = h('div', { class: 'lived', 'aria-live': 'polite' })
@@ -286,103 +579,6 @@ export function MapView(opts: {
       }
     })
     return h('div', { class: 'gm-section' }, btn, out)
-  }
-
-  function sharePill(e: Entrance) {
-    const url = `${location.origin}${location.pathname}?door=${encodeURIComponent(e.id)}`
-    const b = h('button', { class: 'gm-pill', type: 'button' }, icon('share'), t.share)
-    b.addEventListener('click', async () => {
-      try {
-        if (navigator.share) await navigator.share({ title: e.name ?? t.unnamedEntrance, url })
-        else {
-          await navigator.clipboard.writeText(url)
-          announce(t.copied)
-        }
-      } catch {
-        /* share sheet dismissed */
-      }
-    })
-    return b
-  }
-
-  // ---- place card (sheet content for one door or building) ----
-  function showCard(item: Entrance | Building, ...children: (Node | null)[]) {
-    selected = item
-    renderMarkers()
-    const back = h('button', { class: 'gm-icon-btn', type: 'button', 'aria-label': t.back, onclick: closeCard }, icon('arrow_back'))
-    sheetBody.replaceChildren(h('div', { class: 'gm-card-head' }, back), ...children.filter((c): c is Node => c !== null))
-    if (sheet.dataset.state === 'peek') setSheet('half')
-    sheetBody.querySelector<HTMLElement>('h2')?.focus()
-  }
-  function closeCard() {
-    selected = null
-    renderMarkers()
-    renderList()
-    sheetBody.querySelector<HTMLElement>('h2')?.focus()
-  }
-
-  function fact(ic: string, label: string, value: string) {
-    return h('li', { class: 'gm-fact' }, icon(ic), h('span', {}, h('span', { class: 'gm-fact-label' }, label), h('span', { class: 'gm-fact-value' }, value)))
-  }
-
-  function openEntrance(e: Entrance) {
-    const g = guidanceFor(e, opts.profile)
-    const b = e.buildingId ? buildings.find((x) => x.id === e.buildingId) : undefined
-    const unknownNearby = entrances.filter((x) => x.id !== e.id && x.tier === 0 && haversineM(x, e) <= NEARBY_UNKNOWN_M).length
-    const d = haversineM(origin(), e)
-    map?.panTo({ lat: e.lat, lng: e.lon })
-    const action =
-      g.kind === 'arrow'
-        ? h('div', { class: 'gm-actions' }, h(
-            'button',
-            {
-              class: 'gm-pill gm-pill-primary',
-              type: 'button',
-              onclick: async () => {
-                // The Start pill is the one gesture that unlocks compass, camera and sound.
-                // unlockAll must be the first await so iOS still sees the tap.
-                await unlockAll({ camera: true })
-                teardown()
-                opts.onGuide(g.target)
-              },
-            },
-            icon('navigation'),
-            t.guideMe,
-          ), sharePill(e))
-        : h('p', { class: 'reason' }, reasonText[g.reason])
-    showCard(
-      e,
-      h('h2', { id: 'sheet-title', class: 'gm-sheet-title', tabindex: '-1' }, e.name ?? t.unnamedEntrance),
-      h('p', { class: 'gm-sheet-sub' }, [stepFreeLabel(e.stepFree), t.metresShort(d), b?.name ?? b?.addr ?? null].filter(Boolean).join(' · ')),
-      action,
-      warningsBlock(e),
-      h('h3', { class: 'gm-h3' }, t.accessSection),
-      h(
-        'ul',
-        { class: 'gm-facts' },
-        fact('accessible', t.accessLabel, stepFreeLabel(e.stepFree)),
-        e.door ? fact('door_front', t.doorLabel, `${t.door[e.door] ?? e.door}${e.automatic ? `, ${t.automatic}` : ''}`) : null,
-        e.level !== null ? fact('stairs', t.levelLabel, String(e.level)) : null,
-        e.approachBearing !== null ? fact('explore', t.approachLabel, t.faceToEnter(t.compass[Math.round(e.approachBearing / 45) % 8])) : null,
-        fact('verified', t.confidenceLabel, t.confidence[e.confidence] ?? e.confidence),
-      ),
-      e.description ? h('p', {}, e.description) : null,
-      b?.accessSummary.tier === 2 ? h('p', {}, t.buildingReported) : null,
-      unknownNearby ? h('p', { class: 'hint' }, t.nearbyUnknown(unknownNearby)) : null,
-      livedSection(b),
-    )
-  }
-
-  function openBuilding(b: Building) {
-    map?.panTo({ lat: b.centroid[0], lng: b.centroid[1] })
-    showCard(
-      b,
-      h('h2', { id: 'sheet-title', class: 'gm-sheet-title', tabindex: '-1' }, b.name ?? b.addr ?? t.unnamedEntrance),
-      b.addr ? h('p', { class: 'gm-sheet-sub' }, b.addr) : null,
-      h('p', {}, t.buildingReported),
-      h('p', { class: 'reason' }, t.reasonNotTier1),
-      livedSection(b),
-    )
   }
 
   // ---- search: known places plus named doors in the loaded data, no Places API needed ----
@@ -436,6 +632,44 @@ export function MapView(opts: {
     if (ev.key === 'Escape') results.hidden = true
   })
 
+  // Voice search through the browser's speech recognition (Safari and Chrome ship it prefixed).
+  type Rec = { lang: string; interimResults: boolean; start(): void; onresult: ((ev: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null }
+  const RecCtor = (window as unknown as { webkitSpeechRecognition?: new () => Rec; SpeechRecognition?: new () => Rec }).SpeechRecognition ?? (window as unknown as { webkitSpeechRecognition?: new () => Rec }).webkitSpeechRecognition
+  if (!RecCtor) micBtn.hidden = true
+  micBtn.addEventListener('click', () => {
+    if (!RecCtor) return
+    try {
+      const rec = new RecCtor()
+      rec.lang = document.documentElement.lang === 'en' ? 'en-US' : 'de-DE'
+      rec.interimResults = false
+      rec.onresult = (ev) => {
+        searchInput.value = ev.results[0]?.[0]?.transcript ?? ''
+        renderResults()
+      }
+      rec.start()
+      announce(t.listening)
+    } catch {
+      /* recognition unavailable */
+    }
+  })
+  // Lens: the camera view to the nearest door that may carry an arrow.
+  lensBtn.addEventListener('click', () => nearestDoor(true))
+  goBtn.addEventListener('click', () => nearestDoor(false))
+  function nearestDoor(startNow: boolean) {
+    const hit = nearby().find(({ e }) => guidanceFor(e, opts.profile).kind === 'arrow')
+    if (!hit) {
+      announce(t.noDoors)
+      status.textContent = t.noDoors
+      return
+    }
+    openEntrance(hit.e)
+    if (startNow) viewBtn.click()
+  }
+  layersBtn.addEventListener('click', () => {
+    if (!map) return
+    map.setMapTypeId(map.getMapTypeId() === 'hybrid' ? 'roadmap' : 'hybrid')
+  })
+
   // ---- position + data ----
   function drawMe() {
     if (!map || !me) return
@@ -447,7 +681,7 @@ export function MapView(opts: {
         position: pos,
         title: t.myLocation,
         zIndex: 4,
-        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#1a73e8', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 3 },
+        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: '#1a73e8', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2.5 },
       })
   }
   locateBtn.addEventListener('click', () => {
@@ -461,10 +695,10 @@ export function MapView(opts: {
         me = { lat: p.coords.latitude, lon: p.coords.longitude }
         drawMe()
         if (first) {
-          map?.setCenter({ lat: me.lat, lng: me.lon })
+          if (!opts.openDoor) map?.setCenter({ lat: me.lat, lng: me.lon })
           if (!map) void load(bboxAround(me.lat, me.lon, 500))
         }
-        renderList()
+        if (!selected) renderSheet()
       },
       () => {},
       { enableHighAccuracy: true, maximumAge: 5000 },
@@ -478,7 +712,7 @@ export function MapView(opts: {
         const c = me ?? DEFAULT_CENTER
         map = new google.maps.Map(mapEl, {
           center: { lat: c.lat, lng: c.lon },
-          zoom: 18,
+          zoom: 17,
           clickableIcons: false,
           gestureHandling: 'greedy',
           disableDefaultUI: true,
@@ -492,7 +726,7 @@ export function MapView(opts: {
           })
         map.addListener('click', () => {
           results.hidden = true
-          if (sheet.dataset.state === 'full') setSheet('half')
+          if (sheet.dataset.state !== 'peek') setSheet('peek')
         })
         map.addListener('idle', () => {
           const bb = map!.getBounds()
@@ -512,13 +746,21 @@ export function MapView(opts: {
     setSheet('full')
     void load(bboxAround(DEFAULT_CENTER.lat, DEFAULT_CENTER.lon, 500))
   }
-  renderList()
+  renderSheet()
   announce(t.mapTitle)
 
   function teardown() {
     if (geoWatch !== null) navigator.geolocation.clearWatch(geoWatch)
     markers.forEach((m) => m.setMap(null))
     meMarker?.setMap(null)
+    routeLine?.setMap(null)
   }
   return teardown
+}
+
+function bearingFromTo(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const r = Math.PI / 180
+  const y = Math.sin((lon2 - lon1) * r) * Math.cos(lat2 * r)
+  const x = Math.cos(lat1 * r) * Math.sin(lat2 * r) - Math.sin(lat1 * r) * Math.cos(lat2 * r) * Math.cos((lon2 - lon1) * r)
+  return ((Math.atan2(y, x) / r) + 360) % 360
 }

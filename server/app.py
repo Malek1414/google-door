@@ -41,6 +41,7 @@ TTS_VOICE   = os.environ.get("GEMINI_TTS_VOICE",   "Kore")
 app = FastAPI(title="Doorway")
 from server.surface import router as surface_router
 from server.route import router as route_router
+from server.approach import router as approach_router
 
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
@@ -266,7 +267,8 @@ async def speak(req: SpeakReq):
 # no CORS in the way. Mounted last: every /api route above wins over a static path.
 # DOORWAY_WEB points at web/dist; if it isn't built yet the API still runs.
 app.include_router(surface_router)
-app.include_router(route_router)      # POST /api/route — walking directions   # POST /api/surface — see server/surface.py
+app.include_router(route_router)
+app.include_router(approach_router)   # /api/door-fix, /api/door-check      # POST /api/route — walking directions   # POST /api/surface — see server/surface.py
 
 _web = os.environ.get("DOORWAY_WEB", "web/dist")
 if os.path.isdir(_web):

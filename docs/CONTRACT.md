@@ -163,3 +163,32 @@ Bbox `52.5215,13.3640,52.5290,13.3760`, verified 2026-09-23:
   `warnings` contains `"revolving"`
 
 If the 9.1 m pair breaks, the merge is wrong. Two-second check, run it often.
+
+---
+
+## Gemini models — verified 2026-09-23
+
+**`gemini-2.0-flash` and `gemini-2.0-flash-lite` were SHUT DOWN on 2026-06-01.**
+Anything calling them gets an error, not a fallback. Do not copy a model string from
+memory or from an older tutorial — check `GET /api/health`, which reports the live ones.
+
+| use | model | why |
+|---|---|---|
+| `/api/look` — one frame to one spoken sentence | `gemini-3.6-flash` | tuned for speed + multimodal; the user is standing on a street waiting |
+| `/api/lived` — reviews to strict JSON | `gemini-3.8-flash` | strongest current Flash instruction-follower; the no-paraphrase rule must hold exactly |
+
+Override without a code change:
+
+    GEMINI_MODEL_LOOK=gemini-3.8-flash GEMINI_MODEL_LIVED=gemini-3.8-flash uvicorn server.app:app
+
+### Others worth knowing about for this project
+
+| model | relevance |
+|---|---|
+| `gemini-3.8-live` | real-time voice with no reasoning delay — if streaming voice is ever revisited |
+| `gemini-3.1-flash-tts-preview` | TTS; likely better than browser `speechSynthesis` for the spoken guidance |
+| `gemini-3.5-transcribe` | STT with diarization — the deaf profile's captioning path |
+| `gemini-3.1-pro-preview` | offline batch description generation, where latency doesn't matter |
+
+`gemini-3.8-flash` is also the default for the Antigravity SDK, which may settle the
+open question about what the Antigravity accounts are for.

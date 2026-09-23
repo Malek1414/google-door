@@ -18,7 +18,17 @@ from pydantic import BaseModel
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 MAPS_KEY   = os.environ.get("MAPS_API_KEY", "")
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models"
-MODEL      = "gemini-2.0-flash"
+
+# Model IDs verified against ai.google.dev 2026-09-23. gemini-2.0-flash was SHUT DOWN
+# on 2026-06-01 — do not reintroduce it. Env-overridable so a model can be swapped
+# without a code change (and without a redeploy mid-hackathon).
+#
+#   look  : single frame -> one spoken sentence. Latency-sensitive, safety-relevant.
+#           3.6-flash is the one explicitly tuned for speed + multimodal.
+#   lived : review text -> strict JSON, must follow the no-paraphrase rule exactly.
+#           3.8-flash is the strongest current instruction-follower in the Flash tier.
+MODEL_LOOK  = os.environ.get("GEMINI_MODEL_LOOK",  "gemini-3.6-flash")
+MODEL_LIVED = os.environ.get("GEMINI_MODEL_LIVED", "gemini-3.8-flash")
 
 app = FastAPI(title="Doorway")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -36,7 +46,8 @@ def data():
 def health():
     d = data()
     return {"ok": True, "counts": d["meta"]["counts"],
-            "gemini": bool(GEMINI_KEY), "maps": bool(MAPS_KEY)}
+            "gemini": bool(GEMINI_KEY), "maps": bool(MAPS_KEY),
+            "models": {"look": MODEL_LOOK, "lived": MODEL_LIVED}}
 
 
 @app.get("/api/entrances")
@@ -74,7 +85,7 @@ async def look(req: LookReq):
         {"inline_data": {"mime_type": "image/jpeg", "data": req.frame}}]}],
         "generationConfig": {"temperature": 0.0, "maxOutputTokens": 60}}
     async with httpx.AsyncClient(timeout=20) as c:
-        r = await c.post(f"{GEMINI_URL}/{MODEL}:generateContent?key={GEMINI_KEY}", json=body)
+        r = await c.post(f"{GEMINI_URL}/{MODEL_LOOK}:generateContent?key={GEMINI_KEY}", json=body)
     if r.status_code != 200:
         raise HTTPException(502, f"gemini {r.status_code}")
     try:
@@ -123,7 +134,7 @@ async def lived(place_id: str):
     body = {"contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {"temperature": 0.0, "responseMimeType": "application/json"}}
     async with httpx.AsyncClient(timeout=25) as c:
-        gr = await c.post(f"{GEMINI_URL}/{MODEL}:generateContent?key={GEMINI_KEY}", json=body)
+        gr = await c.post(f"{GEMINI_URL}/{MODEL_LIVED}:generateContent?key={GEMINI_KEY}", json=body)
     if gr.status_code != 200:
         return {"placeId": place_id, "claims": []}
     try:

@@ -64,8 +64,11 @@ export function project(
   const relBearingDeg = angleDelta(0, anchor.bearingDeg - turned)
 
   const walked = Math.max(0, stepsNow - anchor.steps) * STEP_M
-  // Project the walk onto the direction of the door as it was at the anchor.
-  const towards = walked * Math.cos((anchor.bearingDeg * Math.PI) / 180)
+  // Project the walk onto the direction of the door AS IT IS NOW, not as it was at the
+  // fix. You walk where you are facing, and the whole orienting phase happens between
+  // the fix and the walk — using the fix's bearing under-counts every step taken after
+  // turning, so the distance never closes and the threshold is never reached.
+  const towards = walked * Math.cos((relBearingDeg * Math.PI) / 180)
   const distanceM = Math.max(0, anchor.distanceM - towards)
 
   return {

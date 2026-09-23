@@ -198,10 +198,12 @@ blockquote footer { color: var(--muted); font-size: 1rem; }
 /* bottom sheet: peek shows the title row above the nav bar */
 .gm { --sheet-h: 66px; --sheet-max: calc(100dvh - var(--nav-h) - var(--top) - 8px); }
 .gm[data-sheet='half'] { --sheet-h: 46dvh; }
-.gm[data-sheet='full'] { --sheet-h: var(--sheet-max); }
-.gm-sheet { position: absolute; left: 0; right: 0; bottom: var(--nav-h); z-index: 4; height: var(--sheet-max); display: flex; flex-direction: column;
+.gm[data-sheet='full'] { --sheet-h: 100%; }
+/* The sheet spans top to nav bar by position, not by a vh calculation: percentages in the
+   transform refer to its own height, so it can never end mid-screen. */
+.gm-sheet { position: absolute; left: 0; right: 0; top: calc(var(--top) + 8px); bottom: var(--nav-h); z-index: 4; display: flex; flex-direction: column;
   background: var(--sheet); border-radius: 26px 26px 0 0;
-  transform: translateY(calc(var(--sheet-max) - var(--sheet-h) + var(--drag, 0px))); transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1); }
+  transform: translateY(calc(100% - var(--sheet-h) + var(--drag, 0px))); transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1); }
 .gm[data-sheet='full'] .gm-right, .gm[data-sheet='full'] .gm-layers, .gm[data-sheet='full'] .gm-top { display: none; }
 .gm-handle { flex: none; height: 22px; border: 0; background: none; display: grid; place-items: center; cursor: grab; touch-action: none; }
 .gm-handle span { width: 42px; height: 4px; border-radius: 2px; background: #5d5b5f; }
@@ -291,6 +293,20 @@ blockquote footer { color: var(--muted); font-size: 1rem; }
 .nav-row .gm-pill { flex: 1; justify-content: center; min-height: 52px; font-size: 16px; }
 .nav-exit { width: 52px; height: 52px; flex: none; border-radius: 50%; border: 0; background: #d93025; color: #fff; display: grid; place-items: center; cursor: pointer; }
 .nav-exit:focus-visible { outline: 3px solid #1a73e8; outline-offset: 2px; }
+
+/* iOS home-screen gap (see fitStandalone in main.ts): the strip below the window shows the
+   html background, so give it the nav colour and let the nav sit flush on top of it. */
+html.ios-gap, html.ios-gap body { background: #1c2224; }
+html.ios-gap .gm { --nav-h: 66px; }
+html.ios-gap .gm-nav { padding-bottom: 0; }
+
+/* Until the sheet is fully open its content does not scroll: vertical swipes move the sheet
+   (MapView touch handlers), horizontal ones still scroll carousels and chips. */
+.gm:not([data-sheet='full']) .gm-sheet-body { overflow-y: hidden; }
+.gm-sheet { touch-action: pan-x; }
+.gm[data-sheet='full'] .gm-sheet-body { touch-action: pan-y; }
+.gm-handle { height: 28px; }
+
 /* ══════════════════════════════════════════════════════════════════════
    ACCESSIBILITY LAYER — Material 3, on top of the Maps shell.
 

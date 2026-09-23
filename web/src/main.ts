@@ -28,6 +28,27 @@ function softFail(err: unknown) {
 window.addEventListener('error', (ev) => softFail(ev.error ?? ev.message))
 window.addEventListener('unhandledrejection', (ev) => softFail(ev.reason))
 
+// iOS home-screen mode with a translucent status bar: the window can end above the screen
+// bottom. Measure it and, if so, paint the leftover strip in the nav colour and drop the
+// nav's own home-indicator padding so bar + strip look like one Maps nav bar.
+function fitStandalone() {
+  try {
+    const standalone = (navigator as unknown as { standalone?: boolean }).standalone === true || matchMedia('(display-mode: standalone)').matches
+    if (!standalone) return
+    const probe = document.createElement('div')
+    probe.style.cssText = 'position:fixed;top:0;visibility:hidden;padding-top:env(safe-area-inset-top)'
+    document.body.append(probe)
+    const top = parseFloat(getComputedStyle(probe).paddingTop) || 0
+    probe.remove()
+    const gap = screen.height - window.innerHeight
+    document.documentElement.classList.toggle('ios-gap', top > 0 && gap > 20)
+  } catch {
+    /* measuring is best effort */
+  }
+}
+fitStandalone()
+window.addEventListener('resize', fitStandalone)
+
 const params = readParams()
 session.profile = loadProfile()
 if (session.profile) applyContrast(outputFor(session.profile).contrast)

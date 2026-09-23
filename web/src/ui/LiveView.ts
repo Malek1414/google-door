@@ -87,6 +87,15 @@ export function directionWord(rel: number): string {
   return t.behind
 }
 
+/** Material Symbols turn glyph for the green instruction card, same bands as directionWord. */
+function turnGlyph(rel: number): string {
+  const a = Math.abs(rel)
+  if (a <= ON_BEARING_DEG) return 'straight'
+  if (a <= 45) return rel < 0 ? 'turn_slight_left' : 'turn_slight_right'
+  if (a <= 135) return rel < 0 ? 'turn_left' : 'turn_right'
+  return 'u_turn_left'
+}
+
 function compassWord(deg: number): string {
   return t.compass[Math.round(deg / 45) % 8]
 }
@@ -162,9 +171,10 @@ export function LiveView(opts: {
       ? h('div', { class: 'warning', role: 'note' }, ...e.warnings.map((w) => h('p', {}, h('strong', {}, `${t.warningPrefix}: `), t.warning[w] ?? w)))
       : null
   const lookOut = h('p', { class: 'look-out', 'aria-live': 'polite' }, '')
-  const lookBtn = h('button', { class: 'btn', type: 'button' }, t.look)
-  const stopBtn = h('button', { class: 'btn btn-secondary', type: 'button' }, t.stop)
-  const endRow = h('div', { class: 'row' })
+  const lookBtn = h('button', { class: 'gm-pill', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'visibility'), t.look)
+  const stopBtn = h('button', { class: 'nav-exit', type: 'button', 'aria-label': t.stop }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'close'))
+  const endRow = h('div', { class: 'nav-row' })
+  const turnIcon = h('span', { class: 'ms', 'aria-hidden': 'true' }, 'navigation')
 
   const root = h(
     'section',
@@ -173,15 +183,12 @@ export function LiveView(opts: {
     svg,
     h(
       'div',
-      { class: 'hud' },
+      { class: 'nav-top' },
+      h('div', { class: 'nav-card' }, turnIcon, h('div', {}, h('h1', { id: 'live-title' }, `${t.liveTitle}: ${name}`), distEl, dirEl)),
       opts.sensors.banner ? h('p', { class: 'banner' }, opts.sensors.banner) : null,
-      h('h1', { id: 'live-title' }, `${t.liveTitle}: ${name}`),
-      distEl,
-      dirEl,
-      accEl,
       warnEl,
     ),
-    h('div', { class: 'controls' }, lookOut, endRow, h('div', { class: 'row' }, lookBtn, stopBtn)),
+    h('div', { class: 'nav-bottom' }, accEl, lookOut, endRow, h('div', { class: 'nav-row' }, stopBtn, lookBtn)),
   )
   mount(root)
 
@@ -221,6 +228,7 @@ export function LiveView(opts: {
       beacon?.stop()
       beaconOn = false
       dirEl.textContent = t.arrived
+      turnIcon.textContent = 'where_to_vote'
       announce(t.arrived)
       arrowG.style.visibility = 'hidden'
       coneG.replaceChildren()
@@ -237,6 +245,7 @@ export function LiveView(opts: {
     } else {
       const word = cone ? `${t.roughly}. ${directionWord(rel)}` : directionWord(rel)
       dirEl.textContent = word
+      turnIcon.textContent = turnGlyph(rel)
       rotor.setAttribute('transform', `rotate(${rel.toFixed(1)})`)
       if (cone) {
         const half = Math.min(60, Math.max(20, (Math.atan2(fix.accuracy ?? CONE_ACCURACY_M, Math.max(dist, 1)) * 180) / Math.PI))
@@ -331,7 +340,7 @@ export function LiveView(opts: {
       if (opts.onReplay) {
         const again = opts.onReplay
         endRow.append(
-          h('button', { class: 'btn', type: 'button', onclick: () => { teardown(); again() } }, t.replayAgain),
+          h('button', { class: 'gm-pill gm-pill-primary', type: 'button', onclick: () => { teardown(); again() } }, t.replayAgain),
         )
       }
       announce(t.replayDone)

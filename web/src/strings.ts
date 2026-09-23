@@ -50,6 +50,24 @@ export const en = {
   metres: (m: number) => (Math.round(m) === 1 ? '1 metre' : `${Math.round(m)} metres`),
   metresShort: (m: number) => `${Math.round(m)} m`,
 
+  searchPlaceholder: 'Search here',
+  searchLabel: 'Search for a place or an entrance',
+  searchNoResults: 'No matching place or entrance.',
+  profileButton: 'Your accessibility settings',
+  myLocation: 'Show my location',
+  chipStepFree: 'Step-free',
+  chipWithSteps: 'With steps',
+  filterLabel: 'Filter doors',
+  sheetHandle: 'Expand or collapse the list',
+  back: 'Back',
+  accessSection: 'Accessibility',
+  doorsCount: (n: number) => (n === 1 ? '1 door with exact position' : `${n} doors with exact positions`),
+  places: [
+    { name: 'Berlin Hauptbahnhof', sub: 'Europaplatz 1, Berlin', lat: 52.5251, lon: 13.3694 },
+    { name: 'Alexanderplatz', sub: 'Berlin Mitte', lat: 52.5219, lon: 13.4132 },
+    { name: 'Friedrichstrasse station', sub: 'Berlin Mitte', lat: 52.5202, lon: 13.3868 },
+  ],
+
   // Detail sheet
   unnamedEntrance: 'Unnamed entrance',
   stepFreeYes: 'Step-free',

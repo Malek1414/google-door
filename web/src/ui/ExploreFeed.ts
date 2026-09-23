@@ -81,7 +81,7 @@ function placeCard(p: PlaceHit, distM: number, trending: boolean, onPick: () => 
   }
 
   const photo = p.photoUrl
-    ? h('img', { class: 'gx-photo', src: p.photoUrl, alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' })
+    ? h('img', { class: 'gx-photo', src: p.photoUrl, alt: '', loading: 'lazy', decoding: 'async', onerror: (ev: Event) => ((ev.target as HTMLElement).style.visibility = 'hidden') })
     : h('div', { class: 'gx-photo gx-photo--empty', 'aria-hidden': 'true' })
 
   return h(

@@ -316,7 +316,7 @@ export function renderPlaceCard(el: HTMLElement, ctx: FeatureCtx, p: PlaceHit, o
   )
 
   const photos = photoList(p)
-  const img = (src: string, cls: string) => h('img', { class: `pc-photo-img ${cls}`, src, alt: L.photoAlt(p.name), loading: 'lazy', referrerpolicy: 'no-referrer' })
+  const img = (src: string, cls: string) => h('img', { class: `pc-photo-img ${cls}`, src, alt: L.photoAlt(p.name), loading: 'lazy', onerror: (ev: Event) => ((ev.target as HTMLElement).style.visibility = 'hidden') })
   const photo = photos.length
     ? h(
         'div',

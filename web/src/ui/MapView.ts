@@ -25,7 +25,7 @@ import { renderPlaceCard, renderPlaceList } from './PlaceCard'
 import { modeSwitch } from './ModeSwitch'
 import { loadMode, saveMode, showDoorMarkers, type Mode } from '../core/mode'
 import { loadSurvey, mergeSurvey } from '../core/survey'
-import { NORMAL_CHIPS, PlacesUnavailable, searchCategory, searchText, type PlaceHit } from '../places'
+import { NORMAL_CHIPS, PlacesUnavailable, fetchPlaceHit, searchCategory, searchText, type PlaceHit } from '../places'
 import { lang } from '../strings'
 import { openSearchScreen } from './SearchScreen'
 import { exploreFeed } from './ExploreFeed'
@@ -1165,7 +1165,8 @@ export function MapView(opts: {
         map = new google.maps.Map(mapEl, {
           center: { lat: c.lat, lng: c.lon },
           zoom: 17,
-          clickableIcons: false,
+          // POI icons (restaurants, shops) are tappable like in Maps: see the click handler.
+          clickableIcons: true,
           gestureHandling: 'greedy',
           disableDefaultUI: true,
           keyboardShortcuts: true,
@@ -1176,7 +1177,21 @@ export function MapView(opts: {
           void findEntrance(opts.openDoor).then((e) => {
             if (e) map?.setCenter({ lat: e.lat, lng: e.lon })
           })
-        map.addListener('click', () => {
+        map.addListener('click', (ev: google.maps.MapMouseEvent | google.maps.IconMouseEvent) => {
+          // Tap on a Google POI: open our place card instead of Google's info window.
+          const placeId = 'placeId' in ev ? ev.placeId : null
+          if (placeId) {
+            ev.stop()
+            results.hidden = true
+            status.textContent = t.loading
+            fetchPlaceHit(placeId)
+              .then((p) => {
+                status.textContent = ''
+                if (p) openPlace(p)
+              })
+              .catch((err) => (status.textContent = err instanceof PlacesUnavailable ? err.message : t.placesError))
+            return
+          }
           results.hidden = true
           // A panel (editor, business) may use map taps itself: do not collapse it then.
           if (panelCleanup) return

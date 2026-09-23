@@ -234,6 +234,18 @@ function toHits(places: google.maps.places.Place[]): PlaceHit[] {
   return places.map(toHit).filter((h): h is PlaceHit => h !== null)
 }
 
+/** Full details for one place the user tapped on the base map (POI icon). */
+export async function fetchPlaceHit(placeId: string): Promise<PlaceHit | null> {
+  const { Place } = await placesLib()
+  try {
+    const place = new Place({ id: placeId, requestedLanguage: lang(), requestedRegion: 'de' })
+    await place.fetchFields({ fields: FIELDS })
+    return toHit(place)
+  } catch (err) {
+    throw new PlacesUnavailable(err)
+  }
+}
+
 /** Nearby search for a chip around the map centre, radius from the visible bounds. */
 export async function searchCategory(map: google.maps.Map, chipId: string): Promise<PlaceHit[]> {
   const chip = NORMAL_CHIPS.find((c) => c.id === chipId)

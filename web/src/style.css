@@ -296,3 +296,10 @@ blockquote footer { color: var(--muted); font-size: 1rem; }
 html.ios-gap, html.ios-gap body { background: #1c2224; }
 html.ios-gap .gm { --nav-h: 66px; }
 html.ios-gap .gm-nav { padding-bottom: 0; }
+
+/* Until the sheet is fully open its content does not scroll: vertical swipes move the sheet
+   (MapView touch handlers), horizontal ones still scroll carousels and chips. */
+.gm:not([data-sheet='full']) .gm-sheet-body { overflow-y: hidden; }
+.gm-sheet { touch-action: pan-x; }
+.gm[data-sheet='full'] .gm-sheet-body { touch-action: pan-y; }
+.gm-handle { height: 28px; }

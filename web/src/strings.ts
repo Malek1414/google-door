@@ -61,6 +61,11 @@ export const en = {
   sheetHandle: 'Expand or collapse the list',
   back: 'Back',
   accessSection: 'Accessibility',
+  share: 'Share',
+  navLabel: 'Main',
+  tabExplore: 'Explore',
+  tabContribute: 'Contribute',
+  tabSettings: 'Accessibility',
   doorsCount: (n: number) => (n === 1 ? '1 door with exact position' : `${n} doors with exact positions`),
   places: [
     { name: 'Berlin Hauptbahnhof', sub: 'Europaplatz 1, Berlin', lat: 52.5251, lon: 13.3694 },
@@ -99,7 +104,7 @@ export const en = {
     steps: 'Steps at this entrance.',
     'level-mismatch': 'Entrance is not at street level.',
   } as Record<string, string>,
-  guideMe: 'Guide me to this door',
+  guideMe: 'Start',
   close: 'Close',
   reasonNotTier1: 'No exact door position is known, so Doorway will not point an arrow here.',
   reasonNotStepFree: 'This door is not step-free, so Doorway will not guide you here.',
@@ -108,7 +113,7 @@ export const en = {
   nearbyUnknown: (n: number) =>
     n === 1 ? '1 other door within 30 metres has no accessibility data.' : `${n} other doors within 30 metres have no accessibility data.`,
   buildingReported: 'An accessible entrance is reported for this building. Which door is not known.',
-  livedButton: 'What visitors have said',
+  livedButton: 'Helpful tips',
   livedNone: 'Visitors have not written anything about getting in.',
   livedError: 'Could not load visitor reports.',
 
@@ -151,4 +156,164 @@ export const en = {
 }
 
 export type Strings = typeof en
-export const t: Strings = en
+
+export const de: Strings = {
+  appName: 'Doorway',
+  tagline: 'Findet den Eingang, den du wirklich nutzen kannst.',
+
+  startButton: 'Start',
+  startHint: 'Ein Tipp schaltet Kompass, Kamera und Ton ein.',
+  startWorking: 'Kompass, Kamera und Ton werden eingeschaltet.',
+  sensorCompass: 'Kompass',
+  sensorCamera: 'Kamera',
+  sensorSound: 'Ton',
+  on: 'an',
+  off: 'aus',
+  openInSafari: 'Öffne diesen Link in Safari',
+  openInSafariWhy: 'Der Kompass funktioniert nur direkt in Safari, nicht in einer anderen App und nicht vom Home-Bildschirm.',
+  continue: 'Weiter',
+  tryAgain: 'Nochmal versuchen',
+  simBanner: 'Simulation. Ein aufgezeichneter Weg wird abgespielt, ohne Sensoren.',
+  simCameraNote: 'Kamera in der Simulation durch ein Standbild ersetzt.',
+
+  onboardStepFree: 'Brauchst du stufenlose Wege?',
+  yes: 'Ja',
+  no: 'Nein',
+  onboardChannels: 'Wie soll Doorway mit dir sprechen?',
+  onboardChannelsHint: 'Eins oder mehrere wählen.',
+  chSpeech: 'Sprache',
+  chVisual: 'Große Anzeige',
+  chHaptic: 'Vibration',
+  next: 'Weiter',
+  onboardTest: 'Testen',
+  onboardTestHint: 'Du hörst einen Ton von links nach rechts wandern, der Pfeil pulsiert und das Handy gibt ein Signal.',
+  testPlaying: 'Test läuft. Der Ton wandert von links nach rechts.',
+  testDone: 'Test beendet.',
+  noVibration: 'Dieses Handy kann im Browser nicht vibrieren. Stattdessen hörst du kurze Töne von der Seite, in die du gehen sollst: zwei für links, drei für rechts, ein langer bei Ankunft.',
+  done: 'Fertig',
+  stepOf: (n: number, total: number) => `Schritt ${n} von ${total}`,
+
+  mapTitle: 'Eingänge in dieser Gegend',
+  settings: 'Einstellungen',
+  listTitle: 'Nächste Eingänge mit genauer Position',
+  noDoors: 'Hier sind keine Eingänge mit genauer Position bekannt.',
+  offlineData: 'Server nicht erreichbar. Die App nutzt ihre eingebaute Eingangsliste.',
+  mapUnavailable: 'Karte nicht verfügbar. Die Liste enthält alle Eingänge mit genauer Position.',
+  loading: 'Eingänge werden geladen.',
+  metres: (m: number) => (Math.round(m) === 1 ? '1 Meter' : `${Math.round(m)} Meter`),
+  metresShort: (m: number) => `${Math.round(m)} m`,
+  searchPlaceholder: 'Hier suchen',
+  searchLabel: 'Nach einem Ort oder Eingang suchen',
+  searchNoResults: 'Kein passender Ort oder Eingang.',
+  profileButton: 'Deine Barrierefreiheits-Einstellungen',
+  myLocation: 'Meinen Standort zeigen',
+  chipStepFree: 'Stufenlos',
+  chipWithSteps: 'Mit Stufen',
+  filterLabel: 'Eingänge filtern',
+  sheetHandle: 'Liste auf- oder zuklappen',
+  back: 'Zurück',
+  accessSection: 'Barrierefreiheit',
+  share: 'Teilen',
+  navLabel: 'Hauptmenü',
+  tabExplore: 'Erkunden',
+  tabContribute: 'Beitragen',
+  tabSettings: 'Barrierefreiheit',
+  doorsCount: (n: number) => (n === 1 ? '1 Eingang mit genauer Position' : `${n} Eingänge mit genauer Position`),
+  places: [
+    { name: 'Berlin Hauptbahnhof', sub: 'Europaplatz 1, Berlin', lat: 52.5251, lon: 13.3694 },
+    { name: 'Alexanderplatz', sub: 'Berlin Mitte', lat: 52.5219, lon: 13.4132 },
+    { name: 'Bahnhof Friedrichstraße', sub: 'Berlin Mitte', lat: 52.5202, lon: 13.3868 },
+  ],
+
+  unnamedEntrance: 'Eingang ohne Namen',
+  stepFreeYes: 'Stufenlos',
+  stepFreeNo: 'Nicht stufenlos',
+  stepFreeUnknown: 'Stufenlos unbekannt',
+  accessLabel: 'Zugang',
+  approachLabel: 'Ankommen',
+  doorLabel: 'Tür',
+  door: {
+    no: 'Keine Tür, offener Durchgang',
+    hinged: 'Drehflügeltür',
+    sliding: 'Schiebetür',
+    revolving: 'Drehtür',
+    yes: 'Tür, Art unbekannt',
+  } as Record<string, string>,
+  automatic: 'öffnet automatisch',
+  levelLabel: 'Ebene',
+  confidenceLabel: 'Quelle',
+  confidence: {
+    surveyed: 'Genaue Türposition erfasst (OpenStreetMap)',
+    reported: 'Für das Gebäude gemeldet, genaue Tür unbekannt',
+    community: 'Aus Bewertungen, ohne Position',
+    unknown: 'Keine Angaben zur Barrierefreiheit',
+  } as Record<string, string>,
+  warningPrefix: 'Achtung',
+  warning: {
+    revolving: 'Drehtür. Mit Rollstuhl, Rollator oder Blindenhund oft nicht nutzbar.',
+    heavy: 'Schwere Tür.',
+    steps: 'Stufen an diesem Eingang.',
+    'level-mismatch': 'Eingang liegt nicht auf Straßenhöhe.',
+  } as Record<string, string>,
+  guideMe: 'Start',
+  close: 'Schließen',
+  reasonNotTier1: 'Die genaue Türposition ist nicht bekannt, deshalb zeigt Doorway hier keinen Pfeil.',
+  reasonNotStepFree: 'Dieser Eingang ist nicht stufenlos, deshalb führt Doorway dich nicht hierher.',
+  reasonStepFreeUnknown: 'Ob dieser Eingang stufenlos ist, ist nicht bekannt, deshalb führt Doorway dich nicht hierher.',
+  reasonBadCoords: 'Für diesen Eingang gibt es keine nutzbare Position.',
+  nearbyUnknown: (n: number) =>
+    n === 1 ? '1 weiterer Eingang im Umkreis von 30 Metern hat keine Angaben zur Barrierefreiheit.' : `${n} weitere Eingänge im Umkreis von 30 Metern haben keine Angaben zur Barrierefreiheit.`,
+  buildingReported: 'Für dieses Gebäude ist ein barrierefreier Eingang gemeldet. Welche Tür, ist nicht bekannt.',
+  livedButton: 'Hilfreiche Tipps',
+  livedNone: 'Besucher haben nichts zum Hineinkommen geschrieben.',
+  livedError: 'Tipps konnten nicht geladen werden.',
+
+  liveTitle: 'Unterwegs zu',
+  stop: 'Führung beenden',
+  look: 'Was sehe ich?',
+  lookBusy: 'Ich schaue.',
+  lookError: 'Die Bildprüfung ist nicht erreichbar.',
+  lookNotConfigured: 'Die Bildprüfung ist auf dem Server nicht eingerichtet.',
+  ahead: 'Geradeaus',
+  turnLeft: 'Links abbiegen',
+  turnRight: 'Rechts abbiegen',
+  slightLeft: 'Leicht links',
+  slightRight: 'Leicht rechts',
+  behind: 'Hinter dir, bitte umdrehen',
+  roughly: 'Ungefähr in diese Richtung',
+  noCompass: 'Kein Kompass. Geh ein paar Schritte, dann wird die Richtung geschätzt.',
+  waitingGps: 'Warte auf deine Position.',
+  arrived: 'Du bist am Eingang angekommen.',
+  arrivingSoon: 'Der Eingang ist direkt vor dir.',
+  approaching: 'Du bist in der Nähe des Eingangs. Noch etwa 10 Meter.',
+  guidingTo: (name: string) => `Führung zu ${name}.`,
+  sayDistanceDir: (m: number, dir: string) => `${Math.round(m)} Meter. ${dir}.`,
+  replayDone: 'Wiedergabe beendet.',
+  replayAgain: 'Nochmal abspielen',
+  compass: ['Norden', 'Nordosten', 'Osten', 'Südosten', 'Süden', 'Südwesten', 'Westen', 'Nordwesten'],
+  faceToEnter: (dir: string) => `Zum Hineingehen nach ${dir} schauen.`,
+  accuracy: (m: number) => `Genauigkeit ${Math.round(m) === 1 ? '1 Meter' : `${Math.round(m)} Meter`}`,
+
+  recordTitle: 'Weg aufzeichnen',
+  recordHint: 'Geh mit erhobenem Handy zum Eingang. Stopp, wenn du an der Tür bist.',
+  recordStart: 'Aufnahme starten',
+  recordStop: 'Stoppen und speichern',
+  recordPoints: (n: number) => `${n} Punkte aufgezeichnet`,
+  recordDownload: 'Weg als JSON laden',
+  recordCopy: 'Weg als JSON kopieren',
+  copied: 'Kopiert.',
+}
+
+/** German unless ?lang=en or the phone is set to another language. */
+function pickLang(): 'de' | 'en' {
+  try {
+    const q = new URLSearchParams(location.search).get('lang')
+    if (q === 'en' || q === 'de') return q
+    return (navigator.language || 'de').toLowerCase().startsWith('en') ? 'en' : 'de'
+  } catch {
+    return 'de'
+  }
+}
+export const lang = typeof location === 'undefined' ? 'en' : pickLang()
+export const t: Strings = lang === 'de' ? de : en
+if (typeof document !== 'undefined') document.documentElement.lang = lang

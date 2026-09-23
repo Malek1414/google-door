@@ -3,10 +3,10 @@
 :root {
   --bg: #000;
   --fg: #fff;
-  --accent: #ffd60a; /* bright fill; always paired with a heavy dark outline */
+  --accent: #a8c7fa; /* Google Blue: M3 primary AND the ISO wheelchair convention */
   --accent-ink: #000;
   --muted: #c8c8c8;
-  --warn-bg: #ffd60a;
+  --warn-bg: #fdd663;   /* warnings stay amber; accessibility is blue */
   --warn-fg: #000;
   --outline: #000;
   --hit: 56px;
@@ -91,8 +91,8 @@ h1:focus, h2:focus { outline: none; }
 .door { width: 100%; display: grid; grid-template-columns: 2.4rem 1fr; grid-template-rows: auto auto; column-gap: 0.75rem; text-align: left;
   min-height: var(--hit); padding: 0.6rem 0.75rem; font: inherit; color: var(--fg); background: transparent; border: 3px solid var(--fg); border-radius: 12px; cursor: pointer; }
 .door-shape { grid-row: 1 / 3; align-self: center; width: 2.2rem; height: 2.2rem; border: 3px solid var(--outline); }
-.door-step-free .door-shape { background: #ffd60a; border-radius: 50%; box-shadow: 0 0 0 2px var(--fg); width: 2.4rem; height: 2.4rem; }
-.door-not-step-free .door-shape { background: #9aa0a6; transform: rotate(45deg) scale(0.8); box-shadow: 0 0 0 2px var(--fg); }
+.door-step-free .door-shape { background: #1a73e8; border-radius: 50%; box-shadow: 0 0 0 2px #fff; width: 2.4rem; height: 2.4rem; }
+.door-not-step-free .door-shape { background: #5f6368; transform: rotate(45deg) scale(0.8); box-shadow: 0 0 0 2px #dadce0; }
 .door-name { font-weight: 700; }
 .door-meta { color: var(--muted); font-size: 1.05rem; }
 .sheet { width: min(40rem, 100vw); max-height: 85vh; margin: auto auto 0; padding: 16px; background: var(--bg); color: var(--fg); border: 3px solid var(--fg); border-radius: 16px 16px 0 0; }
@@ -114,7 +114,7 @@ blockquote footer { color: var(--muted); font-size: 1rem; }
 .arrow-shape { fill: var(--accent); stroke: #000; stroke-width: 4; paint-order: stroke; }
 .cone-shape { fill: var(--accent); fill-opacity: 0.55; stroke: #000; stroke-width: 3; stroke-dasharray: 4 3; }
 .dest-outline { fill: #000; }
-.dest-fill { fill: #ffd60a; }
+.dest-fill { fill: #a8c7fa; }
 .hud { position: absolute; top: 0; left: 0; right: 0; padding: max(12px, env(safe-area-inset-top)) 16px 12px; background: rgb(0 0 0 / 0.72); color: #fff; }
 .hud h1 { font-size: 1.3rem; margin: 0; }
 .hud .banner { background: #fff; color: #000; font-size: 1rem; }
@@ -165,8 +165,8 @@ blockquote footer { color: var(--muted); font-size: 1rem; }
 .gm-chip[aria-pressed='true'] { background: #004f52; color: #c5f0ef; }
 .gm-chip[aria-pressed='true']::after { content: 'check'; font-family: 'Material Symbols Outlined'; font-size: 18px; margin-left: -2px; }
 .gm-chip-shape { width: 14px; height: 14px; flex: none; }
-.shape-step-free { background: #ffd60a; border: 2px solid #000; border-radius: 50%; box-shadow: 0 0 0 1.5px #fff; }
-.shape-not-step-free { background: #9aa0a6; border: 2px solid #202124; transform: rotate(45deg) scale(0.85); box-shadow: 0 0 0 1.5px #fff; }
+.shape-step-free { background: #1a73e8; border: 0; border-radius: 50%; box-shadow: 0 0 0 1.5px #fff; }
+.shape-not-step-free { background: #5f6368; border: 0; transform: rotate(45deg) scale(0.85); box-shadow: 0 0 0 1.5px #dadce0; }
 .gm-status:empty { display: none; }
 .gm-status { display: inline-block; margin: 8px 0 0; padding: 6px 12px; border-radius: 8px; background: var(--s3); color: var(--fg); font-size: 14px; }
 
@@ -195,8 +195,8 @@ blockquote footer { color: var(--muted); font-size: 1rem; }
   background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
 .gm-row > .ms { color: var(--fg2); }
 .gm-row-shape { width: 30px; height: 30px; flex: none; }
-.door-step-free .gm-row-shape { background: #ffd60a; border: 3px solid #000; border-radius: 50%; width: 34px; height: 34px; box-shadow: 0 0 0 2px #fff; }
-.door-not-step-free .gm-row-shape { background: #9aa0a6; border: 3px solid #202124; transform: rotate(45deg) scale(0.75); box-shadow: 0 0 0 2px #fff; }
+.door-step-free .gm-row-shape { background: #1a73e8; border: 0; border-radius: 50%; width: 34px; height: 34px; box-shadow: 0 0 0 2px #fff; }
+.door-not-step-free .gm-row-shape { background: #5f6368; border: 0; transform: rotate(45deg) scale(0.75); box-shadow: 0 0 0 2px #dadce0; }
 .gm-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .gm-row-title { font-size: 16px; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gm-row-meta { font-size: 14px; color: var(--fg2); }
@@ -253,92 +253,137 @@ blockquote footer { color: var(--muted); font-size: 1rem; }
 .nav-exit:focus-visible { outline: 3px solid #1a73e8; outline-offset: 2px; }
 
 /* ══════════════════════════════════════════════════════════════════════
-   PACEMARK OVERLAY — Malek's design system applied over the Maps shell.
-   The shell's structure (search pill, chips, sheet, turn glyphs) is kept
-   wholesale; only the tokens and the instrument treatment change.
+   ACCESSIBILITY LAYER — Material 3, on top of the Maps shell.
 
-   Why not Maps' own teal: volt carries 16.9:1 on this ground against the
-   teal's 9.7:1. In Pacemark volt was chosen precisely because it stays
-   legible over map and photographic backgrounds — which is this app's
-   entire problem, an arrow drawn over a live camera feed.
+   One colour decision carries this file: the accessibility accent is GOOGLE BLUE,
+   not yellow. Blue is Material 3's dark-theme primary AND the ISO 7001 convention
+   for the wheelchair symbol (white on blue), so it is simultaneously on-brand for
+   Maps and correct for the subject. Safety-yellow reads as a warning; a step-free
+   door is not a warning.
 
-   Type rule: prose in SF, every MEASUREMENT and every PROVENANCE claim in
-   monospace with tabular figures. A distance falling 60 -> 0 jitters
-   without tabular digits exactly as a running clock does.
+   Teal stays Maps' own UI accent. Blue means accessibility data. Keeping those two
+   jobs on two colours is what stops the interface saying "everything is important".
+
+   Contrast on Sammy's surfaces, measured: blue on s0 10.8:1, on s1 9.6:1, on s2
+   7.3:1, onPrimary over blue 7.5:1. All AAA.
    ══════════════════════════════════════════════════════════════════════ */
-.gm {
-  --s0: #0b0d0c;          /* Pacemark ground — near-black, never pure #000:
-                             pure black crushes elevation cues and makes OLED
-                             smearing obvious while scrolling. */
-  --s1: #141715;
-  --s2: #1d211e;
-  --s3: #2a2f2b;
-  --line: rgb(244 246 243 / 0.12);
-  --fg: #f4f6f3;
-  --fg2: #a9b0aa;
-  --acc: #d4ff3f;          /* volt */
-  --acc-ink: #0a0c08;
-  --blue: #d4ff3f;         /* one accent only: the eye always knows where the action is */
-  --ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
-  --num: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
-  font-family: var(--ui);
+:root {
+  --a11y: #a8c7fa;             /* M3 primary, dark — the accessibility accent */
+  --a11y-ink: #062e6f;         /* M3 onPrimary, dark */
+  --a11y-container: #0842a0;   /* M3 primaryContainer, dark */
+  --a11y-on-container: #d3e3fd;
+  --a11y-pin: #1a73e8;         /* Google Blue 600 — saturated, for map pins */
+  --neutral: #9aa0a6;          /* steps present. Never red: a fact, not an error. */
+  --gs: 'Google Sans Flex', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
+  --num: 'Google Sans Flex', ui-monospace, 'SF Mono', Menlo, monospace;
 }
-.gm-search { background: var(--s2); border: 1px solid var(--line); box-shadow: 0 8px 24px rgb(0 0 0 / 0.5); }
-.gm-search-input { font-family: var(--ui); }
-.gm-avatar { background: var(--acc); color: var(--acc-ink); }
-.gm-results, .gm-sheet { background: var(--s1); border: 1px solid var(--line); }
-.gm-chip { background: var(--s2); border: 1px solid var(--line); font-family: var(--ui); font-weight: 550; }
-.gm-chip[aria-pressed='true'] { background: rgb(212 255 63 / 0.16); color: var(--acc); border-color: color-mix(in srgb, var(--acc) 45%, transparent); }
-.gm-fab { background: var(--s2); color: var(--acc); border: 1px solid var(--line); }
-.gm-handle span { background: rgb(244 246 243 / 0.28); width: 38px; height: 5px; }
-.gm-sheet-title { font-family: var(--ui); font-weight: 650; letter-spacing: -0.015em; }
-.gm-h3 { font-family: var(--ui); font-weight: 600; }
 
-/* Shape still carries the meaning; volt and grey only reinforce it. */
-.shape-step-free { background: var(--acc); border: 0; border-radius: 50%; box-shadow: none; }
-.shape-not-step-free { background: #8e968f; border: 0; border-radius: 2px; box-shadow: none; }
+/* ── the two door states, everywhere they appear ─────────────────────── */
+/* Shape carries the meaning; blue and grey only reinforce it. */
+.shape-step-free {
+  background: var(--a11y-pin); border: 0; border-radius: 50%;
+  box-shadow: 0 0 0 1.5px #fff;
+}
+.shape-not-step-free {
+  background: var(--neutral); border: 0; border-radius: 2px;
+  transform: rotate(45deg) scale(0.82); box-shadow: 0 0 0 1.5px rgb(255 255 255 / 0.7);
+}
+.door-step-free .door-shape { background: var(--a11y-pin); border-radius: 50%; }
+.door-not-step-free .door-shape { background: var(--neutral); border-radius: 3px; transform: rotate(45deg) scale(0.82); }
 
-/* PROVENANCE CHIP — the confidence ladder, always visible, never hidden.
-   Most products hide uncertainty. Here misplaced confidence is the harm. */
-.tier, .gm-status {
-  font-family: var(--num); font-size: 11px; font-weight: 600;
-  letter-spacing: 0.09em; text-transform: uppercase;
+/* ── provenance chip: the confidence tier, always visible ────────────── */
+/* Most products hide uncertainty. Here, misplaced confidence is the harm. */
+.tier {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--gs); font-size: 11px; font-weight: 500;
+  letter-spacing: 0.06em; text-transform: uppercase;
   padding: 4px 10px; border-radius: 999px;
-  border: 1px solid var(--line); background: transparent; color: var(--fg2);
+  border: 1px solid #3c3d40; color: #c4c7c5; white-space: nowrap;
 }
-.tier-surveyed { color: var(--acc); border-color: color-mix(in srgb, var(--acc) 45%, transparent); background: rgb(212 255 63 / 0.14); }
-.tier-reported { color: #ffc24a; border-color: rgb(255 194 74 / 0.4); }
-.tier-none { color: var(--fg); border-style: dashed; border-color: var(--fg); }
+.tier::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.tier-surveyed { color: var(--a11y); border-color: rgb(168 199 250 / 0.42); background: rgb(168 199 250 / 0.12); }
+.tier-reported { color: #fdd663; border-color: rgb(253 214 99 / 0.38); }
+.tier-community { color: #c4c7c5; }
+.tier-none { color: #e3e3e3; border-style: dashed; border-color: #8e918f; }
 
-/* THE INSTRUMENT PLATE — Maps' turn card, re-set as a measuring device.
-   Opaque, not glass: this is the one thing Erdin must read. */
-.nav-card {
-  background: var(--s1) !important;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  box-shadow: 0 10px 30px rgb(0 0 0 / 0.55);
+/* ── ONBOARDING — Material 3 cards. No yellow. ───────────────────────── */
+.screen, .screen-onboard, .screen-start {
+  font-family: var(--gs);
+  max-width: 34rem; margin: 0 auto;
+  padding: max(20px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
+  background: #131314; color: #e3e3e3;
 }
-.nav-card > .ms { color: var(--acc); font-size: 34px; }
-.nav-card h1 { font-family: var(--ui); font-size: 15px; font-weight: 600; color: var(--fg2); letter-spacing: 0; }
-/* Signature: the distance, in tabular mono volt, sized to be read at arm's length
-   by someone who cannot read the label above it. */
-.nav-card .distance, .distance {
-  font-family: var(--num) !important;
-  font-variant-numeric: tabular-nums;
-  font-size: 44px; line-height: 1.02; font-weight: 700;
-  letter-spacing: -0.03em; color: var(--acc); margin: 2px 0 0;
+.screen-onboard { min-height: 100dvh; }
+.screen h1, .screen-onboard h1, .screen-start h1 {
+  font-family: var(--gs); font-size: 28px; line-height: 1.16;
+  letter-spacing: -0.4px; font-weight: 500; margin: 0 0 8px; color: #e3e3e3;
 }
-.nav-card .direction, .direction { font-family: var(--ui); font-size: 18px; font-weight: 600; color: var(--fg); }
-.accuracy { font-family: var(--num); font-size: 12px; color: var(--fg2); letter-spacing: 0; }
-.nav-bottom .gm-pill, .gm-pill {
-  background: var(--s2); color: var(--fg); border: 1px solid var(--line);
-  font-family: var(--ui); font-weight: 600;
+.lede { font-size: 16px; line-height: 1.5; color: #c4c7c5; margin: 0 0 28px; }
+.hint { color: #c4c7c5; font-size: 14px; }
+.step {
+  font-family: var(--gs); font-size: 12px; font-weight: 500;
+  letter-spacing: 0.8px; text-transform: uppercase; color: var(--a11y); margin: 0 0 10px;
 }
-.nav-exit { background: var(--s2); color: var(--fg); border: 1px solid var(--line); }
+.choices { display: grid; gap: 12px; margin: 20px 0; }
 
-/* The arrow: dark stroke painted BEHIND the fill so it survives whatever the
-   camera happens to be pointing at. */
-.arrow-shape { fill: var(--acc); stroke: #05070a; stroke-width: 5; paint-order: stroke; }
-.cone-shape { fill: var(--acc); fill-opacity: 0.38; stroke: #05070a; stroke-width: 3; stroke-dasharray: 6 4; paint-order: stroke; }
-.dest-fill { fill: var(--acc); }
-.dest-outline { fill: #05070a; }
+/* M3 outlined card as a tap target: 1px outline, 16px radius, state layer on press. */
+.btn-big, .btn-toggle {
+  position: relative; display: flex; align-items: center; gap: 16px;
+  width: 100%; min-height: 76px; padding: 18px 20px;
+  font-family: var(--gs); font-size: 17px; font-weight: 500; text-align: left;
+  background: #1f1f1f; color: #e3e3e3;
+  border: 1px solid #3c3d40; border-radius: 16px; cursor: pointer;
+  transition: background 160ms cubic-bezier(0.2, 0, 0, 1), border-color 160ms, transform 120ms;
+}
+.btn-big:active, .btn-toggle:active { transform: scale(0.985); background: #26272a; }
+.btn-toggle .check {
+  width: 24px; height: 24px; flex: none; border-radius: 7px;
+  border: 2px solid #8e918f; background: transparent;
+  transition: background 160ms, border-color 160ms;
+}
+.btn-toggle[aria-pressed='true'] {
+  background: rgb(168 199 250 / 0.12); border-color: var(--a11y);
+}
+.btn-toggle[aria-pressed='true'] .check {
+  background: var(--a11y); border-color: var(--a11y);
+  box-shadow: inset 0 0 0 4px #1f1f1f;
+}
+
+/* M3 filled button */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 56px; padding: 16px 28px;
+  font-family: var(--gs); font-size: 16px; font-weight: 500;
+  background: var(--a11y); color: var(--a11y-ink);
+  border: 0; border-radius: 28px; cursor: pointer;
+  transition: transform 120ms, background 160ms;
+}
+.btn:active { transform: scale(0.97); background: #c2d9fd; }
+.btn-secondary { background: transparent; color: var(--a11y); border: 1px solid #8e918f; }
+.btn-small { min-height: 44px; padding: 10px 20px; font-size: 14px; }
+.btn:disabled { opacity: 0.38; cursor: not-allowed; }
+.row { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
+.row .btn { flex: 1 1 9rem; }
+.btn-start { min-height: 72px; font-size: 18px; border-radius: 28px; width: 100%; }
+
+.screen-start { display: flex; flex-direction: column; justify-content: flex-end; min-height: 100dvh; gap: 20px; }
+.start-mark { font-family: var(--gs); font-size: 12px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; color: var(--a11y); }
+.sensor-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.sensor-list li { display: flex; align-items: center; gap: 12px; font-size: 14px; color: #c4c7c5; }
+.sensor-list .mark { width: 1.2em; color: var(--a11y); font-weight: 600; }
+.safari { background: var(--a11y-container); color: var(--a11y-on-container); padding: 14px 16px; border-radius: 12px; font-size: 15px; font-weight: 500; }
+.demo-arrow { width: 44vmin; max-width: 210px; display: block; margin: 24px auto; }
+.pulse-demo.pulsing { animation: pulse 0.5s ease-in-out infinite; transform-origin: center; }
+@keyframes pulse { 50% { transform: scale(1.1); } }
+
+/* ── Live View: the arrow must survive whatever the camera is pointing at ── */
+.arrow-shape { fill: var(--a11y); stroke: #041e49; stroke-width: 5; paint-order: stroke; }
+.cone-shape { fill: var(--a11y); fill-opacity: 0.38; stroke: #041e49; stroke-width: 3; stroke-dasharray: 6 4; paint-order: stroke; }
+.dest-fill { fill: var(--a11y); }
+.dest-outline { fill: #041e49; }
+.nav-card > .ms { color: var(--a11y); }
+.distance { font-family: var(--gs); font-variant-numeric: tabular-nums; font-weight: 500; letter-spacing: -1px; color: var(--a11y); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}

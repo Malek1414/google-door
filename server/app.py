@@ -13,6 +13,7 @@ from typing import Optional
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
@@ -220,3 +221,11 @@ async def speak(req: SpeakReq):
     from fastapi import Response
     return Response(content=hdr + pcm, media_type="audio/wav",
                     headers={"Cache-Control": "public, max-age=86400"})
+
+
+# Serve the built PWA from the same origin as /api/*, so there is ONE url to open and
+# no CORS in the way. Mounted last: every /api route above wins over a static path.
+# DOORWAY_WEB points at web/dist; if it isn't built yet the API still runs.
+_web = os.environ.get("DOORWAY_WEB", "web/dist")
+if os.path.isdir(_web):
+    app.mount("/", StaticFiles(directory=_web, html=True), name="web")

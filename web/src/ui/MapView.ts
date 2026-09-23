@@ -27,14 +27,45 @@ const SEARCH_MAX = 6
 
 // ---- marker icons (SVG data URIs; no external assets) ----
 const svgUrl = (svg: string) => `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
-const GLYPH =
-  '<circle cx="15" cy="6.5" r="2.6" fill="#000"/><path d="M14.5 10.5V18H21L24 24.5" fill="none" stroke="#000" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M14.5 14H20" stroke="#000" stroke-width="2.2" stroke-linecap="round"/><path d="M11 14.5A6.5 6.5 0 1 0 20.5 22.5" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="round"/>'
-const ICON_STEP_FREE = svgUrl(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 36 36"><circle cx="16" cy="16" r="15" fill="#FFD60A" stroke="#000" stroke-width="3.5"/>${GLYPH}</svg>`)
-const ICON_NOT_STEP_FREE = svgUrl(
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M16 2L30 16L16 30L2 16Z" fill="#9AA0A6" fill-opacity="0.75" stroke="#202124" stroke-width="2.5"/><path d="M10 16H22" stroke="#202124" stroke-width="3" stroke-linecap="round"/></svg>',
-)
+// Google Maps pin geometry with the Material Symbols "accessible" glyph, so the
+// markers read as part of Maps rather than as something drawn on top of it.
+// Blue is doing two jobs at once here: it is Material 3's primary AND the ISO 7001
+// convention for the wheelchair symbol (white on blue). Shape still carries the
+// meaning independently — pin for step-free, muted square-cut pin for steps — so a
+// colour-blind user loses nothing.
+const PIN_BODY = 'M20 2C12.8 2 7 7.8 7 15c0 9.2 13 23 13 23s13-13.8 13-23c0-7.2-5.8-13-13-13z'
+
+// Material Symbols 'accessible', re-centred into the pin head (24x24 -> 20x20 @ 10,5).
+const WHEELCHAIR =
+  '<g transform="translate(10 5) scale(0.83)">' +
+  '<circle cx="12" cy="4" r="2.1" fill="#fff"/>' +
+  '<path d="M19 13.2v-2.1c-1.5.02-3-.73-3.95-1.78l-1.25-1.39a2.2 2.2 0 0 0-.6-.44h-.01A2.1 2.1 0 0 0 11.8 7.2 2.2 2.2 0 0 0 10 9.4V15a2 2 0 0 0 2 2h4.9v-2.05h-3.9v-3.3c1.25.97 3.07 1.42 3.88 1.41z" fill="#fff"/>' +
+  '<path d="M12.8 18.2a3 3 0 1 1-3.8-3.82v-2.1a5.02 5.02 0 1 0 5.95 5.95z" fill="#fff"/>' +
+  '</g>'
+
+// A flight of steps, drawn the way Maps draws its own small pictograms.
+const STAIRS =
+  '<g transform="translate(11 7)">' +
+  '<path d="M2 17h4v-4h4V9h4V5h4" fill="none" stroke="#fff" stroke-width="2.6" ' +
+  'stroke-linecap="round" stroke-linejoin="round"/>' +
+  '</g>'
+
+const pin = (fill: string, stroke: string, glyph: string) =>
+  svgUrl(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 42" width="40" height="42">' +
+      '<filter id="d" x="-40%" y="-20%" width="180%" height="160%">' +
+      '<feDropShadow dx="0" dy="1.5" stdDeviation="1.6" flood-color="#000" flood-opacity="0.45"/></filter>' +
+      `<path d="${PIN_BODY}" fill="${fill}" stroke="${stroke}" stroke-width="2" filter="url(#d)"/>` +
+      glyph +
+      '</svg>',
+  )
+
+// Google Blue 600. Saturated on purpose: a pin sits on the map, not on a UI surface.
+const ICON_STEP_FREE = pin('#1a73e8', '#ffffff', WHEELCHAIR)
+// Neutral, never red — a door having steps is a fact, not an error.
+const ICON_NOT_STEP_FREE = pin('#5f6368', '#dadce0', STAIRS)
 const ICON_TIER2 = svgUrl(
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="#000" stroke-width="5" stroke-dasharray="6 4"/><circle cx="20" cy="20" r="16" fill="none" stroke="#FFD60A" stroke-width="2.5" stroke-dasharray="6 4"/></svg>',
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="#000" stroke-width="5" stroke-dasharray="6 4"/><circle cx="20" cy="20" r="16" fill="none" stroke="#a8c7fa" stroke-width="2.5" stroke-dasharray="6 4"/></svg>',
 )
 
 let mapsLoading: Promise<void> | null = null
@@ -248,7 +279,13 @@ export function MapView(opts: {
         map,
         position: { lat: e.lat, lng: e.lon },
         title: `${e.name ?? t.unnamedEntrance}, ${stepFreeLabel(e.stepFree)}`,
-        icon: { url: big ? ICON_STEP_FREE : ICON_NOT_STEP_FREE, scaledSize: new google.maps.Size(size, size), anchor: new google.maps.Point(size / 2, size / 2) },
+        // 40x42 artwork: anchor at the pin TIP, not its centre, or every door sits
+        // half a pin north of where it actually is.
+        icon: {
+          url: big ? ICON_STEP_FREE : ICON_NOT_STEP_FREE,
+          scaledSize: new google.maps.Size(size, size * (42 / 40)),
+          anchor: new google.maps.Point(size / 2, size * (42 / 40)),
+        },
         zIndex: selected === e ? 3 : big ? 2 : 1,
         opacity: big ? 1 : 0.85,
       })

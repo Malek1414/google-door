@@ -13,7 +13,7 @@ a blind user must never be left in silence because a CDN blinked.
     GEMINI_API_KEY=... python3 pipeline/synth_speech.py --lang de
     GEMINI_API_KEY=... python3 pipeline/synth_speech.py --probe   # dump raw response
 """
-import base64, json, os, struct, sys, urllib.parse, urllib.request
+import base64, json, os, struct, sys, time, urllib.error, urllib.parse, urllib.request
 
 KEY   = os.environ.get("GEMINI_API_KEY", "")
 MODEL = os.environ.get("GEMINI_MODEL_TTS", "gemini-3.1-flash-tts-preview")
@@ -62,14 +62,28 @@ def wav(pcm: bytes, rate=24000, ch=1, width=2) -> bytes:
             b"data" + struct.pack("<I", len(pcm)) + pcm)
 
 
-def synth(text: str) -> bytes:
+def synth(text: str, tries: int = 5) -> bytes:
+    """Synthesise one clip. Backs off on 429 — the free tier rate-limits hard."""
+    for attempt in range(tries):
+        try:
+            return _synth_once(text)
+        except urllib.error.HTTPError as e:
+            if e.code != 429 or attempt == tries - 1:
+                raise
+            wait = 5 * (2 ** attempt)          # 5, 10, 20, 40s
+            print(f"      429 — waiting {wait}s", flush=True)
+            time.sleep(wait)
+    raise RuntimeError("unreachable")
+
+
+def _synth_once(text: str) -> bytes:
     body = {"contents": [{"parts": [{"text": text}]}],
             "generationConfig": {
                 "responseModalities": ["AUDIO"],
                 "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": VOICE}}}}}
     req = urllib.request.Request(
-        f"{URL}/{MODEL}:generateContent?key={KEY}",
-        data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
+        f"{URL}/{MODEL}:generateContent", data=json.dumps(body).encode(),
+        headers={"Content-Type": "application/json", "x-goog-api-key": KEY})
     with urllib.request.urlopen(req, timeout=60) as r:
         payload = json.load(r)
     if "--probe" in sys.argv:
@@ -114,6 +128,7 @@ def main():
             continue
         with open(path, "wb") as f:
             f.write(data)
+        time.sleep(2.0)                        # stay under the per-minute cap
         manifest[key] = {"file": f"audio/{lang}/{key}.wav", "text": text}
         done += 1
         print(f"  {key:22s} {len(data)//1024:4d} KB", flush=True)

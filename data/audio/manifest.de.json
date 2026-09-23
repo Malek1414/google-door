@@ -1,0 +1,91 @@
+{
+ "lang": "de",
+ "voice": "Kore",
+ "model": "gemini-3.1-flash-tts-preview",
+ "clips": {
+  "turn_left": {
+   "file": "audio/de/turn_left.wav",
+   "text": "Links."
+  },
+  "turn_right": {
+   "file": "audio/de/turn_right.wav",
+   "text": "Rechts."
+  },
+  "straight": {
+   "file": "audio/de/straight.wav",
+   "text": "Geradeaus."
+  },
+  "arrived": {
+   "file": "audio/de/arrived.wav",
+   "text": "Sie haben den Eingang erreicht."
+  },
+  "off_route": {
+   "file": "audio/de/off_route.wav",
+   "text": "Stopp. Der Eingang liegt hinter Ihnen."
+  },
+  "confirmed": {
+   "file": "audio/de/confirmed.wav",
+   "text": "Stufenloser Eingang bestätigt."
+  },
+  "reported_only": {
+   "file": "audio/de/reported_only.wav",
+   "text": "Dieses Gebäude meldet einen stufenlosen Zugang, aber ich weiß nicht, welche Tür."
+  },
+  "unknown": {
+   "file": "audio/de/unknown.wav",
+   "text": "Ich habe keine Daten zu den Eingängen dieses Gebäudes."
+  },
+  "warn_revolving": {
+   "file": "audio/de/warn_revolving.wav",
+   "text": "Achtung: Drehtür."
+  },
+  "warn_steps": {
+   "file": "audio/de/warn_steps.wav",
+   "text": "Achtung: Stufen."
+  },
+  "door_automatic": {
+   "file": "audio/de/door_automatic.wav",
+   "text": "Die Tür öffnet automatisch."
+  },
+  "low_accuracy": {
+   "file": "audio/de/low_accuracy.wav",
+   "text": "Ungefähr in diese Richtung. Das Signal ist ungenau."
+  },
+  "dist_5": {
+   "file": "audio/de/dist_5.wav",
+   "text": "5 Meter."
+  },
+  "dist_10": {
+   "file": "audio/de/dist_10.wav",
+   "text": "10 Meter."
+  },
+  "dist_15": {
+   "file": "audio/de/dist_15.wav",
+   "text": "15 Meter."
+  },
+  "dist_20": {
+   "file": "audio/de/dist_20.wav",
+   "text": "20 Meter."
+  },
+  "dist_30": {
+   "file": "audio/de/dist_30.wav",
+   "text": "30 Meter."
+  },
+  "dist_40": {
+   "file": "audio/de/dist_40.wav",
+   "text": "40 Meter."
+  },
+  "dist_50": {
+   "file": "audio/de/dist_50.wav",
+   "text": "50 Meter."
+  },
+  "dist_75": {
+   "file": "audio/de/dist_75.wav",
+   "text": "75 Meter."
+  },
+  "dist_100": {
+   "file": "audio/de/dist_100.wav",
+   "text": "100 Meter."
+  }
+ }
+}

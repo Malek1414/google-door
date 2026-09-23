@@ -91,7 +91,8 @@ async def look(req: LookReq):
         {"inline_data": {"mime_type": "image/jpeg", "data": req.frame}}]}],
         "generationConfig": {"temperature": 0.0, "maxOutputTokens": 60}}
     async with httpx.AsyncClient(timeout=20) as c:
-        r = await c.post(f"{GEMINI_URL}/{MODEL_LOOK}:generateContent?key={GEMINI_KEY}", json=body)
+        r = await c.post(f"{GEMINI_URL}/{MODEL_LOOK}:generateContent",
+                         json=body, headers={"x-goog-api-key": GEMINI_KEY})
     if r.status_code != 200:
         raise HTTPException(502, f"gemini {r.status_code}")
     try:
@@ -140,7 +141,8 @@ async def lived(place_id: str):
     body = {"contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {"temperature": 0.0, "responseMimeType": "application/json"}}
     async with httpx.AsyncClient(timeout=25) as c:
-        gr = await c.post(f"{GEMINI_URL}/{MODEL_LIVED}:generateContent?key={GEMINI_KEY}", json=body)
+        gr = await c.post(f"{GEMINI_URL}/{MODEL_LIVED}:generateContent",
+                          json=body, headers={"x-goog-api-key": GEMINI_KEY})
     if gr.status_code != 200:
         return {"placeId": place_id, "claims": []}
     try:
@@ -191,8 +193,8 @@ async def speak(req: SpeakReq):
                 "speechConfig": {
                     "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": TTS_VOICE}}}}}
     async with httpx.AsyncClient(timeout=20) as c:
-        r = await c.post(f"{GEMINI_URL}/{MODEL_TTS}:generateContent?key={GEMINI_KEY}",
-                         json=body)
+        r = await c.post(f"{GEMINI_URL}/{MODEL_TTS}:generateContent",
+                         json=body, headers={"x-goog-api-key": GEMINI_KEY})
     if r.status_code != 200:
         raise HTTPException(502, f"tts {r.status_code}")
     try:

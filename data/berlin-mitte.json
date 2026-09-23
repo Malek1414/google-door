@@ -61,6 +61,28 @@
    }
   },
   {
+   "id": "way/104228013",
+   "name": null,
+   "placeId": null,
+   "addr": null,
+   "centroid": [
+    52.526963,
+    13.362166
+   ],
+   "accessSummary": {
+    "tier": 0,
+    "stepFree": null,
+    "confidence": "unknown"
+   },
+   "entranceIds": [],
+   "stats": {
+    "total": 0,
+    "stepFree": 0,
+    "notStepFree": 0,
+    "unknown": 0
+   }
+  },
+  {
    "id": "way/107166434",
    "name": null,
    "placeId": null,
@@ -68,6 +90,28 @@
    "centroid": [
     52.535283,
     13.374732
+   ],
+   "accessSummary": {
+    "tier": 0,
+    "stepFree": null,
+    "confidence": "unknown"
+   },
+   "entranceIds": [],
+   "stats": {
+    "total": 0,
+    "stepFree": 0,
+    "notStepFree": 0,
+    "unknown": 0
+   }
+  },
+  {
+   "id": "way/107306710",
+   "name": null,
+   "placeId": null,
+   "addr": "Lehrter Stra\u00dfe",
+   "centroid": [
+    52.526223,
+    13.362766
    ],
    "accessSummary": {
     "tier": 0,
@@ -149,6 +193,28 @@
    }
   },
   {
+   "id": "way/112149798",
+   "name": null,
+   "placeId": null,
+   "addr": "Friedrichstra\u00dfe 39",
+   "centroid": [
+    52.505923,
+    13.391223
+   ],
+   "accessSummary": {
+    "tier": 0,
+    "stepFree": null,
+    "confidence": "unknown"
+   },
+   "entranceIds": [],
+   "stats": {
+    "total": 0,
+    "stepFree": 0,
+    "notStepFree": 0,
+    "unknown": 0
+   }
+  },
+  {
    "id": "way/11348359",
    "name": null,
    "placeId": null,
@@ -171,6 +237,28 @@
    }
   },
   {
+   "id": "way/11348390",
+   "name": null,
+   "placeId": null,
+   "addr": null,
+   "centroid": [
+    52.525039,
+    13.36989
+   ],
+   "accessSummary": {
+    "tier": 0,
+    "stepFree": null,
+    "confidence": "unknown"
+   },
+   "entranceIds": [],
+   "stats": {
+    "total": 0,
+    "stepFree": 0,
+    "notStepFree": 0,
+    "unknown": 0
+   }
+  },
+  {
    "id": "way/1157288903",
    "name": "The Social Hub",
    "placeId": null,
@@ -178,6 +266,28 @@
    "centroid": [
     52.516814,
     13.417553
+   ],
+   "accessSummary": {
+    "tier": 0,
+    "stepFree": null,
+    "confidence": "unknown"
+   },
+   "entranceIds": [],
+   "stats": {
+    "total": 0,
+    "stepFree": 0,
+    "notStepFree": 0,
+    "unknown": 0
+   }
+  },
+  {
+   "id": "way/124257901",
+   "name": null,
+   "placeId": null,
+   "addr": "Philippstra\u00dfe",
+   "centroid": [
+    52.526259,
+    13.382885
    ],
    "accessSummary": {
     "tier": 0,
@@ -1007,6 +1117,28 @@
    }
   },
   {
+   "id": "way/291725891",
+   "name": null,
+   "placeId": null,
+   "addr": null,
+   "centroid": [
+    52.528051,
+    13.392855
+   ],
+   "accessSummary": {
+    "tier": 0,
+    "stepFree": null,
+    "confidence": "unknown"
+   },
+   "entranceIds": [],
+   "stats": {
+    "total": 0,
+    "stepFree": 0,
+    "notStepFree": 0,
+    "unknown": 0
+   }
+  },
+  {
    "id": "way/293244349",
    "name": null,
    "placeId": null,
@@ -1315,6 +1447,28 @@
    }
   },
   {
+   "id": "way/374825415",
+   "name": "Neurologie, Neuro-Chirurgie und Psychiatrie",
+   "placeId": null,
+   "addr": "Bonhoefferweg 3",
+   "centroid": [
+    52.526791,
+    13.375745
+   ],
+   "accessSummary": {
+    "tier": 0,
+    "stepFree": null,
+    "confidence": "unknown"
+   },
+   "entranceIds": [],
+   "stats": {
+    "total": 0,
+    "stepFree": 0,
+    "notStepFree": 0,
+    "unknown": 0
+   }
+  },
+  {
    "id": "way/380104430",
    "name": null,
    "placeId": null,
@@ -1381,6 +1535,28 @@
    }
   },
   {
+   "id": "way/398722557",
+   "name": null,
+   "placeId": null,
+   "addr": null,
+   "centroid": [
+    52.52941,
+    13.413726
+   ],
+   "accessSummary": {
+    "tier": 0,
+    "stepFree": null,
+    "confidence": "unknown"
+   },
+   "entranceIds": [],
+   "stats": {
+    "total": 0,
+    "stepFree": 0,
+    "notStepFree": 0,
+    "unknown": 0
+   }
+  },
+  {
    "id": "way/41671582",
    "name": "Palais am Festungsgraben",
    "placeId": null,
@@ -1403,6 +1579,28 @@
    }
   },
   {
+   "id": "way/42162939",
+   "name": "Trias",
+   "placeId": null,
+   "addr": "Holzmarktstra\u00dfe 15-17",
+   "centroid": [
+    52.513312,
+    13.422932
+   ],
+   "accessSummary": {
+    "tier": 0,
+    "stepFree": null,
+    "confidence": "unknown"
+   },
+   "entranceIds": [],
+   "stats": {
+    "total": 0,
+    "stepFree": 0,
+    "notStepFree": 0,
+    "unknown": 0
+   }
+  },
+  {
    "id": "way/422415726",
    "name": null,
    "placeId": null,
@@ -1410,6 +1608,28 @@
    "centroid": [
     52.530165,
     13.384323
+   ],
+   "accessSummary": {
+    "tier": 0,
+    "stepFree": null,
+    "confidence": "unknown"
+   },
+   "entranceIds": [],
+   "stats": {
+    "total": 0,
+    "stepFree": 0,
+    "notStepFree": 0,
+    "unknown": 0
+   }
+  },
+  {
+   "id": "way/423457074",
+   "name": "Kornversuchsspeicher",
+   "placeId": null,
+   "addr": null,
+   "centroid": [
+    52.535097,
+    13.366289
    ],
    "accessSummary": {
     "tier": 0,
@@ -1454,6 +1674,28 @@
    "centroid": [
     52.525755,
     13.379532
+   ],
+   "accessSummary": {
+    "tier": 0,
+    "stepFree": null,
+    "confidence": "unknown"
+   },
+   "entranceIds": [],
+   "stats": {
+    "total": 0,
+    "stepFree": 0,
+    "notStepFree": 0,
+    "unknown": 0
+   }
+  },
+  {
+   "id": "way/43025562",
+   "name": "Salomon-Neumann-Haus",
+   "placeId": null,
+   "addr": "Luisenstra\u00dfe 57",
+   "centroid": [
+    52.525605,
+    13.379567
    ],
    "accessSummary": {
     "tier": 0,
@@ -1520,6 +1762,28 @@
    "centroid": [
     52.525246,
     13.382452
+   ],
+   "accessSummary": {
+    "tier": 0,
+    "stepFree": null,
+    "confidence": "unknown"
+   },
+   "entranceIds": [],
+   "stats": {
+    "total": 0,
+    "stepFree": 0,
+    "notStepFree": 0,
+    "unknown": 0
+   }
+  },
+  {
+   "id": "way/43060663",
+   "name": "Department f\u00fcr Agrar\u00f6konomie",
+   "placeId": null,
+   "addr": "Philippstra\u00dfe 13",
+   "centroid": [
+    52.526775,
+    13.384596
    ],
    "accessSummary": {
     "tier": 0,
@@ -1689,6 +1953,28 @@
    }
   },
   {
+   "id": "way/51166236",
+   "name": null,
+   "placeId": null,
+   "addr": null,
+   "centroid": [
+    52.530054,
+    13.401933
+   ],
+   "accessSummary": {
+    "tier": 0,
+    "stepFree": null,
+    "confidence": "unknown"
+   },
+   "entranceIds": [],
+   "stats": {
+    "total": 0,
+    "stepFree": 0,
+    "notStepFree": 0,
+    "unknown": 0
+   }
+  },
+  {
    "id": "way/518201438",
    "name": null,
    "placeId": null,
@@ -1733,6 +2019,28 @@
    }
   },
   {
+   "id": "way/54672669",
+   "name": null,
+   "placeId": null,
+   "addr": "Philippstra\u00dfe 11",
+   "centroid": [
+    52.526252,
+    13.381053
+   ],
+   "accessSummary": {
+    "tier": 0,
+    "stepFree": null,
+    "confidence": "unknown"
+   },
+   "entranceIds": [],
+   "stats": {
+    "total": 0,
+    "stepFree": 0,
+    "notStepFree": 0,
+    "unknown": 0
+   }
+  },
+  {
    "id": "way/550703315",
    "name": "Verwalterhaus",
    "placeId": null,
@@ -1762,6 +2070,28 @@
    "centroid": [
     52.526162,
     13.38045
+   ],
+   "accessSummary": {
+    "tier": 0,
+    "stepFree": null,
+    "confidence": "unknown"
+   },
+   "entranceIds": [],
+   "stats": {
+    "total": 0,
+    "stepFree": 0,
+    "notStepFree": 0,
+    "unknown": 0
+   }
+  },
+  {
+   "id": "way/59273515",
+   "name": null,
+   "placeId": null,
+   "addr": "Chausseestra\u00dfe 126",
+   "centroid": [
+    52.528587,
+    13.383806
    ],
    "accessSummary": {
     "tier": 0,
@@ -1909,6 +2239,28 @@
    }
   },
   {
+   "id": "way/951268571",
+   "name": "Charit\u00e9 Campus-Klinik",
+   "placeId": null,
+   "addr": "Rahel-Hirsch-Weg 5",
+   "centroid": [
+    52.526827,
+    13.377302
+   ],
+   "accessSummary": {
+    "tier": 0,
+    "stepFree": null,
+    "confidence": "unknown"
+   },
+   "entranceIds": [],
+   "stats": {
+    "total": 0,
+    "stepFree": 0,
+    "notStepFree": 0,
+    "unknown": 0
+   }
+  },
+  {
    "id": "way/96381285",
    "name": null,
    "placeId": null,
@@ -1938,6 +2290,50 @@
    "centroid": [
     52.538437,
     13.418869
+   ],
+   "accessSummary": {
+    "tier": 0,
+    "stepFree": null,
+    "confidence": "unknown"
+   },
+   "entranceIds": [],
+   "stats": {
+    "total": 0,
+    "stepFree": 0,
+    "notStepFree": 0,
+    "unknown": 0
+   }
+  },
+  {
+   "id": "way/97590647",
+   "name": null,
+   "placeId": null,
+   "addr": null,
+   "centroid": [
+    52.526514,
+    13.387561
+   ],
+   "accessSummary": {
+    "tier": 0,
+    "stepFree": null,
+    "confidence": "unknown"
+   },
+   "entranceIds": [],
+   "stats": {
+    "total": 0,
+    "stepFree": 0,
+    "notStepFree": 0,
+    "unknown": 0
+   }
+  },
+  {
+   "id": "way/97948312",
+   "name": null,
+   "placeId": null,
+   "addr": null,
+   "centroid": [
+    52.524542,
+    13.370311
    ],
    "accessSummary": {
     "tier": 0,
@@ -15600,7 +15996,7 @@
   },
   {
    "id": "node/14054241386",
-   "buildingId": null,
+   "buildingId": "way/319282430",
    "lat": 52.5055285,
    "lon": 13.4113436,
    "name": null,
@@ -15611,10 +16007,11 @@
    "confidence": "surveyed",
    "door": null,
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 65.1,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "north-east"
   },
   {
    "id": "node/14054241398",
@@ -15888,7 +16285,7 @@
   },
   {
    "id": "node/14132859511",
-   "buildingId": null,
+   "buildingId": "way/59273515",
    "lat": 52.5285682,
    "lon": 13.3838665,
    "name": null,
@@ -15899,14 +16296,15 @@
    "confidence": "surveyed",
    "door": null,
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 240.3,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "south-west"
   },
   {
    "id": "node/14132859512",
-   "buildingId": null,
+   "buildingId": "way/59273515",
    "lat": 52.5285622,
    "lon": 13.3837712,
    "name": null,
@@ -15917,10 +16315,11 @@
    "confidence": "surveyed",
    "door": null,
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 60.7,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "north-east"
   },
   {
    "id": "node/14160603958",
@@ -42792,7 +43191,7 @@
   },
   {
    "id": "node/4187993941",
-   "buildingId": null,
+   "buildingId": "way/107306710",
    "lat": 52.5265189,
    "lon": 13.3622451,
    "name": null,
@@ -42803,14 +43202,15 @@
    "confidence": "surveyed",
    "door": null,
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 176.5,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "south"
   },
   {
    "id": "node/4187993954",
-   "buildingId": null,
+   "buildingId": "way/104228013",
    "lat": 52.5270958,
    "lon": 13.362328,
    "name": null,
@@ -42821,10 +43221,11 @@
    "confidence": "surveyed",
    "door": null,
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 242.9,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "south-west"
   },
   {
    "id": "node/4202548644",
@@ -42990,7 +43391,7 @@
   },
   {
    "id": "node/4230620300",
-   "buildingId": null,
+   "buildingId": "way/423457074",
    "lat": 52.5351114,
    "lon": 13.3663987,
    "name": null,
@@ -43001,10 +43402,11 @@
    "confidence": "surveyed",
    "door": null,
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 238.0,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "south-west"
   },
   {
    "id": "node/4237233722",
@@ -43170,7 +43572,7 @@
   },
   {
    "id": "node/4254159116",
-   "buildingId": null,
+   "buildingId": "way/11348390",
    "lat": 52.5242929,
    "lon": 13.3704525,
    "name": null,
@@ -43181,10 +43583,11 @@
    "confidence": "surveyed",
    "door": null,
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 1.6,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "north"
   },
   {
    "id": "node/4294780868",
@@ -44844,7 +45247,7 @@
   },
   {
    "id": "node/4456834413",
-   "buildingId": null,
+   "buildingId": "way/448696070",
    "lat": 52.5269216,
    "lon": 13.3823791,
    "name": null,
@@ -44855,10 +45258,11 @@
    "confidence": "surveyed",
    "door": null,
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 283.2,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "west"
   },
   {
    "id": "node/4467712322",
@@ -45024,7 +45428,7 @@
   },
   {
    "id": "node/4556857288",
-   "buildingId": null,
+   "buildingId": "way/951268571",
    "lat": 52.5266315,
    "lon": 13.3777383,
    "name": null,
@@ -45035,10 +45439,11 @@
    "confidence": "surveyed",
    "door": null,
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 325.6,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "north-west"
   },
   {
    "id": "node/4557915296",
@@ -45312,7 +45717,7 @@
   },
   {
    "id": "node/4732018059",
-   "buildingId": null,
+   "buildingId": "way/42162939",
    "lat": 52.5137509,
    "lon": 13.4227591,
    "name": null,
@@ -45323,10 +45728,11 @@
    "confidence": "surveyed",
    "door": null,
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 210.1,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "south-west"
   },
   {
    "id": "node/4770002464",
@@ -45726,7 +46132,7 @@
   },
   {
    "id": "node/4930306461",
-   "buildingId": null,
+   "buildingId": "way/43060663",
    "lat": 52.5266812,
    "lon": 13.3850891,
    "name": null,
@@ -45737,14 +46143,15 @@
    "confidence": "surveyed",
    "door": null,
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 350.1,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "north"
   },
   {
    "id": "node/4930306462",
-   "buildingId": null,
+   "buildingId": "way/43060663",
    "lat": 52.5266369,
    "lon": 13.3846539,
    "name": null,
@@ -45755,14 +46162,15 @@
    "confidence": "surveyed",
    "door": null,
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 2.7,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "north"
   },
   {
    "id": "node/4930306463",
-   "buildingId": null,
+   "buildingId": "way/43060663",
    "lat": 52.5267274,
    "lon": 13.3842175,
    "name": null,
@@ -45773,14 +46181,15 @@
    "confidence": "surveyed",
    "door": null,
    "automatic": true,
-   "approachBearing": null,
+   "approachBearing": 22.1,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "north"
   },
   {
    "id": "node/4938899528",
-   "buildingId": null,
+   "buildingId": "way/23853422",
    "lat": 52.5167868,
    "lon": 13.4191999,
    "name": null,
@@ -45791,10 +46200,11 @@
    "confidence": "surveyed",
    "door": "hinged",
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 295.8,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "north-west"
   },
   {
    "id": "node/4945751528",
@@ -46140,7 +46550,7 @@
   },
   {
    "id": "node/5146644825",
-   "buildingId": null,
+   "buildingId": "way/22989670",
    "lat": 52.5076586,
    "lon": 13.3744775,
    "name": null,
@@ -46151,14 +46561,15 @@
    "confidence": "surveyed",
    "door": "sliding",
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 288.7,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "west"
   },
   {
    "id": "node/5146644826",
-   "buildingId": null,
+   "buildingId": "way/22989670",
    "lat": 52.5077435,
    "lon": 13.3740701,
    "name": null,
@@ -46169,10 +46580,11 @@
    "confidence": "surveyed",
    "door": "sliding",
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 108.3,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "east"
   },
   {
    "id": "node/515104350",
@@ -46286,7 +46698,7 @@
   },
   {
    "id": "node/5167154483",
-   "buildingId": null,
+   "buildingId": "way/112149798",
    "lat": 52.5058978,
    "lon": 13.3907812,
    "name": "Berufsinformationszentrum",
@@ -46297,10 +46709,11 @@
    "confidence": "surveyed",
    "door": null,
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 84.4,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "east"
   },
   {
    "id": "node/5167154484",
@@ -48571,7 +48984,7 @@
   },
   {
    "id": "node/5533888841",
-   "buildingId": null,
+   "buildingId": "way/577202752",
    "lat": 52.5261995,
    "lon": 13.380252,
    "name": null,
@@ -48582,14 +48995,15 @@
    "confidence": "surveyed",
    "door": "yes",
    "automatic": true,
-   "approachBearing": null,
+   "approachBearing": 175.9,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "south"
   },
   {
    "id": "node/5533888845",
-   "buildingId": null,
+   "buildingId": "way/577202752",
    "lat": 52.5261777,
    "lon": 13.380343,
    "name": null,
@@ -48600,14 +49014,15 @@
    "confidence": "surveyed",
    "door": "hinged",
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 174.0,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "south"
   },
   {
    "id": "node/5534321659",
-   "buildingId": null,
+   "buildingId": "way/43025562",
    "lat": 52.5256221,
    "lon": 13.3797948,
    "name": null,
@@ -48618,10 +49033,11 @@
    "confidence": "surveyed",
    "door": "hinged",
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 263.0,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "west"
   },
   {
    "id": "node/5534476057",
@@ -48843,7 +49259,7 @@
   },
   {
    "id": "node/5541023448",
-   "buildingId": null,
+   "buildingId": "way/374825415",
    "lat": 52.5265831,
    "lon": 13.3748898,
    "name": null,
@@ -48854,10 +49270,11 @@
    "confidence": "surveyed",
    "door": "hinged",
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 55.1,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "north-east"
   },
   {
    "id": "node/5541023480",
@@ -49025,7 +49442,7 @@
   },
   {
    "id": "node/5576632446",
-   "buildingId": null,
+   "buildingId": "way/54672669",
    "lat": 52.5262192,
    "lon": 13.3810349,
    "name": null,
@@ -49036,14 +49453,15 @@
    "confidence": "surveyed",
    "door": "hinged",
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 85.2,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "east"
   },
   {
    "id": "node/5576632449",
-   "buildingId": null,
+   "buildingId": "way/124257901",
    "lat": 52.5263008,
    "lon": 13.3828025,
    "name": null,
@@ -49054,10 +49472,11 @@
    "confidence": "surveyed",
    "door": "hinged",
    "automatic": true,
-   "approachBearing": null,
+   "approachBearing": 77.6,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "east"
   },
   {
    "id": "node/5576632453",
@@ -51401,7 +51820,7 @@
   },
   {
    "id": "node/6753987908",
-   "buildingId": null,
+   "buildingId": "way/398722557",
    "lat": 52.5294474,
    "lon": 13.4133499,
    "name": "KUGU Home GmbH",
@@ -51412,10 +51831,11 @@
    "confidence": "surveyed",
    "door": null,
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 124.9,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "south-east"
   },
   {
    "id": "node/676083758",
@@ -51851,7 +52271,7 @@
   },
   {
    "id": "node/6906860073",
-   "buildingId": null,
+   "buildingId": "way/51166236",
    "lat": 52.5299176,
    "lon": 13.401692,
    "name": null,
@@ -51862,10 +52282,11 @@
    "confidence": "surveyed",
    "door": null,
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 55.4,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "north-east"
   },
   {
    "id": "node/6911901708",
@@ -51941,7 +52362,7 @@
   },
   {
    "id": "node/6938121640",
-   "buildingId": null,
+   "buildingId": "way/291725891",
    "lat": 52.5280139,
    "lon": 13.3927413,
    "name": null,
@@ -51952,10 +52373,11 @@
    "confidence": "surveyed",
    "door": null,
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 74.2,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "east"
   },
   {
    "id": "node/6939878355",
@@ -51995,7 +52417,7 @@
   },
   {
    "id": "node/6943600944",
-   "buildingId": null,
+   "buildingId": "way/97590647",
    "lat": 52.5264157,
    "lon": 13.3874108,
    "name": null,
@@ -52006,10 +52428,11 @@
    "confidence": "surveyed",
    "door": "hinged",
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 43.4,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "north-east"
   },
   {
    "id": "node/6952617652",
@@ -52067,7 +52490,7 @@
   },
   {
    "id": "node/6982904500",
-   "buildingId": null,
+   "buildingId": "way/1157288903",
    "lat": 52.5168175,
    "lon": 13.4179209,
    "name": null,
@@ -52078,10 +52501,11 @@
    "confidence": "surveyed",
    "door": "sliding",
    "automatic": false,
-   "approachBearing": null,
+   "approachBearing": 267.4,
    "description": null,
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "facing": "west"
   },
   {
    "id": "node/7062810730",

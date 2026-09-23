@@ -48,7 +48,7 @@ file or in `pipeline/fixtures/`, it does not go on a slide.
 
 | t | beat | content |
 |---|---|---|
-| 0:00–0:25 | **The problem, through one person** | Erden, partially blind. He can follow Live View to the pin. Then he's standing outside a building with no idea which of its doors he can use. Not an edge case — his week. |
+| 0:00–0:25 | **The problem, through one person** | Erdin, partially blind. He can follow Live View to the pin. Then he's standing outside a building with no idea which of its doors he can use. Not an edge case — his week. |
 | 0:25–1:00 | **The gap, with numbers** | Hauptbahnhof. 109 doors. Eight work, eleven don't, 90 unknown. Maps shows one pin. Land the 9-metre pair here. |
 | 1:00–2:15 | **Doorway** | Live demo or film. Open, pick the entrance, Live View, arrow, beacon rising, arrival. Show the revolving-door warning — that's the moment judges realise this isn't a boolean. |
 | 2:15–2:40 | **The agent** | Tier 3: Gemini reads reviews disabled people already wrote and reads them back, quoted and attributed. The knowledge existed. Nobody indexed it. |
@@ -62,10 +62,10 @@ an arrow. Do not let the AR visuals crowd it out.
 
 ## Shot list — tonight, 20:00–21:00. Everything else can slip; this cannot.
 
-Two cameras: **A** on Erden and the environment, **B** on the phone screen.
+Two cameras: **A** on Erdin and the environment, **B** on the phone screen.
 Clap once at the start of each take to sync.
 
-1. **Cold open.** Erden outside the building, phone down, looking for the entrance. No app. 15s.
+1. **Cold open.** Erdin outside the building, phone down, looking for the entrance. No app. 15s.
 2. **The wrong door.** Walks to the obvious main entrance. Steps. He stops. 10s.
 3. **Open Doorway.** Screen: entrance markers, accessible one distinct. 10s.
 4. **Live View.** Arrow acquires. Over-the-shoulder, screen and street both legible. 20s.
@@ -73,14 +73,14 @@ Clap once at the start of each take to sync.
    half the product and phone-speaker capture will not survive a PA system.
 6. **Arrival.** Glyph pulses, one long haptic, he reaches the step-free door. 15s.
 7. **The revolving-door line.** App warns him. 10s. Cut this in even if short.
-8. **Erden to camera, unscripted.** "What is this like for you normally?" 30s.
+8. **Erdin to camera, unscripted.** "What is this like for you normally?" 30s.
    His own words will outperform anything written for him.
 9. **The survey.** Team tagging a door, pushing to OSM. Screen capture of the edit. 20s.
 
-**Consent and privacy:** Erden agrees on camera to the footage being shown publicly.
+**Consent and privacy:** Erdin agrees on camera to the footage being shown publicly.
 Blur bystander faces. Keep keyframes only.
 
-**Erden is the demo.** He is not a testimonial after the product — he is the thread
+**Erdin is the demo.** He is not a testimonial after the product — he is the thread
 through it. If a shot has to go, cut a UI shot, never one of him.
 
 ---
@@ -99,5 +99,5 @@ A deck about inclusion that is itself inaccessible will be noticed. Assume it wi
 - [ ] 3-minute script, timed out loud, twice
 - [ ] Backup video exported 1080p with burned-in captions — plays with no network
 - [ ] Every number traced to `pipeline/fixtures/` or this file
-- [ ] Erden's consent recorded
+- [ ] Erdin's consent recorded
 - [ ] Rehearsed twice on site before 10:00

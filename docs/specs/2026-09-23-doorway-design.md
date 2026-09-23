@@ -30,7 +30,7 @@ Designed on two independent axes rather than four disability categories.
 
 | Person | Step-free | Channels |
 |---|---|---|
-| Erden — partially blind, primary demo user | no | large visuals + speech |
+| Erdin — partially blind, primary demo user | no | large visuals + speech |
 | Blind | no | speech + haptic |
 | Deaf | no | visual + haptic |
 | Wheelchair | **yes** | visual |
@@ -144,5 +144,5 @@ is developed indoors rather than by walking to Hauptbahnhof for every change.
 ## Open
 
 1. Google Cloud project + keys in `.env`, never committed.
-2. Erden's colour preference for the glyph — ask him directly.
+2. Erdin's colour preference for the glyph — ask him directly.
 3. Whether tonight's shoot moves to Hauptbahnhof or stays at CODE with a live survey.

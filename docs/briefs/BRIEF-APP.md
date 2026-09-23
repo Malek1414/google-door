@@ -9,7 +9,7 @@ A web app that walks a partially-blind user to the **correct accessible entrance
 of a building, using the camera, GPS and compass. Distributed by QR code.
 Opens in Safari. No install, no account, no app store.
 
-Primary user: **Erden**, partially blind, walking to a door he can't pick out.
+Primary user: **Erdin**, partially blind, walking to a door he can't pick out.
 
 ## Non-goals — do not build these
 

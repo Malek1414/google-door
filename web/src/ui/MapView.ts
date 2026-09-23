@@ -21,6 +21,7 @@ import { businessPanel } from './Business'
 import { contributePanel } from './Contribute'
 import { forYouPanel, rememberRecent } from './ForYou'
 import { renderPlaceCard, renderPlaceList } from './PlaceCard'
+import { fetchPlaceById } from '../places'
 import { modeSwitch } from './ModeSwitch'
 import { loadMode, saveMode, showDoorMarkers, type Mode } from '../core/mode'
 import { loadSurvey, mergeSurvey } from '../core/survey'
@@ -752,6 +753,19 @@ export function MapView(opts: {
     renderSheet()
     setSheet('half')
   }
+  /** Tapping a Google POI gives only an id, so fetch the details then open the card. */
+  async function openPlaceById(placeId: string) {
+    status.textContent = t.loading ?? 'Lädt …'
+    try {
+      const hit = await fetchPlaceById(placeId)
+      status.textContent = ''
+      if (hit) openPlace(hit)
+    } catch (err) {
+      status.textContent = ''
+      console.warn('[doorway] place lookup failed', err)
+    }
+  }
+
   function openPlace(p: PlaceHit) {
     selected = null
     panelCleanup?.()
@@ -989,7 +1003,11 @@ export function MapView(opts: {
         map = new google.maps.Map(mapEl, {
           center: { lat: c.lat, lng: c.lon },
           zoom: 17,
-          clickableIcons: false,
+          // Google's own POI labels stay tappable: in Maps, tapping a restaurant or a
+          // station opens its card, and switching that off made every venue on the map
+          // dead to the touch. We intercept the tap and show OUR card instead of the
+          // default InfoWindow, so accessibility data leads.
+          clickableIcons: true,
           gestureHandling: 'greedy',
           disableDefaultUI: true,
           keyboardShortcuts: true,
@@ -1000,8 +1018,15 @@ export function MapView(opts: {
           void findEntrance(opts.openDoor).then((e) => {
             if (e) map?.setCenter({ lat: e.lat, lng: e.lon })
           })
-        map.addListener('click', () => {
+        map.addListener('click', (ev: google.maps.MapMouseEvent | google.maps.IconMouseEvent) => {
           results.hidden = true
+          const placeId = (ev as google.maps.IconMouseEvent).placeId
+          if (placeId) {
+            // A Google POI was tapped. Suppress the default InfoWindow and show our card.
+            ev.stop?.()
+            void openPlaceById(placeId)
+            return
+          }
           // A panel (editor, business) may use map taps itself: do not collapse it then.
           if (panelCleanup) return
           if (sheet.dataset.state !== 'peek') setSheet('peek')

@@ -196,3 +196,20 @@ export async function searchText(map: google.maps.Map, query: string): Promise<P
     throw new PlacesUnavailable(err)
   }
 }
+
+
+/** One place by id. This is what a tap on a Google POI label yields — the map click
+ *  event carries only a placeId, so the details have to be fetched before the card
+ *  can be shown. Same field set as search, so the card renders identically. */
+export async function fetchPlaceById(placeId: string): Promise<PlaceHit | null> {
+  const { Place } = (await google.maps.importLibrary('places')) as google.maps.PlacesLibrary
+  const place = new Place({ id: placeId })
+  await place.fetchFields({
+    fields: [
+      'id', 'displayName', 'location', 'rating', 'userRatingCount',
+      'primaryTypeDisplayName', 'formattedAddress', 'regularOpeningHours',
+      'photos', 'accessibilityOptions',
+    ],
+  })
+  return toHit(place)
+}

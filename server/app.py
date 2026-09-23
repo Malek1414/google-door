@@ -29,6 +29,11 @@ GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 #           3.8-flash is the strongest current instruction-follower in the Flash tier.
 MODEL_LOOK  = os.environ.get("GEMINI_MODEL_LOOK",  "gemini-3.6-flash")
 MODEL_LIVED = os.environ.get("GEMINI_MODEL_LIVED", "gemini-3.8-flash")
+#   speak : dynamic text -> spoken audio. Predictable lines are pre-synthesised at
+#           build time (pipeline/synth_speech.py) and played from disk; this endpoint
+#           is only for text that could not be known in advance.
+MODEL_TTS   = os.environ.get("GEMINI_MODEL_TTS",   "gemini-3.1-flash-tts-preview")
+TTS_VOICE   = os.environ.get("GEMINI_TTS_VOICE",   "Kore")
 
 app = FastAPI(title="Doorway")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -47,7 +52,8 @@ def health():
     d = data()
     return {"ok": True, "counts": d["meta"]["counts"],
             "gemini": bool(GEMINI_KEY), "maps": bool(MAPS_KEY),
-            "models": {"look": MODEL_LOOK, "lived": MODEL_LIVED}}
+            "models": {"look": MODEL_LOOK, "lived": MODEL_LIVED,
+                       "tts": MODEL_TTS, "voice": TTS_VOICE}}
 
 
 @app.get("/api/entrances")
@@ -85,7 +91,8 @@ async def look(req: LookReq):
         {"inline_data": {"mime_type": "image/jpeg", "data": req.frame}}]}],
         "generationConfig": {"temperature": 0.0, "maxOutputTokens": 60}}
     async with httpx.AsyncClient(timeout=20) as c:
-        r = await c.post(f"{GEMINI_URL}/{MODEL_LOOK}:generateContent?key={GEMINI_KEY}", json=body)
+        r = await c.post(f"{GEMINI_URL}/{MODEL_LOOK}:generateContent",
+                         json=body, headers={"x-goog-api-key": GEMINI_KEY})
     if r.status_code != 200:
         raise HTTPException(502, f"gemini {r.status_code}")
     try:
@@ -134,7 +141,8 @@ async def lived(place_id: str):
     body = {"contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {"temperature": 0.0, "responseMimeType": "application/json"}}
     async with httpx.AsyncClient(timeout=25) as c:
-        gr = await c.post(f"{GEMINI_URL}/{MODEL_LIVED}:generateContent?key={GEMINI_KEY}", json=body)
+        gr = await c.post(f"{GEMINI_URL}/{MODEL_LIVED}:generateContent",
+                          json=body, headers={"x-goog-api-key": GEMINI_KEY})
     if gr.status_code != 200:
         return {"placeId": place_id, "claims": []}
     try:
@@ -158,3 +166,49 @@ async def lived(place_id: str):
                     "topic": cl.get("topic", "step-free-route"),
                     "coords": None})          # tier 3 never carries coordinates
     return {"placeId": place_id, "claims": out}
+
+
+class SpeakReq(BaseModel):
+    text: str
+    lang: str = "de"
+
+
+@app.post("/api/speak")
+async def speak(req: SpeakReq):
+    """Runtime TTS for text that could not be pre-synthesised.
+
+    Everything predictable lives in data/audio/ as WAV and is played from disk with
+    no network. This endpoint exists for the opt-in /api/look reply only. If it fails,
+    the client MUST fall back to browser speechSynthesis — a blind user is never left
+    in silence because a request timed out.
+    """
+    if not GEMINI_KEY:
+        raise HTTPException(503, "GEMINI_API_KEY not configured")
+    if len(req.text) > 400:
+        raise HTTPException(413, "text too long for the walking loop")
+
+    body = {"contents": [{"parts": [{"text": req.text}]}],
+            "generationConfig": {
+                "responseModalities": ["AUDIO"],
+                "speechConfig": {
+                    "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": TTS_VOICE}}}}}
+    async with httpx.AsyncClient(timeout=20) as c:
+        r = await c.post(f"{GEMINI_URL}/{MODEL_TTS}:generateContent",
+                         json=body, headers={"x-goog-api-key": GEMINI_KEY})
+    if r.status_code != 200:
+        raise HTTPException(502, f"tts {r.status_code}")
+    try:
+        b64 = r.json()["candidates"][0]["content"]["parts"][0]["inlineData"]["data"]
+    except (KeyError, IndexError):
+        raise HTTPException(502, "unexpected TTS response shape")
+
+    # Gemini returns raw PCM; a browser needs a RIFF header.
+    import base64 as _b64, struct as _st
+    pcm = _b64.b64decode(b64)
+    rate, ch, width = 24000, 1, 2
+    hdr = (b"RIFF" + _st.pack("<I", 36 + len(pcm)) + b"WAVEfmt " +
+           _st.pack("<IHHIIHH", 16, 1, ch, rate, rate*ch*width, ch*width, width*8) +
+           b"data" + _st.pack("<I", len(pcm)))
+    from fastapi import Response
+    return Response(content=hdr + pcm, media_type="audio/wav",
+                    headers={"Cache-Control": "public, max-age=86400"})

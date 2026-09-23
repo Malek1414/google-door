@@ -1,0 +1,91 @@
+{
+ "lang": "en",
+ "voice": "Kore",
+ "model": "gemini-3.1-flash-tts-preview",
+ "clips": {
+  "turn_left": {
+   "file": "audio/en/turn_left.wav",
+   "text": "Left."
+  },
+  "turn_right": {
+   "file": "audio/en/turn_right.wav",
+   "text": "Right."
+  },
+  "straight": {
+   "file": "audio/en/straight.wav",
+   "text": "Straight ahead."
+  },
+  "arrived": {
+   "file": "audio/en/arrived.wav",
+   "text": "You have reached the entrance."
+  },
+  "off_route": {
+   "file": "audio/en/off_route.wav",
+   "text": "Stop. The entrance is behind you."
+  },
+  "confirmed": {
+   "file": "audio/en/confirmed.wav",
+   "text": "Step-free entrance confirmed."
+  },
+  "reported_only": {
+   "file": "audio/en/reported_only.wav",
+   "text": "This building reports step-free access, but I don't know which door."
+  },
+  "unknown": {
+   "file": "audio/en/unknown.wav",
+   "text": "I have no entrance data for this building."
+  },
+  "warn_revolving": {
+   "file": "audio/en/warn_revolving.wav",
+   "text": "Careful: revolving door."
+  },
+  "warn_steps": {
+   "file": "audio/en/warn_steps.wav",
+   "text": "Careful: steps."
+  },
+  "door_automatic": {
+   "file": "audio/en/door_automatic.wav",
+   "text": "The door opens automatically."
+  },
+  "low_accuracy": {
+   "file": "audio/en/low_accuracy.wav",
+   "text": "Roughly this way. The signal is imprecise."
+  },
+  "dist_5": {
+   "file": "audio/en/dist_5.wav",
+   "text": "5 metres."
+  },
+  "dist_10": {
+   "file": "audio/en/dist_10.wav",
+   "text": "10 metres."
+  },
+  "dist_15": {
+   "file": "audio/en/dist_15.wav",
+   "text": "15 metres."
+  },
+  "dist_20": {
+   "file": "audio/en/dist_20.wav",
+   "text": "20 metres."
+  },
+  "dist_30": {
+   "file": "audio/en/dist_30.wav",
+   "text": "30 metres."
+  },
+  "dist_40": {
+   "file": "audio/en/dist_40.wav",
+   "text": "40 metres."
+  },
+  "dist_50": {
+   "file": "audio/en/dist_50.wav",
+   "text": "50 metres."
+  },
+  "dist_75": {
+   "file": "audio/en/dist_75.wav",
+   "text": "75 metres."
+  },
+  "dist_100": {
+   "file": "audio/en/dist_100.wav",
+   "text": "100 metres."
+  }
+ }
+}

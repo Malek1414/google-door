@@ -192,3 +192,28 @@ Override without a code change:
 
 `gemini-3.8-flash` is also the default for the Antigravity SDK, which may settle the
 open question about what the Antigravity accounts are for.
+
+
+---
+
+## Audio contract
+
+Pre-synthesised guidance lives in `data/audio/<lang>/<key>.wav`, indexed by
+`data/audio/manifest.<lang>.json`:
+
+```json
+{ "lang": "de", "voice": "Kore", "model": "gemini-3.1-flash-tts-preview",
+  "clips": { "turn_left": { "file": "audio/de/turn_left.wav", "text": "Links." } } }
+```
+
+Stable keys the app may rely on:
+
+`turn_left` · `turn_right` · `straight` · `arrived` · `off_route` · `confirmed` ·
+`reported_only` · `unknown` · `warn_revolving` · `warn_steps` · `door_automatic` ·
+`low_accuracy` · `dist_{5,10,15,20,30,40,50,75,100}` · `ent_node_<osmid>`
+
+WAV, 24 kHz mono 16-bit. Regenerate with `pipeline/synth_speech.py --lang de`
+(resumable — existing files are skipped).
+
+**Playback order is cached WAV → `/api/speak` → `speechSynthesis`.** Runtime TTS is
+for unpredictable text only; it must never sit in the walking loop.

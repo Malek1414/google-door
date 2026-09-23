@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleDevelopmentRegion</key><string>de</string>
+  <key>CFBundleDisplayName</key><string>Doorway</string>
+  <key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>
+  <key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+  <key>CFBundleName</key><string>$(PRODUCT_NAME)</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>1.0</string>
+  <key>CFBundleVersion</key><string>1</string>
+  <key>LSRequiresIPhoneOS</key><true/>
+  <key>UILaunchScreen</key><dict><key>UIColorName</key><string></string></dict>
+  <key>UISupportedInterfaceOrientations</key>
+  <array><string>UIInterfaceOrientationPortrait</string></array>
+  <key>UIStatusBarStyle</key><string>UIStatusBarStyleLightContent</string>
+  <key>UIViewControllerBasedStatusBarAppearance</key><false/>
+  <!-- Doorway needs all three at once; the web app asks for them on the Start tap. -->
+  <key>NSCameraUsageDescription</key>
+  <string>Doorway zeigt den Weg zum stufenlosen Eingang in der Kameraansicht.</string>
+  <key>NSLocationWhenInUseUsageDescription</key>
+  <string>Doorway braucht deinen Standort, um dich zum richtigen Eingang zu führen.</string>
+  <key>NSMotionUsageDescription</key>
+  <string>Doorway nutzt den Kompass, um den Pfeil in die richtige Richtung zu drehen.</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Nur für Sprachsuche.</string>
+  <!-- The dev server is plain HTTP on the LAN. -->
+  <key>NSAppTransportSecurity</key>
+  <dict><key>NSAllowsArbitraryLoads</key><true/></dict>
+</dict></plist>

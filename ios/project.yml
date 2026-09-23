@@ -1,0 +1,21 @@
+name: Doorway
+options:
+  bundleIdPrefix: com.malek
+  deploymentTarget: { iOS: "17.0" }
+  createIntermediateGroups: true
+targets:
+  Doorway:
+    type: application
+    platform: iOS
+    sources: [Doorway/Sources, Doorway/Resources]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.malek.doorway
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        INFOPLIST_FILE: Doorway/Resources/Info.plist
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: "UUMBRL7788"
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: NO

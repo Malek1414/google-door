@@ -9,3 +9,5 @@ dist/
 # runtime browser config (Maps key), never committed; see web/config.example.js
 web/config.js
 web/drag.png
+ios/Doorway.xcodeproj/
+ios/build/

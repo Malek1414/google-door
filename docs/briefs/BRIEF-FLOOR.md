@@ -13,8 +13,12 @@ never let it upgrade safety on its own.
    **Unternehmen → Weg filmen** (already exists as the walk recorder; add video capture there,
    or upload an existing clip).
 2. The app uploads the clip to the backend proxy. **Keys stay on the server.**
-3. The backend sends the video to Gemini (video understanding) and gets back a structured list of
-   **surface segments** along the way.
+3. The backend sends the video **with its audio** to Gemini (video understanding) and gets back a
+   structured list of **surface segments** along the way. The owner can **talk while filming**
+   ("hier ist eine Schwelle, etwa zwei Zentimeter", "die Tür hat eine Klinke, keinen Knauf",
+   "Türbreite 90 Zentimeter"). Gemini uses what is said to ground what it sees: spoken facts go
+   into the segment `note` and the door fields, marked `source: "spoken"`, and win over pure
+   image guesses when they disagree.
 4. The owner sees the result on a review screen and confirms or corrects each segment.
 5. Confirmed segments are stored with the entrance and shown to users on the door card
    ("Boden" row) and as warnings, and spoken in the live guidance before the user reaches them.
@@ -40,6 +44,13 @@ never let it upgrade safety on its own.
 
 Derived warnings (added to the entrance `warnings` array only when **confirmed** by the owner):
 `uneven-surface`, `cobblestones`, `gravel`, `steep-slope`, `threshold`, `slippery`.
+
+## Answering without a video
+
+Not every owner wants to film. Everything the video would find can also be answered by hand in
+**Unternehmen → Barrierefreiheit** (built: 9 questions with Ja / Nein / Weiß nicht, entrances with
+door type, width, threshold, handle). The video only pre-fills and adds the floor; it is never
+required.
 
 ## Safety rules (same spirit as the tier ladder)
 

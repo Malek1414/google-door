@@ -17,6 +17,8 @@ export interface BusinessHomeActions {
   onPreview(): void
   onNewBusiness(): void
   onSwitch(id: string): void
+  /** Opens "Gesammelte Daten". The info button is only shown when set. */
+  onData?(): void
 }
 
 export interface BusinessHomeOptions {
@@ -30,6 +32,7 @@ const S = {
   de: {
     title: 'Mein Unternehmen',
     bell: (n: number) => (n ? `Mitteilungen, ${n} offene Aufgaben` : 'Mitteilungen, keine offenen Aufgaben'),
+    info: 'Gesammelte Daten',
     bellHead: 'Offene Aufgaben',
     bellEmpty: 'Alles erledigt. Keine offenen Aufgaben.',
     switcher: (name: string) => `${name}, Unternehmen wechseln oder bearbeiten`,
@@ -53,6 +56,7 @@ const S = {
   en: {
     title: 'My business',
     bell: (n: number) => (n ? `Notifications, ${n} open tasks` : 'Notifications, no open tasks'),
+    info: 'Collected data',
     bellHead: 'Open tasks',
     bellEmpty: 'All done. No open tasks.',
     switcher: (name: string) => `${name}, switch or edit business`,
@@ -141,8 +145,12 @@ export function businessHomeHeader(_ctx: FeatureCtx, business: BusinessProfile, 
       : h('p', { class: 'bzh-pop-empty' }, L.bellEmpty),
   )
   popover(bellBtn, bellPanel)
-  const top = h('header', { class: 'bzh-top' },
+  const infoBtn = actions.onData
+    ? h('button', { class: 'bzh-info', type: 'button', 'aria-label': L.info, onclick: actions.onData }, icon('info'))
+    : null
+  const top = h('header', { class: `bzh-top${infoBtn ? ' bzh-top-info' : ''}` },
     h('h2', { id: 'sheet-title', class: 'bzh-title', tabindex: '-1' }, L.title),
+    infoBtn,
     bellBtn,
     bellPanel,
   )

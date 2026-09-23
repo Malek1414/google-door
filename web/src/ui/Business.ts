@@ -22,6 +22,7 @@ import { openEntranceEditor } from './EntranceEditor'
 import { openBusinessEdit } from './BusinessEdit'
 import { keepOneMain, openEntrancesManager } from './BusinessEntrances'
 import { businessHomeHeader } from './BusinessHome'
+import { openBusinessData } from './BusinessData'
 
 const S = {
   de: {
@@ -484,6 +485,7 @@ export const businessPanel: Panel = (el, ctx) => {
         onEdit: () => sub(() => openBusinessEdit(el, ctx, b.id, back)),
         onEntrances: () => sub(() => openEntrancesManager(el, ctx, b.id, back)),
         onRecord: () => ctx.openRecorder(),
+        onData: () => sub(() => openBusinessData(el, ctx, b.id, back)),
         onPhotos: () => sub(() => openBusinessEdit(el, ctx, b.id, back)),
         onPreview: () => {
           const list = linkedEntrances(b, loadSurvey())

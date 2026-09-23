@@ -10,6 +10,8 @@ import { lang, t } from '../strings'
 import { h, mount, s } from './dom'
 import { arrowShape, applyContrast } from './LiveView'
 import './onboard.css'
+import { loadMode, saveMode } from '../core/mode'
+import { modeSheetRow } from './ModeSwitch'
 
 const S =
   lang === 'de'
@@ -137,6 +139,9 @@ export function Onboard(opts: { initial?: Profile | null; onDone: (p: Profile) =
           switchRow('visual', 'zoom_in', t.chVisual),
           switchRow('haptic', 'vibration', S.vibration, canVibrate() ? null : t.noVibration),
         ),
+        // Accessibility mode for the map (door markers, entrance cards). Off = plain Google Maps.
+        h('h2', { class: 'ob-sub' }, lang === 'de' ? 'Karte' : 'Map'),
+        modeSheetRow(loadMode(), (m) => saveMode(m)),
         testRow,
         h('div', { class: 'ob-actions' }, h('button', { class: 'ob-primary', type: 'button', onclick: done }, t.done)),
       ),

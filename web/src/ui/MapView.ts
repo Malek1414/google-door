@@ -22,8 +22,7 @@ import { businessPanel } from './Business'
 import { contributePanel } from './Contribute'
 import { forYouPanel, rememberRecent } from './ForYou'
 import { renderPlaceCard, renderPlaceList } from './PlaceCard'
-import { modeSwitch } from './ModeSwitch'
-import { loadMode, saveMode, showDoorMarkers, type Mode } from '../core/mode'
+import { loadMode, showDoorMarkers, type Mode } from '../core/mode'
 import { loadSurvey, mergeSurvey } from '../core/survey'
 import { NORMAL_CHIPS, PlacesUnavailable, fetchPlaceHit, searchCategory, searchText, type PlaceHit } from '../places'
 import { lang } from '../strings'
@@ -195,44 +194,16 @@ export function MapView(opts: {
   const clearSearchBtn = h('button', { class: 'gm-search-btn', type: 'button', 'aria-label': lang === 'de' ? 'Suche schließen' : 'Close search', hidden: true }, icon('close'))
   const search = h('div', { class: 'gm-search' }, pinLogo(), searchInput, clearSearchBtn, micBtn, lensBtn, avatar)
 
-  const chipDefs: [Filter, string, string][] = [
-    ['stepFree', 'accessible', t.chipStepFree],
-    ['withSteps', 'stairs', t.chipWithSteps],
-    ['automatic', 'door_sliding', t.chipAutomatic],
-    ['noRevolving', 'block', t.chipNoRevolving],
-  ]
-  const accessChips = chipDefs.map(([key, ic, label]) => {
-      const b = h('button', { class: 'gm-chip', type: 'button', 'aria-pressed': String(filters.has(key)) }, icon(ic), label)
-      b.addEventListener('click', () => {
-        if (filters.has(key)) filters.delete(key)
-        else filters.add(key)
-        b.setAttribute('aria-pressed', String(filters.has(key)))
-        renderMarkers()
-        renderSheet()
-      })
-      return b
-    })
   const placeChips = NORMAL_CHIPS.map((c) => {
     const b = h('button', { class: 'gm-chip', type: 'button', 'aria-pressed': 'false', 'data-chip': c.id }, icon(c.icon), lang === 'de' ? c.labelDe : c.labelEn)
     b.addEventListener('click', () => void runCategory(c.id, lang === 'de' ? c.labelDe : c.labelEn))
     return b
   })
-  const modeChip = modeSwitch(mode, (m) => {
-    mode = m
-    saveMode(m)
-    clearPlaces()
-    selected = null
-    placeShown = null
-    routeLine?.setMap(null)
-    routeLine = null
-    renderChips()
-    renderMarkers()
-    renderSheet()
-    announce(m === 'access' ? t.modeOn : t.modeOff)
-  })
   const chips = h('div', { class: 'gm-chips', role: 'group', 'aria-label': t.filterLabel })
   function renderChips() {
-    chips.replaceChildren(modeChip, ...(mode === 'access' ? accessChips : placeChips))
+    // Only search categories up top, like Google. The accessibility filters live in the result
+    // list ("Rollstuhlgerechter Eingang") and the accessibility mode in the settings.
+    chips.replaceChildren(...placeChips)
     placeChips.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.chip === activePlaceChip)))
   }
   renderChips()
@@ -527,7 +498,11 @@ export function MapView(opts: {
     if (tab === 'contribute') return mountPanel(contributePanel)
     if (tab === 'business') return mountPanel(businessPanel)
     if (placeHits.length) {
-      panelCleanup = renderPlaceList(sheetBody, featureCtx, placeHits, placeTitle, (p) => openPlace(p))
+      panelCleanup = renderPlaceList(sheetBody, featureCtx, placeHits, placeTitle, (p) => openPlace(p), (visibleHits) => {
+        // Keep the map pins in step with the list filters.
+        const keep = new Set(visibleHits.map((x) => x.placeId))
+        placeMarkers.forEach((m, i) => m.setVisible(keep.has(placeHits[i]?.placeId ?? '')))
+      })
       return
     }
     if (!showDoorMarkers(mode)) {

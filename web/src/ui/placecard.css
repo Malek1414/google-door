@@ -58,3 +58,7 @@
 .pc-meta-bit { white-space: nowrap; }
 /* headings get focus programmatically (tabindex -1) for screen readers; no ring on a non-control */
 .pc-card h2[tabindex='-1']:focus, .pc-list h2[tabindex='-1']:focus { outline: none; }
+
+/* Filter chips above a result list (Google style). */
+.pc-filters { margin: 8px -22px 4px 0; }
+.pc-list .gm-sheet-sub { margin: 4px 0 0; }

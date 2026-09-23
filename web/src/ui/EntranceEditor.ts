@@ -231,7 +231,7 @@ export function openEntranceEditor(ctx: FeatureCtx, el: HTMLElement, opts: Entra
       ['hinged', L.doorHinged],
       ['sliding', L.doorSliding],
       ['revolving', L.doorRevolving],
-    ] as const).map(([v, label]) => h('option', { value: v, selected: (init.door ?? 'hinged') === v }, label)),
+    ] as const).map(([v, label]) => h('option', { value: v, selected: (init.door ?? 'yes') === v }, label)),
   ) as HTMLSelectElement
   const automatic = check(L.automatic, init.automatic)
   const bell = check(L.bell, initAny.bell as boolean | undefined)
@@ -309,7 +309,7 @@ export function openEntranceEditor(ctx: FeatureCtx, el: HTMLElement, opts: Entra
     const note = noteIn.value.trim()
     const entrance = {
       ...init,
-      id: init.id ?? `survey-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      id: init.id ?? `survey/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
       buildingId: init.buildingId ?? null,
       lat: pos.lat,
       lon: pos.lon,

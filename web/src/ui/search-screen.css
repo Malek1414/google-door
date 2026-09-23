@@ -1,0 +1,58 @@
+/* Full-screen search view (Maps dark): sheet colour #151316, rows 56 high, chips 36 high.
+   Lives inside the .gm root, so the teal focus ring and Material Symbols come from style.css. */
+.ss { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; background: #151316; color: #e6e1e5; color-scheme: dark;
+  font: 400 16px/1.35 'Google Sans Flex', Roboto, -apple-system, BlinkMacSystemFont, sans-serif; -webkit-tap-highlight-color: transparent; }
+.ss button { font-family: inherit; }
+.ss :focus-visible { outline: 3px solid #62c4cb; outline-offset: 2px; }
+
+/* top bar: back arrow + input + clear, 56 high under the status bar */
+.ss-bar { flex: none; display: flex; align-items: center; gap: 4px; height: calc(56px + max(10px, env(safe-area-inset-top))); padding: max(10px, env(safe-area-inset-top)) 8px 0;
+  background: #151316; border-bottom: 1px solid #2e2c30; }
+.ss-icon-btn { width: 48px; height: 48px; flex: none; border: 0; border-radius: 50%; background: none; color: #e6e1e5; display: grid; place-items: center; cursor: pointer; }
+.ss-icon-btn .ms { font-size: 24px; }
+.ss-input { flex: 1; min-width: 0; height: 48px; border: 0; outline: 0; background: transparent; padding: 0 4px; font: 400 19px/1 'Google Sans Flex', Roboto, sans-serif; color: #e6e1e5; }
+.ss-input::placeholder { color: #c4c6cf; opacity: 1; }
+.ss-input::-webkit-search-cancel-button, .ss-input::-webkit-search-decoration { -webkit-appearance: none; }
+.ss-input:focus-visible { outline: none; }
+.ss-bar:focus-within { box-shadow: inset 0 -2px 0 #62c4cb; }
+
+.ss-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+
+/* category chips */
+.ss-chips { display: flex; gap: 8px; padding: 12px 16px 4px; overflow-x: auto; scrollbar-width: none; }
+.ss-chips::-webkit-scrollbar { display: none; }
+.ss-chip { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px 0 10px; border-radius: 18px; border: 0; flex: none;
+  background: #3b393c; color: #e6e1e5; font-size: 15px; font-weight: 500; white-space: nowrap; box-shadow: 0 1px 3px rgb(0 0 0 / 0.4); cursor: pointer; }
+.ss-chip .ms { font-size: 20px; }
+
+/* sections */
+.ss-section { margin-top: 14px; }
+.ss-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; padding: 0 16px; }
+.ss-h2 { margin: 0; font: 500 16px/1.3 'Google Sans Flex', Roboto, sans-serif; color: #c9c5ca; }
+.ss-text-btn { height: 40px; padding: 0 10px; border: 0; background: none; color: #62c4cb; font-size: 15px; font-weight: 500; cursor: pointer; border-radius: 20px; }
+
+/* rows: icon in a 40 circle, title, sub, optional trailing button */
+.ss-list { list-style: none; margin: 0; padding: 0; }
+.ss-row { display: flex; align-items: center; }
+.ss-row-btn { flex: 1; min-width: 0; display: flex; align-items: center; gap: 16px; min-height: 56px; padding: 8px 16px; border: 0; background: none; text-align: left; color: inherit; cursor: pointer; }
+.ss-row-ic { width: 40px; height: 40px; flex: none; border-radius: 50%; background: #2b2b2f; color: #c9c5ca; display: grid; place-items: center; }
+.ss-row-ic .ms { font-size: 22px; }
+.ss-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ss-row-title { font-size: 17px; font-weight: 400; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ss-row-sub { font-size: 14px; color: #c9c5ca; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ss-row-remove { margin-right: 4px; color: #c9c5ca; }
+.ss-row-btn:active, .ss-chip:active, .ss-icon-btn:active { background: rgb(255 255 255 / 0.08); }
+.ss-empty { padding: 12px 16px; color: #c9c5ca; font-size: 15px; }
+
+/* live suggestions replace the home content while typing */
+.ss-suggest { padding-top: 6px; }
+.ss-suggest [role='option']:last-child .ss-row { border-top: 1px solid #2e2c30; margin-top: 6px; padding-top: 6px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .ss { animation: ss-in 0.18s ease-out; }
+  @keyframes ss-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+}
+@media (forced-colors: active) {
+  .ss-bar { border-bottom: 1px solid CanvasText; }
+  .ss-row-ic, .ss-chip { border: 1px solid CanvasText; }
+}

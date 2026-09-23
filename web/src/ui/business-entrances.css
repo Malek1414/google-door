@@ -1,0 +1,29 @@
+/* Entrances manager in the "Unternehmen" tab. Reuses gm-* tokens (sheet, teal, tonal). */
+.bem { display: flex; flex-direction: column; padding-bottom: 24px; }
+.bem-top { display: flex; align-items: center; gap: 8px; min-height: 48px; }
+.bem-back { width: 44px; height: 44px; flex: none; }
+.bem-h { flex: 1; min-width: 0; margin: 0; font: 500 20px/1.3 'Google Sans Flex', Roboto, sans-serif; color: var(--fg); }
+.bem-count { font-size: 14px; color: var(--fg2); }
+.bem-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.bem-card { padding: 14px 16px; border-radius: 20px; background: var(--nav); }
+.bem-head { display: flex; gap: 14px; align-items: center; }
+.bem-thumb { width: 56px; height: 56px; flex: none; border-radius: 12px; object-fit: cover; background: var(--circle); }
+.bem-thumb-empty { display: grid; place-items: center; color: var(--fg2); }
+.bem-text { flex: 1; min-width: 0; }
+.bem-title { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  font: 500 17px/1.3 'Google Sans Flex', Roboto, sans-serif; color: var(--fg); overflow-wrap: anywhere; }
+.bem-main { padding: 2px 10px; border-radius: 10px; background: var(--tonal); color: var(--teal); font-size: 13px; font-weight: 500; }
+.bem-meta { margin: 4px 0 0; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 14px; color: var(--fg2); }
+.bem-verdict { font-weight: 500; }
+.bem-ok { color: var(--teal); }
+.bem-bad { color: #f2b8b5; }
+.bem-unk { color: var(--fg2); }
+.bem-actions, .bem-confirm { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.bem-actions .gm-pill, .bem-confirm .gm-pill { min-height: 44px; }
+.bem-confirm-text { flex-basis: 100%; margin: 0; font-size: 15px; color: var(--fg); }
+.bem-danger { background: #8c1d18; color: #fff; }
+.bem-add { width: 100%; justify-content: center; height: 48px; margin-top: 16px; }
+.bem-empty { margin-top: 12px; }
+.bem-status { min-height: 1.2em; margin: 10px 0 0; color: var(--teal); font-size: 15px; }
+.bem-status:empty { margin: 0; min-height: 0; }
+.bem button:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }

@@ -62,8 +62,11 @@ export function validLatLon(lat: unknown, lon: unknown): boolean {
 }
 
 /** Tier 1 only with valid coords AND an explicit verdict. Anything else is tier 0. */
-export function surveyTier(e: { lat: number; lon: number; stepFree: boolean | null }): Tier {
+export function surveyTier(e: { lat: number; lon: number; stepFree: boolean | null; by?: 'business' | 'community' }): Tier {
   if (!validLatLon(e.lat, e.lon)) return 0
+  // Safety: an anonymous community report is text until someone confirms it. Only the
+  // business owner, who answers for their own door, can make it guidable.
+  if (e.by === 'community') return 0
   return e.stepFree === true || e.stepFree === false ? 1 : 0
 }
 
@@ -155,12 +158,14 @@ export function mergeSurvey(entrances: Entrance[], survey: SurveyEntrance[]): En
       const target = out[bestIdx]
       out[bestIdx] = {
         ...target,
-        stepFree: s.stepFree,
-        tier: surveyTier({ lat: target.lat, lon: target.lon, stepFree: s.stepFree }),
+        // A survey 'yes' never overrides an OSM 'no': keep the stricter verdict.
+        stepFree: target.stepFree === false ? false : s.stepFree,
+        tier: surveyTier({ lat: target.lat, lon: target.lon, stepFree: target.stepFree === false ? false : s.stepFree }),
         confidence: 'surveyed',
         door: s.door ?? target.door,
         automatic: s.automatic,
-        warnings: [...s.warnings],
+        // Union, never drop an OSM warning such as a revolving door.
+        warnings: [...new Set([...(target.warnings ?? []), ...s.warnings])],
         description: s.description ?? target.description,
         source: 'survey',
       }
@@ -225,7 +230,14 @@ function writeJson(key: string, value: unknown): boolean {
 function isSurveyEntrance(x: unknown): x is SurveyEntrance {
   if (!x || typeof x !== 'object') return false
   const o = x as Record<string, unknown>
-  return typeof o.id === 'string' && o.id.startsWith('survey/') && typeof o.lat === 'number' && typeof o.lon === 'number'
+  return (
+    typeof o.id === 'string' &&
+    (o.id.startsWith('survey/') || o.id.startsWith('survey-')) &&
+    typeof o.lat === 'number' &&
+    typeof o.lon === 'number' &&
+    (o.name === null || o.name === undefined || typeof o.name === 'string') &&
+    (o.approachBearing === null || o.approachBearing === undefined || typeof o.approachBearing === 'number')
+  )
 }
 
 export function loadSurvey(): SurveyEntrance[] {

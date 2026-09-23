@@ -11,6 +11,12 @@ import { LiveView, realSensors, applyContrast } from './ui/LiveView'
 import { MapView } from './ui/MapView'
 import { Onboard } from './ui/Onboard'
 import { Start } from './ui/Start'
+// Pixel fixes measured against the Maps recording; loaded last so they win.
+import './ui/fix-search.css'
+import './ui/fix-sheet.css'
+import './ui/fix-card.css'
+import './ui/fix-buttons.css'
+import './ui/fix-live.css'
 
 // Fail-safe: an error in one feature must never leave a blank screen on stage.
 // Log it and show a short note; the current screen stays usable.

@@ -1,0 +1,41 @@
+/* Place card overrides, measured against rec/full_place.png (443x960, 1 px = 1 CSS px).
+   PlaceCard.ts uses the same gm-* classes, so one set of rules covers both. */
+
+/* title: cap row 105-128, left edge x 24 (measured) */
+.gm-sheet-title { font-size: 24px; font-weight: 500; letter-spacing: 0; line-height: 1.25; }
+
+/* title-row circles: 36x36 at x 276/330/384, gap 18 (measured) */
+.gm-circle { width: 36px; height: 36px; background: #353336; }
+.gm-circle .ms { font-size: 22px; }
+.gm-circle-on { background: #0b565b; color: #dbfaff; }
+.gm-sheet-head { gap: 18px; }
+
+/* pills: y 152-197 (46 tall), gap 8-9, route 112 wide, icon ~24 (measured) */
+.gm-actions { gap: 9px; margin-top: 8px; margin-bottom: 18px; }
+.gm-pill { height: 46px; border-radius: 23px; padding: 0 20px 0 16px; gap: 10px; font-size: 16px; font-weight: 500; background: #053c3f; }
+.gm-pill .ms { font-size: 24px; }
+.gm-pill-primary { background: #62c4cb; color: #00363a; }
+
+/* photo: main tile 290x361 at y 215, radius 16, tile gap 8 (measured) */
+.gm-photo { height: 360px; border-radius: 16px; margin: 0 0 8px; }
+
+/* tabs: labels y 607-624, 16px, gaps ~38; underline y 640-643 = 3px, spans label width, #62c4cb (measured) */
+.gm-tabs { gap: 38px; margin-top: 18px; border-bottom: 0; }
+.gm-tabbtn { height: 50px; font-size: 16px; font-weight: 500; color: #c4c2c5; }
+.gm-tabbtn[aria-selected='true'] { color: #62c4cb; }
+.gm-tabbtn[aria-selected='true']::after { left: -2px; right: -2px; bottom: 0; height: 3px; border-radius: 3px 3px 0 0; background: #62c4cb; }
+
+/* tips: box y 641-821 bg #201f29, head row y 666-686, badge 42x20 #23442b,
+   bullets 3px dot at x 25, text x 40, line pitch 23 (measured) */
+.gm-tips { margin: 0 -22px; padding: 24px 22px 20px; background: #201f29; }
+.gm-tips-head { gap: 10px; margin-bottom: 14px; }
+.gm-tips-head .ms { font-size: 20px; color: #a8c7fa; }
+.gm-tips-head h3 { font-size: 18px; font-weight: 600; letter-spacing: 0; }
+.gm-new { height: 20px; display: inline-flex; align-items: center; padding: 0 6px; border-radius: 4px; background: #23442b; color: #6dd58c; font-size: 13px; font-weight: 500; }
+.gm-tips ul { padding-left: 18px; }
+.gm-tips li { margin: 0 0 8px; font-size: 16px; line-height: 23px; }
+.gm-tips li::marker { font-size: 12px; }
+
+/* info card: x 22-420, starts 18 below tips, bg #1c2224, radius 20 (measured) */
+.gm-facts { margin-top: 18px; padding: 4px 20px; border-radius: 20px; background: #1c2224; }
+.gm-fact { min-height: 52px; gap: 20px; font-size: 16px; border-bottom-color: rgba(255,255,255,0.08); }

@@ -137,14 +137,23 @@ async def lived(place_id: str):
 
     prompt = (
         "Below are reviews of a place. Extract ONLY first-hand statements about "
-        "physically getting INTO the building: entrances, ramps, steps, doors, lifts.\n\n"
+        "PHYSICAL ACCESS: getting into the building, and moving through it.\n\n"
+        "In scope: entrances, which door to use, ramps, steps, stairs, doors, lifts, "
+        "escalators (including broken ones), level changes, accessible toilets, step-free "
+        "routes, and anything a wheelchair user, a blind person or someone with a pram "
+        "would need to know before arriving.\n"
+        "Out of scope: food, staff, prices, cleanliness, architecture, crowds, trains.\n\n"
         "Rules:\n"
-        "- Every claim MUST include `quote`: text copied EXACTLY, character for "
-        "character, from a review below. Never paraphrase.\n"
-        "- If nothing in the reviews is about entering the building, return "
-        '{\"claims\": []}. That is the correct answer and it is common.\n'
-        "- Never invent a location, address, or direction.\n"
-        'Return JSON only: {"claims":[{"quote":"...","topic":"step-free-route|door|steps|lift"}]}\n\n'
+        "- Every claim MUST include `quote`: text copied EXACTLY, character for character, "
+        "from a review below. Never paraphrase, never repair grammar, never trim mid-word.\n"
+        "- `topic` must be one of: entrance, door, steps, ramp, lift, escalator, toilet, "
+        "step-free-route.\n"
+        "- `blocksAccess` is true only when the reviewer describes something that would "
+        "stop or seriously hinder a disabled person, false when it is merely informative.\n"
+        "- If nothing in the reviews is about physical access, return {\"claims\": []}. "
+        "That is the correct answer and it is common.\n"
+        "- Never invent a location, address, direction or detail not in the text.\n"
+        'Return JSON only: {"claims":[{"quote":"...","topic":"...","blocksAccess":true|false}]}\n\n'
         + json.dumps(corpus, ensure_ascii=False))
 
     body = {"contents": [{"parts": [{"text": prompt}]}],
@@ -173,6 +182,7 @@ async def lived(place_id: str):
         out.append({"quote": q,
                     "author": f"Google review{', ' + when if when else ''}",
                     "topic": cl.get("topic", "step-free-route"),
+                    "blocksAccess": bool(cl.get("blocksAccess")),
                     "coords": None})          # tier 3 never carries coordinates
     return {"placeId": place_id, "claims": out}
 

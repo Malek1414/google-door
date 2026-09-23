@@ -302,3 +302,98 @@ caps and temp-file handling are a different shape from the JSON endpoints.
 People walk through station entrances without consenting to be filmed.
 
 The prompt must forbid guessing: if the floor is not clearly visible, the answer is `unknown`.
+
+---
+
+## Last 10 metres (v1) — the approach contract
+
+Where Maps stops. Its navigation ends at a pin on a building; this begins there and
+ends when the user is through the door.
+
+**GPS does not participate.** Accuracy is 5–30 m and the whole feature lives inside
+that error bar. Nothing here may read a GPS fix for bearing, distance or arrival.
+
+### Who it serves
+
+| profile | behaviour |
+|---|---|
+| blind / low vision | the guidance loop |
+| wheelchair | one vision call, one passability verdict, no loop |
+| deaf | not offered — they can see the door |
+
+### DoorFix — what vision returns
+
+```json
+{
+  "found": true,
+  "bearingDeg": -22.4,
+  "distanceM": 6.5,
+  "confidence": 0.82,
+  "kind": "sliding|hinged|revolving|opening|unknown",
+  "note": "Glastür links neben der Treppe",
+  "ts": 1758750000000,
+  "source": "gemini-live|gemini-frame|osm-fallback"
+}
+```
+
+- `bearingDeg` is RELATIVE TO THE CAMERA CENTRE, negative left. Not a compass bearing:
+  the model sees a picture, not a heading, and converting it here would hide where the
+  number came from.
+- `source` is never cosmetic. `osm-fallback` means vision failed and this is the
+  surveyed door coordinate instead, and the UI must say so.
+- `confidence` below 0.5 is treated as `found: false`.
+
+### Stability — the hallucination guard
+
+Between two fixes the compass knows how far the PHONE turned. If the door's bearing
+moves far more than the phone did, the door did not move and the model is guessing.
+
+```
+unstable  ⇔  |Δ bearing − Δ heading| > 25°
+```
+
+Two unstable fixes in a row drop Live streaming to on-demand **for the rest of the
+approach** — sticky, because flapping between modes mid-walk is worse than either
+mode. The user is told once: "Ich bin mir gerade unsicher."
+
+### Phases
+
+```
+orienting → walking → threshold → through
+```
+
+- **orienting** — stand still and turn. The BEACON does the work: pitch rises as the
+  bearing error falls, continuous and sub-100 ms. Speech only marks the state change.
+  Discrete speech alone makes people overshoot, because the word arrives after the turn.
+- **walking** — on bearing, distance counting down.
+- **threshold** — under 1.5 m. "Die Tür ist direkt vor dir."
+- **through** — vision proposes, a large "Noch draußen" button overrides.
+
+### Instruction bands — fixed, short, never reworded
+
+```
+ ≤ 8°     Geradeaus
+ 8–25°    Leicht links / rechts
+ 25–70°   Links / rechts
+ 70–135°  Scharf links / rechts
+ > 135°   Dreh dich um
+```
+
+### Endpoints
+
+    POST /api/door-fix    one frame + heading -> DoorFix
+    POST /api/door-check  one frame -> passability verdict (wheelchair path)
+    GET  /api/live-token  short-lived token for the Gemini Live session
+
+### Rules that are not negotiable
+
+1. **Door guidance only.** Said out loud once at the start: "Ich führe dich nur zur
+   Tür. Achte weiter selbst auf deine Umgebung." No obstacle, traffic or people
+   warnings. A half-trusted warning is worse than none, because it invites someone to
+   stop scanning with their cane.
+2. **Never dead-reckon past a lost fix.** When vision fails, say so and fall back to
+   the OSM bearing, naming the source. Guidance that keeps speaking confidently while
+   drifting is the failure mode that actually hurts someone.
+3. **Trigger is an ordinary button**, not a custom gesture. VoiceOver's double-tap
+   activates it for free; a literal double-tap handler would be swallowed by VoiceOver
+   and fail for exactly the users this is built for.

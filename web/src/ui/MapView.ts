@@ -26,6 +26,7 @@ import { loadMode, saveMode, showDoorMarkers, type Mode } from '../core/mode'
 import { loadSurvey, mergeSurvey } from '../core/survey'
 import { NORMAL_CHIPS, PlacesUnavailable, searchCategory, searchText, type PlaceHit } from '../places'
 import { lang } from '../strings'
+import { openSearchScreen } from './SearchScreen'
 import { t } from '../strings'
 import { h, mount, s } from './dom'
 
@@ -480,6 +481,8 @@ export function MapView(opts: {
   }
 
   function showCard(item: Entrance | Building, ...children: (Node | null)[]) {
+    panelCleanup?.()
+    panelCleanup = null
     selected = item
     renderMarkers()
     chips.hidden = true
@@ -690,6 +693,7 @@ export function MapView(opts: {
     morePill.hidden = false
     goBtn.hidden = true
     map?.panTo({ lat: p.lat, lng: p.lon })
+    panelCleanup = null
     try {
       panelCleanup = renderPlaceCard(sheetBody, featureCtx, p, () => {
         chips.hidden = false
@@ -769,6 +773,54 @@ export function MapView(opts: {
     )
     results.hidden = false
   }
+  // Tapping the bar opens the full-screen search like Maps; the inline list stays as fallback.
+  let searchOpen = false
+  searchInput.addEventListener('focus', () => {
+    if (searchOpen) return
+    searchOpen = true
+    searchInput.blur()
+    const runQuery = (q: string) => {
+      searchInput.value = q
+      if (!map) return
+      status.textContent = t.loading
+      searchText(map, q)
+        .then((hits) => {
+          status.textContent = hits.length ? '' : t.searchNoResults
+          showPlaces(hits, q)
+        })
+        .catch((err) => (status.textContent = err instanceof PlacesUnavailable ? err.message : t.placesError))
+    }
+    let close: () => void = () => {}
+    try {
+      close = openSearchScreen(root, {
+        initial: searchInput.value,
+        onQuery: (q) => {
+          close()
+          runQuery(q)
+        },
+        onPickPlaceName: (name) => {
+          close()
+          runQuery(name)
+        },
+        onClose: () => {
+          searchOpen = false
+        },
+        suggestions: (q) => {
+          const ql = q.trim().toLowerCase()
+          if (!ql) return []
+          const places = t.places.filter((p) => p.name.toLowerCase().includes(ql)).map((p) => ({ title: p.name, sub: p.sub, icon: 'location_on', go: () => { close(); flyTo(p.lat, p.lon) } }))
+          const doors = entrances
+            .filter((e) => typeof e.name === 'string' && e.name.toLowerCase().includes(ql) && markerKind(e) !== 'no-marker')
+            .map((e) => ({ title: e.name!, sub: stepFreeLabel(e.stepFree), icon: 'door_front', go: () => { close(); openEntrance(e) } }))
+          return [...places, ...doors].slice(0, SEARCH_MAX)
+        },
+      })
+    } catch (err) {
+      console.error('[doorway] search screen failed', err)
+      searchOpen = false
+      searchInput.focus()
+    }
+  })
   searchInput.addEventListener('input', renderResults)
   searchInput.addEventListener('keydown', (ev) => {
     if (ev.key === 'Enter') {
@@ -884,6 +936,8 @@ export function MapView(opts: {
           })
         map.addListener('click', () => {
           results.hidden = true
+          // A panel (editor, business) may use map taps itself: do not collapse it then.
+          if (panelCleanup) return
           if (sheet.dataset.state !== 'peek') setSheet('peek')
         })
         map.addListener('idle', () => {

@@ -19,6 +19,9 @@ import { lang } from '../strings'
 import type { FeatureCtx, Panel } from './ctx'
 import { h } from './dom'
 import { openEntranceEditor } from './EntranceEditor'
+import { openBusinessEdit } from './BusinessEdit'
+import { openEntrancesManager } from './BusinessEntrances'
+import { businessHomeHeader } from './BusinessHome'
 
 const S = {
   de: {
@@ -359,11 +362,7 @@ export const businessPanel: Panel = (el, ctx) => {
       h(
         'div',
         { class: 'bz' },
-        h('div', { class: 'gm-sheet-head' },
-          h('h2', { id: 'sheet-title', class: 'gm-sheet-title', tabindex: '-1' }, b.name),
-          h('button', { class: 'gm-circle bz-edit', type: 'button', 'aria-label': L.edit, onclick: () => renderCreate(b) }, icon('edit')),
-        ),
-        h('p', { class: 'gm-sheet-sub' }, b.address || L.noAddress),
+        home(b),
         scoreBlock,
         offer,
         entrances,
@@ -371,6 +370,44 @@ export const businessPanel: Panel = (el, ctx) => {
         msg,
       ),
     )
+  }
+
+  // Google Business Profile style header with the round action buttons. Each sub-screen
+  // renders into the sheet and comes back to the dashboard; a failing one never kills the tab.
+  function sub(open: () => () => void) {
+    closeEditor()
+    try {
+      editorCleanup = open()
+    } catch (err) {
+      console.error('[doorway] business sub-screen failed', err)
+      renderDashboard()
+    }
+  }
+  function home(b: BusinessProfile): HTMLElement {
+    const back = () => {
+      closeEditor()
+      ctx.refresh()
+      renderDashboard()
+    }
+    try {
+      return businessHomeHeader(ctx, b, {
+        onEdit: () => sub(() => openBusinessEdit(el, ctx, b.id, back)),
+        onEntrances: () => sub(() => openEntrancesManager(el, ctx, b.id, back)),
+        onRecord: () => ctx.openRecorder(),
+        onPhotos: () => sub(() => openBusinessEdit(el, ctx, b.id, back)),
+        onPreview: () => {
+          const main = linkedEntrances(b, loadSurvey())[0]
+          if (main) ctx.openDoor(main)
+          else ctx.announce(L.entrancesEmpty)
+        },
+      })
+    } catch (err) {
+      console.error('[doorway] business header failed', err)
+      return h('div', { class: 'gm-sheet-head' },
+        h('h2', { id: 'sheet-title', class: 'gm-sheet-title', tabindex: '-1' }, b.name),
+        h('button', { class: 'gm-circle bz-edit', type: 'button', 'aria-label': L.edit, onclick: () => renderCreate(b) }, icon('edit')),
+      )
+    }
   }
 
   renderDashboard()

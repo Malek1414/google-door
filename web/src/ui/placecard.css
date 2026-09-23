@@ -31,3 +31,24 @@
 .pc-row .pc-star { font-size: 15px; }
 .pc-a11y { flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: #1a3a6b; color: #a8c7fa; margin-top: 4px; }
 .pc-a11y .ms { font-size: 20px; }
+/* Google place sheet parity: rating/category/walk row, hours line, photo strip, info rows. */
+.pc-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; font-size: 15px; color: var(--fg2, #c9c5ca); }
+.pc-meta .pc-rating { margin: 0; }
+.pc-dot { color: var(--fg2, #c9c5ca); }
+.pc-walk { font-size: 17px; vertical-align: -3px; margin-right: 2px; }
+.pc-hours { margin: 4px 0 0; font-size: 15px; color: var(--fg2, #c9c5ca); }
+.gm-circle-on { background: var(--teal, #62c4cb); color: var(--teal-ink, #00363a); }
+.pc-strip { display: grid; grid-template-columns: 1fr; gap: 8px; height: 300px; margin: 0 0 8px; }
+.pc-strip-multi { grid-template-columns: 2fr 1fr; margin-right: -22px; }
+.pc-strip-big, .pc-strip-small { overflow: hidden; border-radius: 16px; background: #202124; min-height: 0; }
+.pc-strip-multi .pc-strip-small { border-radius: 16px 0 0 16px; }
+.pc-strip-col { display: grid; grid-auto-rows: 1fr; gap: 8px; min-height: 0; }
+.pc-photo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding-top: 12px; }
+.pc-photo-grid .pc-photo-img { aspect-ratio: 1; border-radius: 10px; }
+.pc-fact-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pc-fact-text .pc-hours { margin: 0; }
+.pc-fact-sub { font-size: 14px; color: var(--fg2, #c9c5ca); }
+.pc-fact-link { color: var(--teal, #62c4cb); text-decoration: none; overflow-wrap: anywhere; }
+.pc-fact-link:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+.pc-suggest { display: flex; justify-content: center; margin: 20px 0 8px; }
+.pc-card .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

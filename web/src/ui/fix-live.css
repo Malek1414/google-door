@@ -1,0 +1,42 @@
+/* Live view overrides in the look of Google Maps walking navigation / Live View on iOS.
+   Loaded after style.css and arrival.css.
+   Sources:
+   - Google Maps Help "Use Live View on Google Maps" (support.google.com/maps/answer/9332056):
+     Live View is a walking-directions mode, blue primary actions, camera with overlaid guidance.
+   - Google Maps navigation UI (iOS, observed): rounded green instruction card at the top with a
+     large white maneuver arrow, big distance, street/direction below; dark bottom sheet with ETA,
+     remaining distance and a round red exit ("Beenden") button on the left; teal pills in dark mode.
+   - Google green 800 #137333 (Google Material palette): white text 5.9:1, AA for all sizes. */
+
+.nav-top { padding: max(8px, env(safe-area-inset-top)) 8px 0; }
+
+.nav-card { gap: 16px; padding: 16px 18px; border-radius: 20px; background: #137333; color: #fff;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.4); align-items: center; }
+.nav-card > div { min-width: 0; }
+.nav-card .ms { font-size: 56px; line-height: 1; color: #fff; flex: none; }
+.nav-card h1 { font-size: 0.95rem; font-weight: 500; margin: 0 0 2px; opacity: 1; color: #e6f4ea; /* 5.1:1 on #137333 */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nav-card .distance { font-size: 2.5rem; font-weight: 500; line-height: 1.05; margin: 0; letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums; }
+.nav-card .direction { font-size: 1.3rem; font-weight: 500; line-height: 1.25; margin: 2px 0 0; overflow-wrap: anywhere; }
+
+.nav-bottom { background: #1f1f1f; color: #e3e3e3; border-radius: 28px 28px 0 0; padding: 10px 16px max(16px, env(safe-area-inset-bottom));
+  box-shadow: 0 -4px 16px rgb(0 0 0 / 0.45); }
+/* Grab handle like the Maps bottom sheet. */
+.nav-bottom::before { content: ''; display: block; width: 36px; height: 4px; margin: 0 auto 10px; border-radius: 2px; background: #5f6368; }
+.nav-bottom .accuracy { color: #c4c7c5; font-size: 0.95rem; }
+.nav-bottom .look-out { color: #e3e3e3; font-size: 1.15rem; font-weight: 500; }
+
+/* Pills: Maps dark-mode teal. #60c4c7 on #1f1f1f is 8.4:1, #00363a on #60c4c7 is 7.9:1. */
+.nav-bottom .gm-pill, .arrival .gm-pill { color: #60c4c7; border: 1px solid #8e918f; background: transparent; border-radius: 26px; }
+.nav-bottom .gm-pill-primary, .arrival .gm-pill-primary { background: #60c4c7; color: #00363a; border-color: transparent; }
+.nav-bottom .gm-pill:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+/* Round red exit on the left of the bottom sheet. White on #d93025 is 4.6:1, icon is large. */
+.nav-exit { width: 56px; height: 56px; background: #d93025; color: #fff; box-shadow: 0 2px 6px rgb(0 0 0 / 0.4); }
+.nav-exit .ms { font-size: 28px; }
+.nav-exit:active { background: #b3261e; }
+.nav-exit:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+/* Arrival card uses the same guidance green. */
+.arrival-head { background: #137333; }

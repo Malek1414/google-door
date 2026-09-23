@@ -33,6 +33,18 @@ const S = {
     tabOverview: 'Übersicht',
     tabReviews: 'Rezensionen',
     tabAccess: 'Barrierefreiheit',
+    tabPhotos: 'Fotos',
+    call: 'Anrufen',
+    closesAt: (t: string) => `Schließt um ${t}`,
+    opensAt: (t: string) => `Öffnet um ${t}`,
+    walkMin: (n: number) => `${n} min`,
+    walkLabel: (n: number) => `${n} Minuten zu Fuß`,
+    hours: 'Öffnungszeiten',
+    address: 'Adresse',
+    website: 'Website',
+    phone: 'Telefon',
+    suggestEdit: 'Änderung vorschlagen',
+    photosNone: 'Keine Fotos vorhanden.',
     tipsTitle: 'Hilfreiche Tipps',
     newBadge: 'Neu!',
     tipsLoading: 'Erfahrungen werden geladen.',
@@ -76,6 +88,18 @@ const S = {
     tabOverview: 'Overview',
     tabReviews: 'Reviews',
     tabAccess: 'Accessibility',
+    tabPhotos: 'Photos',
+    call: 'Call',
+    closesAt: (t: string) => `Closes ${t}`,
+    opensAt: (t: string) => `Opens ${t}`,
+    walkMin: (n: number) => `${n} min`,
+    walkLabel: (n: number) => `${n} minute walk`,
+    hours: 'Opening hours',
+    address: 'Address',
+    website: 'Website',
+    phone: 'Phone',
+    suggestEdit: 'Suggest an edit',
+    photosNone: 'No photos available.',
     tipsTitle: 'Helpful tips',
     newBadge: 'New!',
     tipsLoading: 'Loading experiences.',
@@ -148,6 +172,39 @@ function openState(p: PlaceHit): HTMLElement | null {
   return h('span', { class: p.openNow ? 'pc-open' : 'pc-closed' }, p.openNow ? L.open : L.closed)
 }
 
+/** Optional fields a richer PlaceHit may carry; read defensively, never required. */
+type PlaceExtras = { photoUrls?: unknown; phone?: unknown; website?: unknown; closesAt?: unknown; opensAt?: unknown; hoursText?: unknown }
+const extras = (p: PlaceHit) => p as PlaceHit & PlaceExtras
+const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null)
+
+function photoList(p: PlaceHit): string[] {
+  const raw = extras(p).photoUrls
+  const list = Array.isArray(raw) ? raw.filter((u): u is string => typeof u === 'string' && /^https:\/\//.test(u)) : []
+  if (p.photoUrl && !list.includes(p.photoUrl)) list.unshift(p.photoUrl)
+  return list
+}
+function phoneOf(p: PlaceHit): string | null {
+  const v = str(extras(p).phone)
+  return v && /^[+\d][\d\s()/-]{3,}$/.test(v) ? v : null
+}
+function websiteOf(p: PlaceHit): string | null {
+  const v = str(extras(p).website)
+  if (!v) return null
+  try {
+    const u = new URL(v)
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : null
+  } catch {
+    return null
+  }
+}
+/** "Geöffnet · Schließt um 19:00" when data allows, else null. */
+function hoursLine(p: PlaceHit): HTMLElement | null {
+  if (typeof p.openNow !== 'boolean') return null
+  const t = p.openNow ? str(extras(p).closesAt) : str(extras(p).opensAt)
+  const tail = t ? (p.openNow ? L.closesAt(t) : L.opensAt(t)) : null
+  return h('p', { class: 'pc-hours' }, h('span', { class: p.openNow ? 'pc-open' : 'pc-closed' }, p.openNow ? L.open : L.closed), tail ? ` · ${tail}` : null)
+}
+
 function readSaved(): string[] {
   try {
     const raw = localStorage.getItem(SAVED_KEY)
@@ -176,7 +233,7 @@ function stepFreeText(v: boolean | null): string {
   return v === true ? L.stepFree : v === false ? L.notStepFree : L.unknown
 }
 
-export function renderPlaceCard(el: HTMLElement, ctx: FeatureCtx, p: PlaceHit, onClose: () => void): () => void {
+export function renderPlaceCard(el: HTMLElement, ctx: FeatureCtx, p: PlaceHit, onClose: () => void, onSuggestEdit?: (p: PlaceHit) => void): () => void {
   let disposed = false
   const doors = tier1Near(ctx, p)
   const best = doors.find((e) => e.stepFree === true) ?? doors[0] ?? null
@@ -221,14 +278,20 @@ export function renderPlaceCard(el: HTMLElement, ctx: FeatureCtx, p: PlaceHit, o
     roundIcon('close', L.close, onClose),
   )
 
+  const walk = Math.max(1, Math.ceil(haversineM(ctx.origin(), p) / 80))
   const metaBits: (Node | string)[] = []
-  if (p.category) metaBits.push(p.category)
-  const os = openState(p)
-  if (os) {
-    if (metaBits.length) metaBits.push(' · ')
-    metaBits.push(os)
-  }
-  const meta = metaBits.length ? h('p', { class: 'gm-sheet-sub pc-meta' }, ...metaBits) : null
+  const rr = ratingRow(p)
+  if (rr) metaBits.push(rr)
+  if (p.category) metaBits.push(h('span', {}, p.category))
+  metaBits.push(h('span', { 'aria-label': L.walkLabel(walk) }, h('span', { class: 'ms pc-walk', 'aria-hidden': 'true' }, 'directions_walk'), L.walkMin(walk)))
+  const meta = h('p', { class: 'gm-sheet-sub pc-meta' })
+  metaBits.forEach((b, i) => {
+    if (i) meta.append(h('span', { class: 'pc-dot', 'aria-hidden': 'true' }, '·'))
+    meta.append(b)
+  })
+  const hours = hoursLine(p)
+  const phone = phoneOf(p)
+  const website = websiteOf(p)
 
   // ---- pills ----
   const pills = h(
@@ -248,11 +311,19 @@ export function renderPlaceCard(el: HTMLElement, ctx: FeatureCtx, p: PlaceHit, o
       L.route,
     ),
     best ? h('button', { class: 'gm-pill', type: 'button', onclick: () => ctx.openDoor(best) }, icon('navigation', true), L.start) : null,
+    phone ? h('a', { class: 'gm-pill', href: `tel:${phone.replace(/[^+\d]/g, '')}` }, icon('call', true), L.call) : null,
     h('button', { class: 'gm-pill', type: 'button', onclick: () => void share() }, icon('ios_share'), L.share),
   )
 
-  const photo = p.photoUrl
-    ? h('div', { class: 'gm-photo' }, h('img', { class: 'pc-photo-img', src: p.photoUrl, alt: L.photoAlt(p.name), loading: 'lazy', referrerpolicy: 'no-referrer' }))
+  const photos = photoList(p)
+  const img = (src: string, cls: string) => h('img', { class: `pc-photo-img ${cls}`, src, alt: L.photoAlt(p.name), loading: 'lazy', referrerpolicy: 'no-referrer' })
+  const photo = photos.length
+    ? h(
+        'div',
+        { class: `pc-strip${photos.length > 1 ? ' pc-strip-multi' : ''}` },
+        h('div', { class: 'pc-strip-big' }, img(photos[0], '')),
+        photos.length > 1 ? h('div', { class: 'pc-strip-col' }, ...photos.slice(1, 3).map((u) => h('div', { class: 'pc-strip-small' }, img(u, '')))) : null,
+      )
     : null
 
   // ---- lived quotes (Tier 3): verbatim, attributed, never paraphrased ----
@@ -342,16 +413,35 @@ export function renderPlaceCard(el: HTMLElement, ctx: FeatureCtx, p: PlaceHit, o
     entrancesSection(),
   ]
 
+  const infoRows = () => {
+    const rows: HTMLElement[] = []
+    const hoursTxt = str(extras(p).hoursText)
+    if (hours || hoursTxt) rows.push(h('li', { class: 'gm-fact' }, icon('schedule'), h('span', { class: 'pc-fact-text' }, h('span', { class: 'sr-only' }, `${L.hours}: `), hours ? hours.cloneNode(true) : null, hoursTxt ? h('span', { class: 'pc-fact-sub' }, hoursTxt) : null)))
+    if (p.address) rows.push(h('li', { class: 'gm-fact' }, icon('location_on'), h('span', { class: 'pc-fact-text' }, h('span', { class: 'sr-only' }, `${L.address}: `), p.address)))
+    if (website) rows.push(h('li', { class: 'gm-fact' }, icon('public'), h('a', { class: 'pc-fact-link', href: website, target: '_blank', rel: 'noopener noreferrer' }, h('span', { class: 'sr-only' }, `${L.website}: `), new URL(website).hostname.replace(/^www\./, ''))))
+    if (phone) rows.push(h('li', { class: 'gm-fact' }, icon('call'), h('a', { class: 'pc-fact-link', href: `tel:${phone.replace(/[^+\d]/g, '')}` }, h('span', { class: 'sr-only' }, `${L.phone}: `), phone)))
+    return rows.length ? h('ul', { class: 'gm-facts' }, ...rows) : null
+  }
+
   const overview = h(
     'div',
     { class: 'gm-tabpanel', role: 'tabpanel', id: 'pc-panel-0', 'aria-labelledby': 'pc-tab-0' },
     tips,
-    p.address ? h('ul', { class: 'gm-facts' }, h('li', { class: 'gm-fact' }, icon('location_on'), h('span', {}, p.address))) : null,
+    infoRows(),
     entrancesSection(),
+    onSuggestEdit
+      ? h('div', { class: 'pc-suggest' }, h('button', { class: 'gm-pill', type: 'button', onclick: () => onSuggestEdit(p) }, icon('edit'), L.suggestEdit))
+      : null,
   )
   const reviews = h('div', { class: 'gm-tabpanel', role: 'tabpanel', id: 'pc-panel-1', 'aria-labelledby': 'pc-tab-1', hidden: true }, reviewsOut)
-  const access = h('div', { class: 'gm-tabpanel', role: 'tabpanel', id: 'pc-panel-2', 'aria-labelledby': 'pc-tab-2', hidden: true }, ...accessPanelChildren())
-  const panels = [overview, reviews, access]
+  const photosPanel = h(
+    'div',
+    { class: 'gm-tabpanel', role: 'tabpanel', id: 'pc-panel-2', 'aria-labelledby': 'pc-tab-2', hidden: true },
+    photos.length ? h('div', { class: 'pc-photo-grid' }, ...photos.map((u) => img(u, ''))) : h('p', { class: 'gm-p' }, L.photosNone),
+  )
+  const access = h('div', { class: 'gm-tabpanel', role: 'tabpanel', id: 'pc-panel-3', 'aria-labelledby': 'pc-tab-3', hidden: true }, ...accessPanelChildren())
+  const panels = [overview, reviews, photosPanel, access]
+  const n = panels.length
 
   const tabBtns: HTMLButtonElement[] = []
   const select = (i: number, focus = false) => {
@@ -365,19 +455,19 @@ export function renderPlaceCard(el: HTMLElement, ctx: FeatureCtx, p: PlaceHit, o
   const tabs = h(
     'div',
     { class: 'gm-tabs', role: 'tablist' },
-    ...[L.tabOverview, L.tabReviews, L.tabAccess].map((label, i) => {
+    ...[L.tabOverview, L.tabReviews, L.tabPhotos, L.tabAccess].map((label, i) => {
       const b = h('button', { class: 'gm-tabbtn', type: 'button', role: 'tab', id: `pc-tab-${i}`, 'aria-controls': `pc-panel-${i}`, 'aria-selected': String(i === 0), tabindex: i === 0 ? '0' : '-1' }, label)
       b.addEventListener('click', () => select(i))
       b.addEventListener('keydown', (ev) => {
-        if (ev.key === 'ArrowRight') select((i + 1) % 3, true)
-        else if (ev.key === 'ArrowLeft') select((i + 2) % 3, true)
+        if (ev.key === 'ArrowRight') select((i + 1) % n, true)
+        else if (ev.key === 'ArrowLeft') select((i + n - 1) % n, true)
       })
       tabBtns.push(b)
       return b
     }),
   )
 
-  const root = h('div', { class: 'pc-card' }, head, ratingRow(p), meta, pills, photo, tabs, ...panels)
+  const root = h('div', { class: 'pc-card' }, head, meta, hours, pills, photo, tabs, ...panels)
   el.replaceChildren(root)
   el.scrollTop = 0
   head.querySelector<HTMLElement>('h2')?.focus({ preventScroll: true })

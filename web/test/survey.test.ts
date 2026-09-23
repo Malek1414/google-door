@@ -191,3 +191,11 @@ describe('storage', () => {
     expect(loadBusiness()).toMatchObject(b)
   })
 })
+
+describe('community reports are text until confirmed', () => {
+  it('never makes a community entry guidable', async () => {
+    const { surveyTier } = await import('../src/core/survey')
+    expect(surveyTier({ lat: 52.5, lon: 13.4, stepFree: true, by: 'community' })).toBe(0)
+    expect(surveyTier({ lat: 52.5, lon: 13.4, stepFree: true, by: 'business' })).toBe(1)
+  })
+})

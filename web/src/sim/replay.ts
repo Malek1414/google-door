@@ -8,9 +8,10 @@
 import { normalize360, relativeBearing } from '../core/geo'
 import { requestHeadingPermission, startHeading, type Heading, type HeadingSource } from '../core/heading'
 import { announce } from '../session'
-import { t as str } from '../strings'
+import { lang, t as str } from '../strings'
 import { h, mount } from '../ui/dom'
 import type { Fix, Sensors } from '../ui/LiveView'
+import './recorder.css'
 
 export interface TrackPoint {
   t: number
@@ -93,6 +94,17 @@ export function replaySensors(track: TrackPoint[], opts: { speed: number; imageU
   }
 }
 
+// Labels only this screen needs. Everything else comes from strings.ts.
+const REC = lang === 'de'
+  ? { gps: 'GPS-Genauigkeit', gpsWait: 'Wartet auf GPS', compassOff: 'Kein Kompass', compassOn: 'Kompass aktiv', compassGps: 'Richtung aus GPS-Kurs', compassIdle: 'Aus', duration: 'Dauer', done: 'Weg gespeichert', ready: 'Bereit' }
+  : { gps: 'GPS accuracy', gpsWait: 'Waiting for GPS', compassOff: 'No compass', compassOn: 'Compass on', compassGps: 'Heading from GPS course', compassIdle: 'Off', duration: 'Duration', done: 'Walk saved', ready: 'Ready' }
+
+const icon = (name: string) => h('span', { class: 'ms', 'aria-hidden': 'true' }, name)
+const mmss = (ms: number) => {
+  const s = Math.max(0, Math.floor(ms / 1000))
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
+}
+
 /** ?record=1 screen. Samples the latest fix and heading once per second. */
 export function Recorder(opts: { onBack?: () => void } = {}): void {
   const points: TrackPoint[] = []
@@ -101,14 +113,60 @@ export function Recorder(opts: { onBack?: () => void } = {}): void {
   let stopHeading: (() => void) | null = null
   let watch: number | null = null
   let timer: number | null = null
+  let uiTimer: number | null = null
   let t0 = 0
+  let recording = false
 
-  const count = h('p', { class: 'distance', 'aria-live': 'polite' }, str.recordPoints(0))
-  const out = h('div', { class: 'row' })
-  const startBtn = h('button', { class: 'btn', type: 'button' }, str.recordStart)
-  const stopBtn = h('button', { class: 'btn btn-secondary', type: 'button', disabled: true }, str.recordStop)
+  const time = h('div', { class: 'rec-time', role: 'timer', 'aria-label': REC.duration }, '00:00')
+  const count = h('p', { class: 'rec-points', 'aria-live': 'polite' }, str.recordPoints(0))
+  const gpsVal = h('span', { class: 'rec-row-v' }, REC.compassIdle)
+  const gpsRow = h('li', { class: 'rec-row' }, icon('my_location'), h('span', { class: 'rec-row-text' }, h('span', { class: 'rec-row-k' }, REC.gps), gpsVal))
+  const compassVal = h('span', { class: 'rec-row-v' }, REC.compassIdle)
+  const compassRow = h('li', { class: 'rec-row' }, icon('explore'), h('span', { class: 'rec-row-text' }, h('span', { class: 'rec-row-k' }, str.sensorCompass), compassVal))
+  const out = h('div', { class: 'rec-out' })
+  const recLabel = h('p', { class: 'rec-btn-label', id: 'rec-btn-label' }, str.recordStart)
+  const recBtn = h('button', { class: 'rec-btn', type: 'button', 'aria-pressed': 'false', 'aria-label': str.recordStart }, h('span', { class: 'rec-btn-inner', 'aria-hidden': 'true' }))
 
-  startBtn.addEventListener('click', async () => {
+  const paint = () => {
+    time.textContent = mmss(recording ? performance.now() - t0 : 0)
+    time.dataset.live = String(recording)
+    if (!recording) {
+      gpsVal.textContent = REC.compassIdle
+      compassVal.textContent = REC.compassIdle
+      gpsRow.dataset.state = compassRow.dataset.state = ''
+      return
+    }
+    if (fix) {
+      const acc = Math.round(fix.coords.accuracy)
+      gpsVal.textContent = `± ${acc} m`
+      gpsRow.dataset.state = acc <= 10 ? 'ok' : 'warn'
+    } else {
+      gpsVal.textContent = REC.gpsWait
+      gpsRow.dataset.state = 'warn'
+    }
+    const src = heading?.source ?? 'none'
+    if (src === 'none') { compassVal.textContent = REC.compassOff; compassRow.dataset.state = 'warn' }
+    else if (src === 'gps-course') { compassVal.textContent = REC.compassGps; compassRow.dataset.state = 'warn' }
+    else { compassVal.textContent = `${REC.compassOn}, ${Math.round(heading!.deg)}°`; compassRow.dataset.state = 'ok' }
+  }
+
+  const setRecording = (on: boolean) => {
+    recording = on
+    recBtn.setAttribute('aria-pressed', String(on))
+    recBtn.setAttribute('aria-label', on ? str.recordStop : str.recordStart)
+    recLabel.textContent = on ? str.recordStop : str.recordStart
+    paint()
+  }
+
+  const stopSensors = () => {
+    if (timer !== null) window.clearInterval(timer)
+    if (uiTimer !== null) window.clearInterval(uiTimer)
+    if (watch !== null) navigator.geolocation.clearWatch(watch)
+    stopHeading?.()
+    timer = uiTimer = watch = null
+  }
+
+  const start = async () => {
     // Opened from the Contribute tab there was no Start screen: ask for the compass inside this tap.
     await requestHeadingPermission()
     points.length = 0
@@ -128,20 +186,19 @@ export function Recorder(opts: { onBack?: () => void } = {}): void {
       })
       count.textContent = str.recordPoints(points.length)
     }, 1000)
-    startBtn.disabled = true
-    stopBtn.disabled = false
-  })
+    uiTimer = window.setInterval(paint, 250)
+    setRecording(true)
+  }
 
-  stopBtn.addEventListener('click', () => {
-    if (timer !== null) window.clearInterval(timer)
-    if (watch !== null) navigator.geolocation.clearWatch(watch)
-    stopHeading?.()
-    startBtn.disabled = false
-    stopBtn.disabled = true
+  const stop = () => {
+    const elapsed = mmss(performance.now() - t0)
+    stopSensors()
+    setRecording(false)
+    time.textContent = elapsed
     const json = JSON.stringify(points, null, 1)
     const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }))
     const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')
-    const copy = h('button', { class: 'btn btn-secondary', type: 'button' }, str.recordCopy)
+    const copy = h('button', { class: 'rec-pill', type: 'button' }, icon('content_copy'), str.recordCopy)
     copy.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(json)
@@ -150,22 +207,35 @@ export function Recorder(opts: { onBack?: () => void } = {}): void {
         /* clipboard blocked */
       }
     })
-    out.replaceChildren(h('a', { class: 'btn', href: url, download: `track-recorded-${stamp}.json` }, str.recordDownload), copy)
+    out.replaceChildren(
+      h(
+        'section',
+        { class: 'rec-result', 'aria-labelledby': 'rec-result-title' },
+        h('h2', { class: 'rec-result-title', id: 'rec-result-title' }, REC.done),
+        h('p', { class: 'rec-result-meta' }, `${str.recordPoints(points.length)}, ${REC.duration} ${elapsed}`),
+        h('div', { class: 'rec-actions' }, h('a', { class: 'rec-pill rec-pill-primary', href: url, download: `track-recorded-${stamp}.json` }, icon('download'), str.recordDownload), copy),
+      ),
+    )
     announce(str.recordPoints(points.length))
-  })
+  }
+
+  recBtn.addEventListener('click', () => (recording ? stop() : void start()))
 
   mount(
     h(
       'section',
-      { class: 'screen screen-record', 'aria-labelledby': 'rec-title' },
-      opts.onBack
-        ? h('button', { class: 'btn btn-secondary btn-small', type: 'button', onclick: () => { if (timer !== null) window.clearInterval(timer); if (watch !== null) navigator.geolocation.clearWatch(watch); stopHeading?.(); opts.onBack!() } }, str.back)
-        : null,
-      h('h1', { id: 'rec-title' }, str.recordTitle),
-      h('p', { class: 'hint' }, str.recordHint),
-      count,
-      h('div', { class: 'row' }, startBtn, stopBtn),
+      { class: 'rec', 'aria-labelledby': 'rec-title' },
+      h(
+        'header',
+        { class: 'rec-top' },
+        opts.onBack ? h('button', { class: 'rec-back', type: 'button', 'aria-label': str.back, onclick: () => { stopSensors(); opts.onBack!() } }, icon('arrow_back')) : null,
+        h('h1', { class: 'rec-title', id: 'rec-title' }, str.recordTitle),
+      ),
+      h('p', { class: 'rec-hint' }, str.recordHint),
+      h('div', { class: 'rec-counter' }, time, count),
+      h('ul', { class: 'rec-card' }, gpsRow, compassRow),
       out,
+      h('div', { class: 'rec-control' }, recBtn, recLabel),
     ),
   )
 }

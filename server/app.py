@@ -8,10 +8,12 @@ bundle. Everything else the app needs is a static file.
     pip install fastapi uvicorn httpx
     GEMINI_API_KEY=... MAPS_API_KEY=... uvicorn server.app:app --port 8080
 """
-import json, os, re, base64
+import json, os, re, base64, asyncio
+from collections import OrderedDict
 from typing import Optional
 import httpx
 from fastapi import FastAPI, HTTPException
+from fastapi import Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -38,6 +40,7 @@ TTS_VOICE   = os.environ.get("GEMINI_TTS_VOICE",   "Kore")
 
 app = FastAPI(title="Doorway")
 from server.surface import router as surface_router
+from server.route import router as route_router
 
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
@@ -194,6 +197,13 @@ class SpeakReq(BaseModel):
     lang: str = "de"
 
 
+# Route instructions are new text with no pre-made clip, so they would hit Gemini on
+# every turn and get rate-limited. They also repeat constantly ("Links abbiegen auf
+# Invalidenstrasse"), so a small cache removes almost all of that traffic.
+_SPEAK_CACHE: "OrderedDict[str, bytes]" = OrderedDict()
+_SPEAK_CACHE_MAX = 64
+
+
 @app.post("/api/speak")
 async def speak(req: SpeakReq):
     """Runtime TTS for text that could not be pre-synthesised.
@@ -213,11 +223,25 @@ async def speak(req: SpeakReq):
                 "responseModalities": ["AUDIO"],
                 "speechConfig": {
                     "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": TTS_VOICE}}}}}
-    async with httpx.AsyncClient(timeout=20) as c:
-        r = await c.post(f"{GEMINI_URL}/{MODEL_TTS}:generateContent",
-                         json=body, headers={"x-goog-api-key": GEMINI_KEY})
-    if r.status_code != 200:
-        raise HTTPException(502, f"tts {r.status_code}")
+    key = f"{TTS_VOICE}|{req.lang}|{req.text}"
+    hit = _SPEAK_CACHE.get(key)
+    if hit is not None:
+        _SPEAK_CACHE.move_to_end(key)
+        return Response(content=hit, media_type="audio/wav",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+    # 429 is routine on this tier and is not a failure; back off rather than give up,
+    # because the client falling through to speechSynthesis is a worse voice.
+    r = None
+    for attempt in range(3):
+        async with httpx.AsyncClient(timeout=20) as c:
+            r = await c.post(f"{GEMINI_URL}/{MODEL_TTS}:generateContent",
+                             json=body, headers={"x-goog-api-key": GEMINI_KEY})
+        if r.status_code != 429:
+            break
+        await asyncio.sleep(1.5 * (2 ** attempt))
+    if r is None or r.status_code != 200:
+        raise HTTPException(502, f"tts {r.status_code if r else 'no response'}")
     try:
         b64 = r.json()["candidates"][0]["content"]["parts"][0]["inlineData"]["data"]
     except (KeyError, IndexError):
@@ -230,15 +254,19 @@ async def speak(req: SpeakReq):
     hdr = (b"RIFF" + _st.pack("<I", 36 + len(pcm)) + b"WAVEfmt " +
            _st.pack("<IHHIIHH", 16, 1, ch, rate, rate*ch*width, ch*width, width*8) +
            b"data" + _st.pack("<I", len(pcm)))
-    from fastapi import Response
-    return Response(content=hdr + pcm, media_type="audio/wav",
+    wav = hdr + pcm
+    _SPEAK_CACHE[key] = wav
+    if len(_SPEAK_CACHE) > _SPEAK_CACHE_MAX:
+        _SPEAK_CACHE.popitem(last=False)
+    return Response(content=wav, media_type="audio/wav",
                     headers={"Cache-Control": "public, max-age=86400"})
 
 
 # Serve the built PWA from the same origin as /api/*, so there is ONE url to open and
 # no CORS in the way. Mounted last: every /api route above wins over a static path.
 # DOORWAY_WEB points at web/dist; if it isn't built yet the API still runs.
-app.include_router(surface_router)   # POST /api/surface — see server/surface.py
+app.include_router(surface_router)
+app.include_router(route_router)      # POST /api/route — walking directions   # POST /api/surface — see server/surface.py
 
 _web = os.environ.get("DOORWAY_WEB", "web/dist")
 if os.path.isdir(_web):

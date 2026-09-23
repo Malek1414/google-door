@@ -1,6 +1,8 @@
 // Talks to the two backend endpoints, with a static fallback for entrance data.
 
 import { apiBase } from './config'
+import type { Route } from './core/route'
+import type { LatLon } from './core/geo'
 import type { Building, Dataset, Entrance, LivedClaim, Meta } from './core/types'
 
 export interface BBox {
@@ -87,4 +89,19 @@ export function bboxAround(lat: number, lon: number, radiusM: number): BBox {
   const dLat = radiusM / 111320
   const dLon = radiusM / (111320 * Math.cos((lat * Math.PI) / 180))
   return { south: lat - dLat, north: lat + dLat, west: lon - dLon, east: lon + dLon }
+}
+
+
+/** Walking directions to a door. Returns a not-found route rather than throwing, so
+ *  guidance can fall back to a straight-line bearing and say so. */
+export async function fetchRoute(from: LatLon, to: LatLon, lang = 'de-DE'): Promise<Route> {
+  try {
+    return await fetchJson<Route>(`${apiBase()}/api/route`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fromLat: from.lat, fromLon: from.lon, toLat: to.lat, toLon: to.lon, lang }),
+    }, 15000)
+  } catch {
+    return { found: false, distanceM: null, path: [], steps: [] }
+  }
 }

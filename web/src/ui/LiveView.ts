@@ -7,6 +7,8 @@ import { arrowPulseHz, ARRIVE_M, beaconFor, cuePan, hapticFor, HAPTIC_ARRIVED, O
 import { bearingDeg, haversineM, relativeBearing } from '../core/geo'
 import { distanceKey } from '../core/speech'
 import { HeadingSmoother } from '../core/smooth'
+import { progressAlong, currentStep, type Route } from '../core/route'
+import { fetchRoute } from '../data'
 import { chevronStack, destinationPin, stackTransform, type ArPhase } from './ar'
 import './ar.css'
 import { startHeading, type Heading } from '../core/heading'
@@ -300,6 +302,12 @@ export function LiveView(opts: {
   let arPhase: ArPhase = 'scanning'
   let lastSafe = 0
 
+  // Walking route to the door. Until it arrives (or if none exists) guidance falls
+  // back to a straight-line bearing, which points through buildings — so the UI says
+  // "direkt" in that case rather than pretending it is a route.
+  let route: Route | null = null
+  let routeAsked = false
+
   const smoother = new HeadingSmoother({ tau: 0.2, deadbandDeg: 1.5 })
   const beacon = cfg.beacon && session.audio ? new BeaconAudio(session.audio) : null
   let beaconOn = false
@@ -440,8 +448,25 @@ export function LiveView(opts: {
     if (!fix) return
     // CONTRACT v1 has no footway graph: snapToGraph passes the fix through (see core/match.ts).
     const pos = snapToGraph(fix, []).pos
+
+    // One request, on the first real fix. Re-routing on every frame would burn quota
+    // and make the arrow jitter between slightly different paths.
+    if (!routeAsked) {
+      routeAsked = true
+      void fetchRoute(pos, target).then((r) => { route = r.found ? r : null })
+    }
+    // Straight line as the floor; the route overrides both bearing and distance.
     dist = haversineM(pos, target)
-    const toDoor = bearingDeg(pos, target)
+    let toDoor = bearingDeg(pos, target)
+    let onRoute = false
+    if (route && route.path.length > 1) {
+      const p = progressAlong(pos, route.path)
+      if (p && !p.offRoute) {
+        toDoor = p.bearing          // aim along the path, not through the building
+        dist = p.remainingM         // metres still to WALK, not as the crow flies
+        onRoute = true
+      }
+    }
     const hasHeading = heading !== null && heading.source !== 'none'
     const smoothedDeg = hasHeading ? smoother.push(heading!.deg) : 0
     rel = hasHeading ? relativeBearing(toDoor, smoothedDeg) : 0
@@ -473,7 +498,12 @@ export function LiveView(opts: {
       coneG.replaceChildren()
       beacon?.update(beaconFor(dist, 0))
     } else {
-      const word = cone ? `${t.roughly}. ${directionWord(rel)}` : directionWord(rel)
+      const step = onRoute && route ? currentStep(dist, route) : null
+      const word = step?.text
+        ? step.text.split('\n')[0]
+        : cone
+          ? `${t.roughly}. ${directionWord(rel)}`
+          : directionWord(rel)
       dirEl.textContent = word
       turnIcon.textContent = turnGlyph(rel)
       // Chevrons foreshorten as they swing away, the way an extruded plate would.

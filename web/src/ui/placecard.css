@@ -52,3 +52,19 @@
 .pc-fact-link:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 .pc-suggest { display: flex; justify-content: center; margin: 20px 0 8px; }
 .pc-card .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Skeleton shown the instant a POI is tapped, replaced when the card arrives.
+   Without it the sheet sat empty for the length of a network round-trip, which is
+   what read as lag next to Google Maps. */
+.pc-skel { padding: 4px 0 8px; display: grid; gap: 12px; }
+.pc-skel-line { height: 16px; border-radius: 8px;
+  background: linear-gradient(90deg, #2a2b2e 25%, #35363a 50%, #2a2b2e 75%);
+  background-size: 200% 100%; animation: pc-shimmer 1.15s linear infinite; }
+.pc-skel-title { height: 26px; width: 62%; }
+.pc-skel-sub { width: 44%; }
+.pc-skel-row { width: 78%; }
+.pc-skel-photo { height: 116px; border-radius: 14px;
+  background: linear-gradient(90deg, #2a2b2e 25%, #35363a 50%, #2a2b2e 75%);
+  background-size: 200% 100%; animation: pc-shimmer 1.15s linear infinite; }
+@keyframes pc-shimmer { to { background-position: -200% 0 } }
+@media (prefers-reduced-motion: reduce) { .pc-skel-line, .pc-skel-photo { animation: none } }

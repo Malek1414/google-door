@@ -831,17 +831,66 @@ export function MapView(opts: {
     setSheet('half')
   }
   /** Tapping a Google POI gives only an id, so fetch the details then open the card. */
-  async function openPlaceById(placeId: string) {
-    status.textContent = t.loading ?? 'Lädt …'
+  /** Places already fetched this session. A second tap on the same POI is instant. */
+  const placeCache = new Map<string, PlaceHit>()
+  let placeInFlight: string | null = null
+
+  /**
+   * A POI tap must feel instant. Google raises the sheet on touch and fills it in
+   * afterwards; awaiting the network first left a dead half-second with nothing but a
+   * status label, which is what read as lag.
+   *
+   * So: pan and raise the sheet on the same frame as the tap, show a skeleton, then
+   * swap in the real card. Repeat taps are served from cache.
+   */
+  async function openPlaceById(placeId: string, at?: google.maps.LatLng | null) {
+    const cached = placeCache.get(placeId)
+    if (cached) {
+      openPlace(cached)
+      return
+    }
+    if (placeInFlight === placeId) return // second tap while the first is still running
+    placeInFlight = placeId
+
+    // --- immediate, same frame as the tap ---
+    if (at) map?.panTo(at)
+    selected = null
+    panelCleanup?.()
+    panelCleanup = null
+    chips.hidden = true
+    morePill.hidden = false
+    goBtn.hidden = true
+    setSheet('half')
+    renderPlaceSkeleton()
+
     try {
       const hit = await fetchPlaceById(placeId)
-      status.textContent = ''
-      if (hit) openPlace(hit)
+      if (hit) {
+        placeCache.set(placeId, hit)
+        openPlace(hit)
+      } else {
+        renderSheet()
+      }
     } catch (err) {
-      status.textContent = ''
       console.warn('[doorway] place lookup failed', err)
+      renderSheet()
+    } finally {
+      placeInFlight = null
     }
   }
+
+  /** Grey bars in the shape of the card that is coming, so the sheet is never empty. */
+  function renderPlaceSkeleton() {
+    sheetBody.replaceChildren(
+      h('div', { class: 'pc-skel', 'aria-busy': 'true', 'aria-label': t.loading ?? 'Lädt' },
+        h('div', { class: 'pc-skel-line pc-skel-title' }),
+        h('div', { class: 'pc-skel-line pc-skel-sub' }),
+        h('div', { class: 'pc-skel-line pc-skel-row' }),
+        h('div', { class: 'pc-skel-photo' }),
+      ),
+    )
+  }
+
 
   function openPlace(p: PlaceHit) {
     selected = null
@@ -1101,7 +1150,7 @@ export function MapView(opts: {
           if (placeId) {
             // A Google POI was tapped. Suppress the default InfoWindow and show our card.
             ev.stop?.()
-            void openPlaceById(placeId)
+            void openPlaceById(placeId, ev.latLng)
             return
           }
           // A panel (editor, business) may use map taps itself: do not collapse it then.

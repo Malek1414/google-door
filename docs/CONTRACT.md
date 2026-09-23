@@ -151,14 +151,15 @@ Rate-limited per session. **Never called from the render loop.**
 
 ## Regression fixture — Berlin Hauptbahnhof
 
-`pipeline/fixtures/hbf_groundtruth.json`. Verified against Overpass 2026-09-23.
-Any pipeline change must keep these true:
+`pipeline/fixtures/hbf_groundtruth.json`, **generated** by `pipeline/make_fixture.py`.
+Never hand-edit it. Re-derive and diff with `make_fixture.py --verify`.
 
-- 109 entrance nodes in bbox `52.5215,13.3640,52.5290,13.3760`
-- 9 `stepFree: true`, 9 `stepFree: false`, 91 `stepFree: null`
-- `node/4398651551` stepFree true, `node/390962614` stepFree false,
-  both named `Hauptbahnhof`, both `level: 0`, **36.9 m apart**
-- `node/2745105107` (Eingang Europaplatz) stepFree true, `door: "revolving"`,
+Bbox `52.5215,13.3640,52.5290,13.3760`, verified 2026-09-23:
+
+- 109 entrance nodes: **8 step-free, 11 not, 90 unknown**
+- closest contradiction **9.1 m**: `node/10795939972` step-free (unnamed) vs
+  `node/1250148681` not step-free (Invalidenstrasse 52 — the addressed door)
+- `node/2745105107` Eingang Europaplatz: stepFree true, `door: "revolving"`,
   `warnings` contains `"revolving"`
 
-If the 37m pair breaks, the merge is wrong. Two-second check, run it often.
+If the 9.1 m pair breaks, the merge is wrong. Two-second check, run it often.

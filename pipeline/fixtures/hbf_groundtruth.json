@@ -1,0 +1,61 @@
+{
+  "_generated_by": "pipeline/make_fixture.py — DERIVED FROM LIVE OSM, never hand-edited",
+  "bbox": [
+    52.5215,
+    13.364,
+    52.529,
+    13.376
+  ],
+  "counts": {
+    "entrances": 109,
+    "stepFreeTrue": 8,
+    "stepFreeFalse": 11,
+    "stepFreeNull": 90
+  },
+  "closest_contradiction": {
+    "_why": "The inaccessible door carries the street address, so it is the one a geocoder resolves. The step-free door is metres away, unnamed.",
+    "stepFree": {
+      "id": "node/10795939972",
+      "lat": 52.5272097,
+      "lon": 13.3711667,
+      "name": null,
+      "entrance": "secondary",
+      "door": null,
+      "wheelchair": "yes",
+      "addr": null
+    },
+    "notStepFree": {
+      "id": "node/1250148681",
+      "lat": 52.5272338,
+      "lon": 13.371295,
+      "name": null,
+      "entrance": "yes",
+      "door": null,
+      "wheelchair": "no",
+      "addr": "Invalidenstraße 52"
+    },
+    "separationM": 9.1,
+    "toleranceM": 1.0
+  },
+  "revolving": {
+    "_why": "Tagged step-free, functionally a barrier. A boolean cannot say this.",
+    "id": "node/2745105107",
+    "lat": 52.5256614,
+    "lon": 13.3690438,
+    "name": "Eingang Europaplatz",
+    "entrance": "main",
+    "door": "revolving",
+    "wheelchair": "yes",
+    "addr": null
+  },
+  "clear_opening": {
+    "id": "node/2739626375",
+    "lat": 52.5243669,
+    "lon": 13.3699107,
+    "name": "Eingang Washingtonplatz",
+    "entrance": "main",
+    "door": null,
+    "wheelchair": "yes",
+    "addr": null
+  }
+}

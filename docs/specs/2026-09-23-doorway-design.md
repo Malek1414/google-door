@@ -11,9 +11,10 @@ building with no idea which of its doors he can actually use. Google Places carr
 `accessibilityOptions.wheelchairAccessibleEntrance` — but it is a **building-level
 boolean**. It asserts that an accessible entrance exists. It does not say where.
 
-Berlin Hauptbahnhof has **109 mapped entrances**. Nine are step-free, nine are
-explicitly not, and 83% are unrecorded. Two doors both named `Hauptbahnhof`, both at
-street level, sit **36.9 m apart** — one works, one doesn't. Maps shows one pin.
+Berlin Hauptbahnhof has **109 mapped entrances**. Eight are step-free, eleven are
+explicitly not, and 83% are unrecorded. Two doors sit **9.1 m apart** — one step-free,
+one not — and the inaccessible one is the one carrying the street address, so it is the
+door a geocoder resolves. Maps shows one pin.
 
 **Doorway supplies the missing primitive: the coordinates of the specific door, and
 guidance to it.**
@@ -124,7 +125,9 @@ pieces fit on push.
 
 Pure modules (`geo`, `beacon`, `profile`, `match`) unit-test with no device.
 `pipeline/fixtures/hbf_groundtruth.json` is the pipeline regression: 109 nodes,
-9/9/91 split, the 36.9 m pair, the Europaplatz revolving-door warning. A replay
+8/11/90 split, the 9.1 m pair, the Europaplatz revolving-door warning. The fixture is
+**generated** by `pipeline/make_fixture.py` from live OSM, never hand-written — an
+earlier hand-transcribed fixture encoded a wheelchair value OSM did not carry. A replay
 simulator (`?sim=1`) runs the whole overlay against a recorded track, so the AR layer
 is developed indoors rather than by walking to Hauptbahnhof for every change.
 

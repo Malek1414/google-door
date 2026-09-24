@@ -5,10 +5,11 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { STEP_M } from '../src/core/anchor'
-import { fallbackLine, safetyLine, unsureLine } from '../src/core/instruct'
+import { STILL_MS } from '../src/core/approach'
+import { fallbackLine, noDirectionLine, pitchFor, safetyLine, thresholdLine, throughLine, unsureLine } from '../src/core/instruct'
 import { angleDelta } from '../src/core/stability'
 import type { Entrance } from '../src/core/types'
-import { createApproachEngine, FALLBACK_AFTER, parseDoorFix, pitchFor, thresholdLine } from '../src/ui/approachEngine'
+import { createApproachEngine, FALLBACK_AFTER, INSIDE_MIN_CONFIDENCE, parseDoorFix, saysInside } from '../src/ui/approachEngine'
 import { engine, type ApproachView, type CompassReading } from '../src/ui/approachPort'
 import { startDemoApproach } from '../src/ui/approachDemo'
 import { MIN_STEP_MS, StepDetector } from '../src/ui/stepCounter'
@@ -177,6 +178,13 @@ describe('the real engine, driven through ApproachIO', () => {
     expect(r.views.every((v) => v.relBearingDeg === null && v.source === null && v.beaconPitch === undefined)).toBe(true)
   })
 
+  it('without a surveyed bearing it says so, exactly once, instead of falling silent', async () => {
+    const r = rig(() => ({ found: false }), { approachBearing: null })
+    r.heading(100)
+    for (let i = 0; i < 40 * FALLBACK_AFTER; i++) await r.tick()
+    expect(r.spoken().filter((x) => x.includes(noDirectionLine('de')))).toHaveLength(1)
+  })
+
   it('never has more than one request in flight', async () => {
     let release!: (v: unknown) => void
     const r = rig(() => new Promise((res) => (release = res)))
@@ -217,12 +225,107 @@ describe('the real engine, driven through ApproachIO', () => {
   })
 })
 
+/** Door straight ahead, 1.2 m: aimed and at the threshold from the first fix. */
+const atDoor = (extra: Record<string, unknown> = {}) => () => ({
+  found: true, bearingDeg: 0, distanceM: 1.2, confidence: 0.9, source: 'gemini-frame', ...extra,
+})
+
+describe('through: proposed by vision or by stillness, taken back by "Noch draußen"', () => {
+  it('standing still STILL_MS at the threshold proposes through, said once', async () => {
+    const r = rig(atDoor())
+    r.heading(100)
+    await r.tick()
+    await r.tick()
+    expect(r.views.at(-1)!.phase).toBe('threshold')
+    for (let ms = 0; ms < STILL_MS - 500; ms += 100) await r.tick()
+    expect(r.views.at(-1)!.phase).toBe('threshold')
+    for (let i = 0; i < 10; i++) await r.tick()
+    expect(r.views.at(-1)!.phase).toBe('through')
+    expect(r.views.at(-1)!.beaconPitch).toBeUndefined()
+    expect(r.views.at(-1)!.relBearingDeg).toBeNull()
+    expect(r.views.at(-1)!.distanceM).toBeNull()
+    expect(r.spoken().filter((x) => x.includes(throughLine('de')))).toHaveLength(1)
+  })
+
+  it('a step resets the stillness clock', async () => {
+    const r = rig(atDoor())
+    r.heading(100)
+    await r.tick()
+    await r.tick()
+    for (let ms = 0; ms < STILL_MS - 1000; ms += 100) await r.tick()
+    r.step()
+    for (let ms = 0; ms < STILL_MS - 1000; ms += 100) await r.tick()
+    expect(r.views.at(-1)!.phase).toBe('threshold')
+  })
+
+  it('stillOutside takes it back and restarts the clock, so it is not re-proposed at once', async () => {
+    const r = rig(atDoor())
+    r.heading(100)
+    await r.tick()
+    for (let ms = 0; ms <= STILL_MS + 500; ms += 100) await r.tick()
+    expect(r.views.at(-1)!.phase).toBe('through')
+    r.session.stillOutside()
+    expect(r.views.at(-1)!.phase).toBe('threshold')
+    for (let ms = 0; ms < STILL_MS - 500; ms += 100) await r.tick()
+    expect(r.views.at(-1)!.phase).toBe('threshold')
+    for (let i = 0; i < 10; i++) await r.tick()
+    expect(r.views.at(-1)!.phase).toBe('through')
+  })
+
+  it('vision inside:true at confidence >= 0.6 proposes through at once', async () => {
+    const r = rig(atDoor({ inside: true, confidence: INSIDE_MIN_CONFIDENCE }))
+    r.heading(100)
+    await r.tick()
+    await r.tick()
+    expect(r.views.at(-1)!.phase).toBe('through')
+    expect(r.views.at(-1)!.instruction).toContain(throughLine('de'))
+  })
+
+  it('inside:true with no door in view (entrance behind) still counts', async () => {
+    let n = 0
+    const r = rig(() => (n++ === 0 ? atDoor()() : { found: false, inside: true, confidence: 0.9 }))
+    r.heading(100)
+    for (let i = 0; i < 20; i++) await r.tick()
+    expect(r.views.at(-1)!.phase).toBe('through')
+  })
+
+  it('inside:false or low confidence never proposes through', async () => {
+    for (const extra of [{ inside: false }, { inside: true, confidence: 0.55 }, { inside: 'true' }]) {
+      const r = rig(atDoor(extra))
+      r.heading(100)
+      for (let i = 0; i < 20; i++) await r.tick() // 2 s: under STILL_MS
+      expect(r.views.at(-1)!.phase).toBe('threshold')
+    }
+  })
+
+  it('inside:true on a fix the guard rejects is ignored', async () => {
+    // First fix anchors at -20; the second jumps 80 deg with the phone still: untrusted.
+    let n = 0
+    const r = rig(() => (n++ === 0
+      ? { found: true, bearingDeg: -20, distanceM: 8, confidence: 0.9, source: 'gemini-frame' }
+      : { found: true, bearingDeg: 60, distanceM: 8, confidence: 0.9, inside: true, source: 'gemini-frame' }))
+    r.heading(100)
+    for (let i = 0; i < 17; i++) await r.tick()
+    expect(n).toBe(2)
+    expect(r.views.at(-1)!.phase).not.toBe('through')
+  })
+})
+
 describe('parseDoorFix', () => {
   it('only a found, confident, numeric fix counts', () => {
     expect(parseDoorFix(null)).toBeNull()
     expect(parseDoorFix({ found: false, bearingDeg: null })).toBeNull()
     expect(parseDoorFix({ found: true, bearingDeg: 5, distanceM: 4, confidence: 0.3 })).toBeNull()
     expect(parseDoorFix({ found: true, bearingDeg: 5, distanceM: 4, confidence: 0.8, source: 'osm-fallback' })!.source).toBe('gemini-frame')
+  })
+  it('inside counts only as an explicit true at confidence >= 0.6', () => {
+    expect(saysInside({ inside: true, confidence: 0.6 })).toBe(true)
+    expect(saysInside({ found: false, inside: true, confidence: 0.9 })).toBe(true)
+    expect(saysInside({ inside: true, confidence: 0.59 })).toBe(false)
+    expect(saysInside({ inside: false, confidence: 0.9 })).toBe(false)
+    expect(saysInside({ inside: 'true', confidence: 0.9 })).toBe(false)
+    expect(saysInside({ confidence: 0.9 })).toBe(false)
+    expect(saysInside(null)).toBe(false)
   })
 })
 
@@ -235,6 +338,12 @@ describe('engine(): real by default, demo only on request', () => {
     for (const f of ['../src/ui/approachEngine.ts', '../src/ui/stepCounter.ts']) {
       expect(readFileSync(resolve(__dirname, f), 'utf8')).not.toMatch(/navigator\.geolocation\s*\./)
     }
+  })
+  it('the engine holds no wording or pitch curve of its own: all of it is core/instruct.ts', () => {
+    const src = readFileSync(resolve(__dirname, '../src/ui/approachEngine.ts'), 'utf8')
+    expect(src).not.toMatch(/function\s+(thresholdLine|metresLine|throughLine|noDirectionLine|pitchFor)\b/)
+    expect(src).not.toMatch(/PITCH_(AWAY|ON|MIN|MAX)_HZ\s*=/)
+    expect(src).not.toMatch(/['`"](Die Tür|Du müsstest|Ich sehe|The door|You should)|Meter['`]|metres?['`]/)
   })
 })
 

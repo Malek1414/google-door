@@ -14,7 +14,18 @@
 
 import { Approach, type ApproachState } from '../core/approach'
 import { MAX_AGE_MS, type Anchor } from '../core/anchor'
-import { type Band, bandText, fallbackLine, safetyLine, unsureLine } from '../core/instruct'
+import {
+  type Band,
+  bandText,
+  fallbackLine,
+  metresLine,
+  noDirectionLine,
+  pitchFor,
+  safetyLine,
+  thresholdLine,
+  throughLine,
+  unsureLine,
+} from '../core/instruct'
 import { StabilityGuard, angleDelta } from '../core/stability'
 import { lang as appLang } from '../strings'
 import type { ApproachIO, ApproachSession, ApproachView, DoorFixSource, StartApproach } from './approachPort'
@@ -30,24 +41,9 @@ export const FALLBACK_AFTER = 3
  *  direction, not a distance, and GPS is not allowed to supply one. */
 export const FALLBACK_ASSUMED_M = 10
 export const TICK_MS = 100
-/** Beacon pitch: low when facing away, high when on bearing. Rises continuously. */
-export const PITCH_AWAY_HZ = 330
-export const PITCH_ON_HZ = 740
-
-/** Contract phrase for the threshold phase (CONTRACT "Phases"). */
-export function thresholdLine(lang: string): string {
-  return lang.startsWith('de') ? 'Die Tür ist direkt vor dir.' : 'The door is right in front of you.'
-}
-
-function metresLine(m: number, lang: string): string {
-  return lang.startsWith('de') ? `${m} Meter` : `${m} ${m === 1 ? 'metre' : 'metres'}`
-}
-
-/** Pitch from bearing error: squared so the last few degrees are the easiest to hear. */
-export function pitchFor(relBearingDeg: number): number {
-  const closeness = 1 - Math.min(180, Math.abs(relBearingDeg)) / 180
-  return Math.round(PITCH_AWAY_HZ + (PITCH_ON_HZ - PITCH_AWAY_HZ) * closeness * closeness)
-}
+/** CONTRACT "DoorFix": `inside` ends the guidance, so it needs an explicit true at
+ *  this confidence or above. A wrong true abandons someone on the pavement. */
+export const INSIDE_MIN_CONFIDENCE = 0.6
 
 export interface EngineDeps {
   fetch: typeof fetch
@@ -74,6 +70,15 @@ interface VisionFix {
   source: DoorFixSource
 }
 
+/** Does this /api/door-fix body say "interior"? Only an explicit true at
+ *  INSIDE_MIN_CONFIDENCE counts; absent, hedged or low-confidence is "still outside".
+ *  Independent of `found`: indoors the entrance is BEHIND the camera, so found is false. */
+export function saysInside(raw: unknown): boolean {
+  if (typeof raw !== 'object' || raw === null) return false
+  const o = raw as Record<string, unknown>
+  return o.inside === true && typeof o.confidence === 'number' && o.confidence >= INSIDE_MIN_CONFIDENCE
+}
+
 /** /api/door-fix body -> a usable fix, or null for "no door" in any shape. */
 export function parseDoorFix(raw: unknown): VisionFix | null {
   if (typeof raw !== 'object' || raw === null) return null
@@ -90,7 +95,12 @@ export function parseDoorFix(raw: unknown): VisionFix | null {
 
 const TIMEOUT_MS = 15000
 
-async function requestFix(deps: EngineDeps, base: string, frame: string, headingDeg: number): Promise<VisionFix | null> {
+interface VisionReply {
+  fix: VisionFix | null
+  inside: boolean
+}
+
+async function requestFix(deps: EngineDeps, base: string, frame: string, headingDeg: number): Promise<VisionReply | null> {
   const ctl = new AbortController()
   const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS)
   try {
@@ -101,7 +111,8 @@ async function requestFix(deps: EngineDeps, base: string, frame: string, heading
       signal: ctl.signal,
     })
     if (!r.ok) return null
-    return parseDoorFix(await r.json())
+    const raw: unknown = await r.json()
+    return { fix: parseDoorFix(raw), inside: saysInside(raw) }
   } catch {
     return null
   } finally {
@@ -129,6 +140,8 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     let lastSourceSpoken: DoorFixSource | null = null
     let stopped = false
     let pendingUnsure = false
+    let pendingNoDirection = false
+    let saidNoDirection = false
 
     // The safety line is the first thing the session ever says, and it is said once.
     let view: ApproachView = {
@@ -172,9 +185,10 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
       const at = { heading, steps, ts: now }
       inFlight = true
       lastRequestAt = now
-      void requestFix(deps, io.apiBase, frame, at.heading).then((fix) => {
+      void requestFix(deps, io.apiBase, frame, at.heading).then((reply) => {
         inFlight = false
         if (stopped) return
+        const fix = reply?.fix ?? null
         const wasLive = guard.mode === 'live'
         const verdict = fix ? guard.push({ bearingDeg: fix.bearingDeg, headingDeg: at.heading, confidence: fix.confidence }) : null
         if (fix && verdict?.trusted) {
@@ -189,9 +203,17 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
               anchor = fb
               approach.setAnchor(fb)
               failures = 0
+            } else if (!saidNoDirection) {
+              // Vision failed and the door has no surveyed bearing: nothing to point at.
+              // Never dead-reckon, but say so: silence reads as a crash.
+              pendingNoDirection = true
             }
           }
         }
+        // Interior proposes "through". Only from a reply the guard did not reject: a
+        // found fix must be trusted; a found:false reply (entrance behind the camera,
+        // as it is indoors) carries no bearing for the guard to judge.
+        if (reply?.inside && (!fix || verdict?.trusted)) approach.visionSaysInside()
         if (wasLive && guard.hasFallenBack) pendingUnsure = true
         tick()
       })
@@ -207,6 +229,11 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
         pendingUnsure = false
         lines.push(unsureLine(L))
       }
+      if (pendingNoDirection && !saidNoDirection) {
+        saidNoDirection = true
+        pendingNoDirection = false
+        lines.push(noDirectionLine(L))
+      }
 
       const p = st.projection && st.projection.fresh ? st.projection : null
       const source = p ? p.source : null
@@ -214,11 +241,14 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
         if (p.source === 'osm-fallback' && lastSourceSpoken !== 'osm-fallback') lines.push(fallbackLine(L))
         lastSourceSpoken = p.source
 
-        if (st.phase === 'threshold' && lastPhase !== 'threshold' && p.source !== 'osm-fallback') {
-          lines.push(thresholdLine(L))
-        } else if (st.phase !== 'through' && st.band !== lastBand) {
-          lines.push(bandText(st.band, L))
-          lastBand = st.band
+        // "through" is said below, since it does not need a fresh projection.
+        if (st.phase !== 'through') {
+          if (st.phase === 'threshold' && lastPhase !== 'threshold' && p.source !== 'osm-fallback') {
+            lines.push(thresholdLine(L))
+          } else if (st.band !== lastBand) {
+            lines.push(bandText(st.band, L))
+            lastBand = st.band
+          }
         }
         // A map bearing gives a direction, never a distance.
         if (st.speakDistanceM !== null && p.source !== 'osm-fallback') lines.push(metresLine(st.speakDistanceM, L))
@@ -227,16 +257,21 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
         // said again once a fix is back.
         lastBand = null
       }
+      // Vision can propose "through" from a reply with no door in it, so this does not
+      // wait for a fresh projection.
+      if (st.phase === 'through' && lastPhase !== 'through') lines.push(throughLine(L))
       lastPhase = st.phase
 
+      // In `through` there is nothing left to point at: no arrow, no metres, no beacon.
+      const aim = st.phase === 'through' ? null : p
       emit({
         phase: st.phase,
-        relBearingDeg: p ? p.relBearingDeg : null,
-        distanceM: p && p.source !== 'osm-fallback' ? p.distanceM : null,
+        relBearingDeg: aim ? aim.relBearingDeg : null,
+        distanceM: aim && aim.source !== 'osm-fallback' ? aim.distanceM : null,
         instruction: lines.length ? lines.join(' ') : view.instruction,
         source: source ?? view.source,
         unsure: guard.hasFallenBack,
-        beaconPitch: p && st.phase !== 'through' ? pitchFor(p.relBearingDeg) : undefined,
+        beaconPitch: aim ? pitchFor(aim.relBearingDeg) : undefined,
       })
       maybeRequest(st)
     }
@@ -255,6 +290,7 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
         return () => subs.delete(cb)
       },
       stillOutside() {
+        // Core takes the proposal back and restarts its stillness clock.
         approach.stillOutside()
         lastPhase = approach.currentPhase
         lastBand = null

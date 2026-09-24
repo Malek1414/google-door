@@ -28,6 +28,8 @@ export interface DoorFix {
   confidence: number
   kind: DoorKind
   note: string
+  /** Vision sees interior. Counts only as an explicit true at confidence >= 0.6. */
+  inside: boolean
   ts: number
   source: DoorFixSource
 }

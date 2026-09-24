@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { ARRIVE_JITTER_M, isArrived, type TimedFix } from '../src/ui/LiveView'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { APPROACH_PIN_M, ARRIVE_JITTER_M, isArrived, nearTriggerShown, type TimedFix } from '../src/ui/LiveView'
 
 const door = { lat: 52.52, lon: 13.405 }
 const M_PER_DEG_LAT = 111_195
@@ -34,5 +36,27 @@ describe('isArrived', () => {
   })
   it('bad coordinates are not arrived', () => {
     expect(isArrived([{ lat: NaN, lon: NaN, t: 0 }], door)).toBe(false)
+  })
+})
+
+describe('nearTriggerShown: "Zum Eingang führen" in the Live View panel', () => {
+  it('appears from APPROACH_PIN_M in, long before GPS says arrived', () => {
+    expect(nearTriggerShown(40, false)).toBe(false)
+    expect(nearTriggerShown(APPROACH_PIN_M, false)).toBe(true)
+    // 10 m out: GPS near buildings may never get to 3-4 m, the button must be there.
+    expect(nearTriggerShown(10, false)).toBe(true)
+  })
+  it('does not flash on jitter at the edge (1.3x hysteresis)', () => {
+    expect(nearTriggerShown(APPROACH_PIN_M + 5, true)).toBe(true)
+    expect(nearTriggerShown(APPROACH_PIN_M * 1.3 + 1, true)).toBe(false)
+  })
+  it('an unknown distance keeps the current state', () => {
+    expect(nearTriggerShown(NaN, true)).toBe(true)
+    expect(nearTriggerShown(NaN, false)).toBe(false)
+  })
+  it('both triggers open the approach through one handler', () => {
+    const src = readFileSync(resolve(__dirname, '../src/ui/LiveView.ts'), 'utf8')
+    expect(src).toMatch(/nearBtn\?\.addEventListener\('click', startApproach\)/)
+    expect(src).toMatch(/approachBtn\?\.addEventListener\('click', startApproach\)/)
   })
 })

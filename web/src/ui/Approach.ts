@@ -32,6 +32,8 @@ export const AP = {
     fromMap: 'Richtung aus der Karte, nicht aus der Kamera.',
     stillOutside: 'Noch draußen',
     checking: 'Ich prüfe die Tür.',
+    aim: 'Kamera auf die Tür halten.',
+    recheck: 'Nochmal prüfen',
     checkTitle: 'Die Tür',
     offline: 'Die Prüfung ist gerade nicht erreichbar.',
     noCamera: 'Kein Kamerabild.',
@@ -42,6 +44,8 @@ export const AP = {
     fromMap: 'Direction from the map, not the camera.',
     stillOutside: 'Still outside',
     checking: 'Checking the door.',
+    aim: 'Hold the camera on the door.',
+    recheck: 'Check again',
     checkTitle: 'The door',
     offline: 'The check is not available right now.',
     noCamera: 'No camera picture.',
@@ -282,42 +286,80 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
   return teardown
 }
 
+/** Time to lift the phone from the button to the door before the frame is taken. */
+export const AIM_DELAY_MS = 1500
+
 function DoorCheckScreen(opts: { door: Entrance; config: OutputConfig; onExit: () => void }): () => void {
   const name = opts.door.name ?? t.unnamedEntrance
   const { root, cam } = shell(`${AP.checkTitle}: ${name}`, () => exit())
   root.classList.add('apr-check')
-  const status = h('p', { class: 'apr-status', role: 'status' }, AP.checking)
+  const status = h('p', { class: 'apr-status', role: 'status' }, AP.aim)
   const card = h('div', { class: 'apr-card', hidden: true })
-  root.append(h('div', { class: 'apr-panel' }, status, card))
+  const again = h('button', { class: 'apr-big apr-recheck', type: 'button', hidden: true }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'refresh'), AP.recheck)
+  root.append(h('div', { class: 'apr-panel' }, status, card, again))
   mount(root)
-  announce(AP.checking)
 
   let closed = false
-  // Exactly one request per screen. No retry loop, no beacon, no turn-by-turn.
-  let frame: string | null = null
-  void runDoorCheckOnce(
-    frameWhenReady(cam).then((f) => (frame = f)),
-    checkDoor,
-  ).then((result) => {
-    if (closed) return
-    const rows = verdictRows(result, lang)
-    const modelNote = verdictNote(result)
-    card.replaceChildren(
-      h('h2', { class: 'apr-card-title' }, AP.checkTitle),
-      h('dl', { class: 'apr-rows' }, ...rows.flatMap((r) => [h('dt', {}, r.label), h('dd', { class: r.unclear ? 'is-unclear' : '' }, r.value)])),
-      ...(modelNote ? [h('p', { class: 'apr-note' }, modelNote)] : []),
-    )
-    card.hidden = false
-    const note = !frame ? AP.noCamera : !result.reachable ? AP.offline : ''
-    status.textContent = note
-    status.hidden = !note
-    const spoken = [...rows.map((r) => `${r.label}: ${r.value}.`), modelNote, note].filter(Boolean).join(' ')
-    if (opts.config.speak) speak(spoken, { interrupt: true })
-    announce(spoken)
+  let timer = 0
+  let run = 0
+
+  const say = (text: string, interrupt = true) => {
+    if (opts.config.speak) speak(text, { interrupt })
+    announce(text)
+  }
+
+  // One request per tap: on open (after the aim pause) and on "Nochmal prüfen".
+  // No retry loop, no beacon, no turn-by-turn.
+  const check = () => {
+    const mine = ++run
+    status.textContent = AP.checking
+    status.hidden = false
+    say(AP.checking)
+    let frame: string | null = null
+    void runDoorCheckOnce(
+      frameWhenReady(cam).then((f) => (frame = f)),
+      checkDoor,
+    ).then((result) => {
+      if (closed || mine !== run) return
+      const rows = verdictRows(result, lang)
+      const modelNote = verdictNote(result)
+      card.replaceChildren(
+        h('h2', { class: 'apr-card-title' }, AP.checkTitle),
+        h('dl', { class: 'apr-rows' }, ...rows.flatMap((r) => [h('dt', {}, r.label), h('dd', { class: r.unclear ? 'is-unclear' : '' }, r.value)])),
+        ...(modelNote ? [h('p', { class: 'apr-note' }, modelNote)] : []),
+      )
+      card.hidden = false
+      const note = !frame ? AP.noCamera : !result.reachable ? AP.offline : ''
+      status.textContent = note
+      status.hidden = !note
+      again.hidden = false
+      again.disabled = false
+      say([...rows.map((r) => `${r.label}: ${r.value}.`), modelNote, note].filter(Boolean).join(' '))
+    })
+  }
+
+  // The phone is still pointed at the button that opened this screen: ask the user to
+  // aim first, and take the frame only after a pause.
+  const aimThenCheck = () => {
+    status.textContent = AP.aim
+    status.hidden = false
+    say(AP.aim)
+    window.clearTimeout(timer)
+    timer = window.setTimeout(() => {
+      if (!closed) check()
+    }, AIM_DELAY_MS)
+  }
+  again.addEventListener('click', () => {
+    // Disabled, not hidden: VoiceOver focus stays on the button for the next tap.
+    if (again.disabled) return
+    again.disabled = true
+    aimThenCheck()
   })
+  aimThenCheck()
 
   function teardown() {
     closed = true
+    window.clearTimeout(timer)
     try {
       speechSynthesis?.cancel()
     } catch {

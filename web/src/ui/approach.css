@@ -73,6 +73,7 @@
 .apr-big:active, .apr-trigger:active { background: #4fb0b7; }
 .apr-big[hidden], .apr-trigger[hidden] { display: none; }
 .apr-outside { min-height: 88px; font-size: 26px; }
+.apr-big:disabled { opacity: 0.6; cursor: default; }
 .apr-trigger .ms, .apr-big .ms { font-size: 28px; color: var(--apr-teal-ink, #00363a); }
 
 /* The disclaimer stays on screen for the whole approach (read, not only heard). */

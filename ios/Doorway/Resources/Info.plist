@@ -37,9 +37,7 @@
   <key>NSMotionUsageDescription</key>
   <string>Doorway nutzt den Kompass, um den Pfeil in die richtige Richtung zu drehen.</string>
   <key>NSMicrophoneUsageDescription</key>
-  <string>Für Sprachsuche und für Fragen zum Eingang.</string>
-  <key>NSSpeechRecognitionUsageDescription</key>
-  <string>Damit du Fragen zum Eingang sprechen kannst, zum Beispiel ob er stufenlos ist.</string>
+  <string>Nur für Sprachsuche.</string>
   <!-- Plain HTTP only to local addresses (the LAN dev server, localhost). Everything on the
        internet, including the serveo tunnel, must be HTTPS. -->
   <key>NSAppTransportSecurity</key>

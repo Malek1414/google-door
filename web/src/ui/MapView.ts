@@ -186,8 +186,18 @@ export function MapView(opts: {
   // ---- top: search bar, chips, layers ----
   const status = h('p', { class: 'gm-status', role: 'status' }, '')
   const mapEl = h('div', { class: 'gm-map', role: 'region', 'aria-label': t.mapTitle })
-  const searchInput = h('input', { class: 'gm-search-input', type: 'search', placeholder: t.searchPlaceholder, 'aria-label': t.searchLabel, autocomplete: 'off', enterkeyhint: 'search' }) as HTMLInputElement
-  const results = h('ul', { class: 'gm-results', role: 'listbox', 'aria-label': t.searchLabel, hidden: true })
+  // The pill is a button, not an input: it only opens the full-screen search. As an
+  // input it opened the overlay on focus, so keyboard and Switch Control users tabbing
+  // past it were trapped in the search (WCAG 2.1.1, 3.2.1).
+  const searchInput = h('button', { class: 'gm-search-input is-empty', type: 'button', 'aria-haspopup': 'dialog' }, t.searchPlaceholder) as HTMLButtonElement
+  let searchQuery = ''
+  const setSearchQuery = (q: string) => {
+    searchQuery = q
+    searchInput.textContent = q || t.searchPlaceholder
+    searchInput.classList.toggle('is-empty', !q)
+    searchInput.setAttribute('aria-label', q ? `${t.searchPlaceholder}: ${q}` : t.searchPlaceholder)
+  }
+  setSearchQuery('')
   const micBtn = h('button', { class: 'gm-search-btn', type: 'button', 'aria-label': t.voiceSearch }, icon('mic'))
   const lensBtn = h('button', { class: 'gm-search-btn', type: 'button', 'aria-label': t.look }, icon('photo_camera'))
   const avatar = h('button', { class: 'gm-avatar', type: 'button', 'aria-label': t.profileButton, onclick: opts.onSettings }, 'S')
@@ -364,7 +374,7 @@ export function MapView(opts: {
     { class: 'gm', 'aria-labelledby': 'map-title' },
     h('h1', { id: 'map-title', class: 'sr-only' }, t.mapTitle),
     mapEl,
-    h('div', { class: 'gm-top' }, search, results, chips, morePill, status),
+    h('div', { class: 'gm-top' }, search, chips, morePill, status),
     layersBtn,
     rightCol,
     sheet,
@@ -1263,65 +1273,27 @@ export function MapView(opts: {
       map.setZoom(18)
     } else void load(bboxAround(lat, lon, 500))
   }
-  function renderResults() {
-    const q = searchInput.value.trim().toLowerCase()
-    if (!q) {
-      results.hidden = true
-      return
-    }
-    const placeHits = t.places.filter((p) => p.name.toLowerCase().includes(q)).map((p) => ({ title: p.name, sub: p.sub, go: () => flyTo(p.lat, p.lon), ic: 'location_on' }))
-    const doorHits = entrances
-      .filter((e) => e.name && e.name.toLowerCase().includes(q) && markerKind(e) !== 'no-marker')
-      .map((e) => ({ title: e.name!, sub: stepFreeLabel(e.stepFree), go: () => openEntrance(e), ic: 'door_front' }))
-    const hits = [...placeHits, ...doorHits].slice(0, SEARCH_MAX)
-    results.replaceChildren(
-      ...(hits.length
-        ? hits.map((r) =>
-            h(
-              'li',
-              { role: 'option' },
-              h(
-                'button',
-                {
-                  class: 'gm-result',
-                  type: 'button',
-                  onclick: () => {
-                    searchInput.value = r.title
-                    results.hidden = true
-                    searchInput.blur()
-                    r.go()
-                  },
-                },
-                icon(r.ic),
-                h('span', { class: 'gm-row-text' }, h('span', { class: 'gm-row-title' }, r.title), h('span', { class: 'gm-row-meta' }, r.sub)),
-              ),
-            ),
-          )
-        : [h('li', { class: 'gm-empty' }, t.searchNoResults)]),
-    )
-    results.hidden = false
+  const runQuery = (q: string) => {
+    setSearchQuery(q)
+    if (!map) return
+    status.textContent = t.loading
+    searchText(map, q)
+      .then((hits) => {
+        status.textContent = hits.length ? '' : t.searchNoResults
+        showPlaces(hits, q)
+      })
+      .catch((err) => (status.textContent = err instanceof PlacesUnavailable ? err.message : t.placesError))
   }
-  // Tapping the bar opens the full-screen search like Maps; the inline list stays as fallback.
+  // Tapping the bar opens the full-screen search like Maps. Click also fires for Enter
+  // and Space, and focus alone never opens it; closing hands focus back to the pill.
   let searchOpen = false
-  searchInput.addEventListener('focus', () => {
+  searchInput.addEventListener('click', () => {
     if (searchOpen) return
     searchOpen = true
-    searchInput.blur()
-    const runQuery = (q: string) => {
-      searchInput.value = q
-      if (!map) return
-      status.textContent = t.loading
-      searchText(map, q)
-        .then((hits) => {
-          status.textContent = hits.length ? '' : t.searchNoResults
-          showPlaces(hits, q)
-        })
-        .catch((err) => (status.textContent = err instanceof PlacesUnavailable ? err.message : t.placesError))
-    }
     let close: () => void = () => {}
     try {
       close = openSearchScreen(root, {
-        initial: searchInput.value,
+        initial: searchQuery,
         onQuery: (q) => {
           close()
           runQuery(q)
@@ -1332,6 +1304,9 @@ export function MapView(opts: {
         },
         onClose: () => {
           searchOpen = false
+          // Safari does not focus a tapped button, so the screen may have nothing to
+          // hand focus back to. The pill is where the user came from.
+          if (!document.activeElement || document.activeElement === document.body) searchInput.focus({ preventScroll: true })
         },
         suggestions: (q) => {
           const ql = q.trim().toLowerCase()
@@ -1346,30 +1321,8 @@ export function MapView(opts: {
     } catch (err) {
       console.error('[doorway] search screen failed', err)
       searchOpen = false
-      searchInput.focus()
     }
   })
-  searchInput.addEventListener('input', renderResults)
-  searchInput.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Enter') {
-      const first = results.querySelector<HTMLButtonElement>('button')
-      if (first) first.click()
-      else if (map && searchInput.value.trim()) {
-        const q = searchInput.value.trim()
-        results.hidden = true
-        searchInput.blur()
-        status.textContent = t.loading
-        searchText(map, q)
-          .then((hits) => {
-            status.textContent = hits.length ? '' : t.searchNoResults
-            showPlaces(hits, q)
-          })
-          .catch((err) => (status.textContent = err instanceof PlacesUnavailable ? err.message : t.placesError))
-      }
-    }
-    if (ev.key === 'Escape') results.hidden = true
-  })
-
   // Voice search through the browser's speech recognition (Safari and Chrome ship it prefixed).
   type Rec = { lang: string; interimResults: boolean; start(): void; onresult: ((ev: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null }
   const RecCtor = (window as unknown as { webkitSpeechRecognition?: new () => Rec; SpeechRecognition?: new () => Rec }).SpeechRecognition ?? (window as unknown as { webkitSpeechRecognition?: new () => Rec }).webkitSpeechRecognition
@@ -1381,8 +1334,8 @@ export function MapView(opts: {
       rec.lang = document.documentElement.lang === 'en' ? 'en-US' : 'de-DE'
       rec.interimResults = false
       rec.onresult = (ev) => {
-        searchInput.value = ev.results[0]?.[0]?.transcript ?? ''
-        renderResults()
+        const q = (ev.results[0]?.[0]?.transcript ?? '').trim()
+        if (q) runQuery(q)
       }
       rec.start()
       announce(t.listening)
@@ -1467,7 +1420,6 @@ export function MapView(opts: {
             if (e) map?.setCenter({ lat: e.lat, lng: e.lon })
           })
         map.addListener('click', (ev: google.maps.MapMouseEvent | google.maps.IconMouseEvent) => {
-          results.hidden = true
           const placeId = (ev as google.maps.IconMouseEvent).placeId
           if (placeId) {
             // A Google POI was tapped. Suppress the default InfoWindow and show our card.

@@ -15,7 +15,6 @@
 import { Approach, type ApproachState } from '../core/approach'
 import { MAX_AGE_MS, type Anchor } from '../core/anchor'
 import {
-  atDoorLine,
   type Band,
   bandText,
   doorTypeLine,
@@ -400,7 +399,7 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
       // Vision can propose "through" from a reply with no door in it, so this does not
       // wait for a fresh projection.
       // Only vision earns "inside"; stillness only knows the user stopped at the door.
-      if (st.phase === 'through' && lastPhase !== 'through') lines.push(st.throughBy === 'still' ? atDoorLine(L) : throughLine(L))
+      if (st.phase === 'through' && lastPhase !== 'through') lines.push(throughLine(L))
       lastPhase = st.phase
 
       // In `through` there is nothing left to point at: no arrow, no metres, no beacon.

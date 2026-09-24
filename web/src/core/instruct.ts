@@ -187,9 +187,10 @@ export function atDoorLine(lang = 'de'): string {
   return lang.startsWith('de') ? 'Du bist an der Tür.' : 'You are at the door.'
 }
 
-/** Spoken when vision sees the interior. Vision proposes; the user can take it back. */
+/** The end of the approach: said once in `through`, then the screen returns to the map.
+ *  "Noch draußen" stays on screen until then, so the user can still take it back. */
 export function throughLine(lang = 'de'): string {
-  return lang.startsWith('de') ? 'Du müsstest jetzt drin sein.' : 'You should be inside now.'
+  return lang.startsWith('de') ? 'Du bist durch die Tür.' : 'You are through the door.'
 }
 
 export function metresLine(m: number, lang = 'de'): string {

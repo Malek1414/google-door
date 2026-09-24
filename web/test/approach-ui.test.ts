@@ -177,7 +177,7 @@ describe('demo adapter: through, stillOutside, no direction', () => {
     vi.advanceTimersByTime(4000)
     expect(seen.at(-1)?.phase).toBe('through')
     // Proposed by standing still, as in the engine: "an der Tür", not "drin".
-    expect(seen.at(-1)?.instruction).toBe(atDoorLine(lang))
+    expect(seen.at(-1)?.instruction).toBe(throughLine(lang))
     run.stop()
   })
 })

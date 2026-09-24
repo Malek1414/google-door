@@ -246,7 +246,7 @@ const atDoor = (extra: Record<string, unknown> = {}) => () => ({
 })
 
 describe('through: proposed by vision or by stillness, taken back by "Noch draußen"', () => {
-  it('standing still STILL_MS at the threshold proposes through as "at the door", never "inside", said once', async () => {
+  it('standing still STILL_MS at the threshold proposes through: "Du bist durch die Tür.", said once', async () => {
     const r = rig(atDoor())
     r.heading(100)
     await r.tick()
@@ -259,8 +259,9 @@ describe('through: proposed by vision or by stillness, taken back by "Noch drau�
     expect(r.views.at(-1)!.beaconPitch).toBeUndefined()
     expect(r.views.at(-1)!.relBearingDeg).toBeNull()
     expect(r.views.at(-1)!.distanceM).toBeNull()
-    expect(r.spoken().filter((x) => x.includes(atDoorLine('de')))).toHaveLength(1)
-    expect(r.spoken().some((x) => x.includes(throughLine('de')))).toBe(false)
+    // The user's call: the approach ends on "through the door", whichever way it got there.
+    expect(r.spoken().filter((x) => x.includes(throughLine('de')))).toHaveLength(1)
+    expect(r.spoken().some((x) => x.includes(atDoorLine('de')))).toBe(false)
   })
 
   it('a step resets the stillness clock', async () => {

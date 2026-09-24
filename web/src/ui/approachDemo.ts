@@ -10,7 +10,7 @@
 //
 // Words and pitch come from core/instruct.ts, as they do in the real engine.
 
-import { atDoorLine, bandFor, bandText, metresLine, pitchFor, safetyLine, thresholdLine, throughLine } from '../core/instruct'
+import { bandFor, bandText, metresLine, pitchFor, safetyLine, thresholdLine, throughLine } from '../core/instruct'
 import { lang } from '../strings'
 import type { ApproachSession, ApproachView, Phase, StartApproach } from './approachPort'
 
@@ -42,7 +42,7 @@ export const DEMO_SCRIPT: readonly ApproachView[] = [
 ]
 
 /** What the engine says when `through` comes from standing still, not from vision. */
-const THROUGH_STILL: ApproachView = { phase: 'through', relBearingDeg: null, distanceM: null, instruction: atDoorLine(L), source: 'gemini-frame', unsure: false }
+const THROUGH_STILL: ApproachView = { phase: 'through', relBearingDeg: null, distanceM: null, instruction: throughLine(L), source: 'gemini-frame', unsure: false }
 
 const STEP_MS = 2500
 /** Mirrors the engine's stillness rule: standing at the threshold this long proposes `through`. */

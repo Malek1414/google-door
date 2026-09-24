@@ -106,12 +106,13 @@ function showLive(target: ArrowTarget, p: Profile, name?: string, fromNav = fals
   })
 }
 
-function showApproach(door: Entrance, p: Profile, mode: ApproachMode) {
-  Approach({ door, mode, config: outputFor(p), onExit: () => showMap(p) })
-}
+/** After `through` the approach holds this long ("Du bist durch die Tür." is said), then the map is back. */
+const THROUGH_EXIT_MS = 4000
+const DEMO_THROUGH_EXIT_MS = THROUGH_EXIT_MS
 
-/** After `through` the demo holds this long (the line is said), then the map is back. */
-const DEMO_THROUGH_EXIT_MS = 4000
+function showApproach(door: Entrance, p: Profile, mode: ApproachMode) {
+  Approach({ door, mode, config: outputFor(p), onExit: () => showMap(p), exitAfterThroughMs: THROUGH_EXIT_MS })
+}
 
 /**
  * ?demo=1: the whole loop in one go. A short simulated walk to the door, the arrival

@@ -76,6 +76,7 @@ export function replaySensors(track: TrackPoint[], opts: { speed: number; imageU
   return {
     media: { kind: 'image', url: opts.imageUrl },
     banner: opts.label,
+    replay: true,
     start(onFix: (f: Fix) => void, onHeading: (h: Heading) => void, onEnd?: () => void) {
       const t0 = performance.now()
       const end = track[track.length - 1].t

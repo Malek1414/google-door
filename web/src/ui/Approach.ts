@@ -15,7 +15,7 @@ import { metresLine, safetyLine } from '../core/instruct'
 import type { OutputConfig } from '../core/profile'
 import type { Entrance } from '../core/types'
 import { announce, keepScreenOn, session } from '../session'
-import { lang, t } from '../strings'
+import { lang } from '../strings'
 import { engine, type ApproachMode, type ApproachView } from './approachPort'
 import { playInstruction, playLine, preloadClips, reportMissingClips, stopLines } from './clips'
 import { checkDoor, runDoorCheckOnce, verdictNote, verdictRows } from './doorCheck'
@@ -24,6 +24,7 @@ import { grabFrame } from './LiveView'
 import { SteadyAngle } from './arrowSteady'
 import { isMuted, muteButton } from './voiceCalm'
 import './approach.css'
+import { pathDoorName } from './doorName'
 
 // Screen chrome only. Everything spoken during guidance comes from the engine
 // (core/instruct.ts); the verdict rows come from doorCheck.verdictRows.
@@ -114,16 +115,18 @@ export function guideLayout(v: ApproachView, language: string = lang) {
     fromMap: v.source === 'osm-fallback',
     distance: v.distanceM === null ? '' : metresLine(v.distanceM, language),
     // The big distance line already says the metres; the words under it drop a repeat of it.
-    instruction: withoutMetres(v.instruction, v.distanceM === null ? '' : metresLine(v.distanceM, language)),
+    instruction: v.distanceM === null ? v.instruction : withoutMetres(v.instruction),
     // The disclaimer stays readable for the whole approach, except while it IS the instruction.
     safety: !v.instruction.startsWith(safetyLine(language)),
   }
 }
 
-function withoutMetres(instruction: string, metres: string): string {
-  if (!metres) return instruction
-  if (instruction === metres) return ''
-  return instruction.endsWith(` ${metres}`) ? instruction.slice(0, -metres.length - 1) : instruction
+// Any trailing metres phrase, not only the current one: the spoken metres line lags the
+// live distance, and "3 Meter" over "5 Meter" reads as two different distances.
+const TRAILING_METRES = /\s*(Ein Meter|One metre|\d+ (Meter|metres))\.?$/
+
+function withoutMetres(instruction: string): string {
+  return instruction.replace(TRAILING_METRES, '')
 }
 
 function cameraEl(): HTMLVideoElement {
@@ -197,7 +200,7 @@ function shell(title: string, onExit: () => void) {
 }
 
 function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () => void }): () => void {
-  const name = opts.door.name ?? t.unnamedEntrance
+  const name = pathDoorName(opts.door)
   const { root, cam } = shell(`${AP.title}: ${name}`, () => exit())
   root.classList.add('apr-guide')
 
@@ -363,7 +366,7 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
 export const AIM_DELAY_MS = 1500
 
 function DoorCheckScreen(opts: { door: Entrance; config: OutputConfig; onExit: () => void }): () => void {
-  const name = opts.door.name ?? t.unnamedEntrance
+  const name = pathDoorName(opts.door)
   const { root, cam } = shell(`${AP.checkTitle}: ${name}`, () => exit())
   root.classList.add('apr-check')
   const status = h('p', { class: 'apr-status', role: 'status' }, AP.aim)

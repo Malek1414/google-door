@@ -48,3 +48,37 @@ describe('stopSpeech voids a pending /api/speak fallback (arrival card vs. appro
     }
   })
 })
+
+describe('a failed /api/speak sends the next lines straight to the device voice (TTS quota out)', () => {
+  it('after one 429, the next say() does not call /api/speak and speaks at once', async () => {
+    const { vi } = await import('vitest')
+    const { say, resetSpeakBackoff, API_SPEAK_BACKOFF_MS } = await import('../src/core/speech')
+    vi.useFakeTimers()
+    const spoken: string[] = []
+    const g = globalThis as Record<string, unknown>
+    const saved = { window: g.window, document: g.document, speechSynthesis: g.speechSynthesis, SpeechSynthesisUtterance: g.SpeechSynthesisUtterance, fetch: g.fetch }
+    const synth = { speak: vi.fn((u: { text: string }) => spoken.push(u.text)), cancel: vi.fn() }
+    g.speechSynthesis = synth
+    g.window = { speechSynthesis: synth }
+    g.document = { documentElement: { lang: 'de' } }
+    g.SpeechSynthesisUtterance = class { lang = ''; rate = 1; constructor(public text: string) {} }
+    const fetchMock = vi.fn(async () => ({ ok: false, status: 429 }))
+    g.fetch = fetchMock
+    resetSpeakBackoff()
+    try {
+      expect(await say(null, 'Führung zu Nebeneingang.')).toBe('synth')
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(await say(null, 'Angekommen.')).toBe('synth') // resolves without any timer running
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(spoken).toEqual(['Führung zu Nebeneingang.', 'Angekommen.'])
+      // After the back-off the server is tried again.
+      vi.setSystemTime(Date.now() + API_SPEAK_BACKOFF_MS + 1)
+      await say(null, 'Links abbiegen.')
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    } finally {
+      resetSpeakBackoff()
+      vi.useRealTimers()
+      Object.assign(g, saved)
+    }
+  })
+})

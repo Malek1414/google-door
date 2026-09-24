@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Doorway Pitch</title>
+<!--
+  Doorway, Pitch-Deck. Google x Aktion Mensch, "AI Agents for Inclusion", Berlin.
+  Offline: keine CDN, nur Systemschriften.
+  Bedienung: Pfeil rechts, Leertaste, Bild runter = weiter. Pfeil links, Umschalt+Leertaste, Bild hoch = zurück.
+  Pos1 / Ende = erste / letzte Folie. C = Untertitel-Spur ein/aus (nur bei Film ohne eingebrannte Untertitel).
+  Start mit Film und Untertiteln: im Ordner pitch/ "python3 -m http.server 8000" und
+  http://localhost:8000/deck/ öffnen (file:// blockiert in Chrome die VTT-Spur).
+  Kontrast: siehe contrast.py im selben Ordner. Alle Zahlen: siehe PR-Beschreibung, Abschnitt Zahlen-Nachweis.
+-->
+<style>
+  :root {
+    --paper: #FFFFFF;
+    --ink: #111111;
+    --muted: #444444;
+    --stepfree: #0A4A9E;   /* Bedeutung: stufenlos. Immer mit Text und Füllung "voll". */
+    --barrier: #9B1C1C;    /* Bedeutung: nicht stufenlos. Immer mit Text und Schraffur. */
+    --unknown: #595959;    /* Bedeutung: keine Angabe. Immer mit Text und nur Umriss. */
+    --slide-w: 1920px;
+    --slide-h: 1080px;
+    --pad-x: 128px;
+    --pad-y: 104px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: #000000;
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { overflow: hidden; height: 100vh; }
+
+  #deck {
+    position: absolute;
+    top: 0; left: 0;
+    width: var(--slide-w);
+    height: var(--slide-h);
+    transform-origin: 0 0;
+  }
+  .slide {
+    position: absolute;
+    inset: 0;
+    width: var(--slide-w);
+    height: var(--slide-h);
+    padding: var(--pad-y) var(--pad-x);
+    background: var(--paper);
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .slide.active { display: flex; }
+
+  /* Typografie. Kleinste Schrift im Deck: 38px = 28,5pt auf der 1920er Folie. */
+  h1, h2, p, figure, ul, ol { margin: 0; }
+  .statement {
+    font-size: 120px;
+    line-height: 1.08;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    max-width: 1560px;
+  }
+  .statement .second { display: block; margin-top: 56px; }
+  h2 {
+    font-size: 88px;
+    line-height: 1.08;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    max-width: 1600px;
+  }
+  .body { font-size: 52px; line-height: 1.3; max-width: 1400px; }
+  .source { font-size: 38px; line-height: 1.3; color: var(--muted); margin-top: auto; }
+  .big-number {
+    font-size: 280px;
+    line-height: 0.9;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+  }
+  strong { font-weight: 700; }
+
+  /* Filmfenster */
+  .clip {
+    position: relative;
+    background: #1A1A1A;
+    border: 4px solid var(--ink);
+  }
+  .clip video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #1A1A1A;
+  }
+  .clip .missing {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 64px;
+    color: #FFFFFF;
+    font-size: 40px;
+    line-height: 1.35;
+    pointer-events: none;
+  }
+  .clip .missing strong { font-size: 52px; margin-bottom: 16px; }
+  .clip.ready .missing { display: none; }
+
+  /* Platzhalter, die das Team vor dem Freeze füllen oder streichen muss */
+  .placeholder {
+    border: 5px dashed var(--ink);
+    padding: 40px 48px;
+    font-size: 42px;
+    line-height: 1.35;
+  }
+  .placeholder strong { display: block; }
+
+  /* Folie 1 und 6: Überschrift über großem Film */
+  .film-slide h2 { margin-bottom: 48px; }
+  .film-slide .clip { width: 1440px; height: 810px; }
+  .film-slide.compact { padding-top: 72px; padding-bottom: 72px; }
+  .film-slide.compact .clip { width: 1456px; height: 819px; }
+  .film-slide.compact h2 { margin-bottom: 40px; }
+
+  /* Folie 2 */
+  .center-v { justify-content: center; }
+
+  /* Folie 3: 109 Eingänge */
+  .hbf-grid {
+    display: grid;
+    grid-template-columns: 948px 1fr;
+    column-gap: 112px;
+    align-items: center;
+    margin-top: 72px;
+  }
+  .legend { list-style: none; padding: 0; display: grid; row-gap: 44px; }
+  .legend li {
+    display: grid;
+    grid-template-columns: 64px 1fr;
+    column-gap: 32px;
+    align-items: center;
+    font-size: 52px;
+    line-height: 1.15;
+  }
+  .legend .n { font-weight: 700; font-size: 72px; margin-right: 16px; }
+  .legend svg { width: 64px; height: 64px; }
+
+  /* Folie 4: 9,1 m */
+  .pair { margin-top: 56px; }
+  .pair svg { width: 1664px; height: auto; display: block; }
+  .pair-labels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 96px;
+    margin-top: 24px;
+    font-size: 48px;
+    line-height: 1.3;
+  }
+  .pair-labels .k { font-weight: 700; }
+  .pair-labels > div:last-child { text-align: right; }
+
+  /* Folie 5: Mitte */
+  .mitte { display: grid; grid-template-columns: auto 1fr; column-gap: 96px; align-items: end; margin-top: 88px; }
+  .mitte .body { max-width: 780px; padding-bottom: 20px; }
+
+  /* Folie 7: Drehtür */
+  .split { display: grid; grid-template-columns: 864px 1fr; column-gap: 80px; align-items: center; flex: 1; }
+  .split .clip { width: 864px; height: 486px; }
+  .split h2 { font-size: 76px; }
+  .split .body { margin-top: 48px; }
+
+  /* Folie 8: Agent */
+  .quote-slot { margin-top: 72px; max-width: 1500px; }
+
+  /* Folie 9: Leiter */
+  .ladder { list-style: none; padding: 0; margin-top: 72px; border-top: 4px solid var(--ink); max-width: 1664px; }
+  .ladder li {
+    display: grid;
+    grid-template-columns: 620px 1fr;
+    column-gap: 64px;
+    padding: 30px 0;
+    border-bottom: 2px solid var(--ink);
+    font-size: 48px;
+    line-height: 1.25;
+  }
+  .ladder .what { font-weight: 700; }
+  .ladder .only { font-weight: 700; }
+
+  /* Folie 10 */
+  .close .body { margin-top: 56px; }
+  .close .placeholder { margin-top: 64px; max-width: 1600px; }
+
+  /* Nur für Screenreader */
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+
+  /* Druck / PDF: eine Folie pro Seite */
+  @page { size: 1920px 1080px; margin: 0; }
+  @media print {
+    html, body { background: var(--paper); overflow: visible; height: auto; }
+    #deck { position: static; transform: none !important; width: auto; height: auto; }
+    .slide {
+      position: relative;
+      display: flex !important;
+      break-after: page;
+      page-break-after: always;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .slide:last-child { break-after: auto; page-break-after: auto; }
+    .clip video { display: none; }
+    .clip.ready .missing { display: flex; }
+  }
+</style>
+</head>
+<body>
+<p id="announce" class="sr-only" aria-live="polite"></p>
+<!-- Gemeinsame Muster. Außerhalb der Folien, damit sie auch auf gerade verborgenen Folien greifen. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <pattern id="hatch" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="14" height="14" fill="#FFFFFF"/>
+      <rect width="6" height="14" fill="#9B1C1C"/>
+    </pattern>
+  </defs>
+</svg>
+
+<main id="deck" aria-roledescription="Präsentation" aria-label="Doorway Pitch">
+
+  <!-- 1 · 0:00 · Problem, durch Erdin -->
+  <section class="slide film-slide" aria-roledescription="Folie" aria-label="Das ist Erdin.">
+    <h2>Das ist Erdin.</h2>
+    <figure class="clip">
+      <video preload="metadata" playsinline
+             aria-label="Film: Erdin steht vor einem Gebäude und sucht den Eingang. Er geht zum naheliegenden Haupteingang, dort sind Stufen, er bleibt stehen.">
+        <source src="../media/backup-video.mp4#t=0,25" type="video/mp4">
+        <track kind="captions" srclang="de" label="Deutsch" src="../captions/backup-video.de.vtt">
+      </video>
+      <figcaption class="missing"><strong>Film fehlt noch: Shot 1 und 2</strong>Erdin sucht den Eingang, Stufen am Haupteingang. Datei: pitch/media/backup-video.mp4, 0:00 bis 0:25.</figcaption>
+    </figure>
+  </section>
+
+  <!-- 2 · 0:18 · Der eine Satz -->
+  <section class="slide center-v" aria-roledescription="Folie" aria-label="Google Maps weiß, dass das Gebäude barrierefrei ist. Es weiß nicht, welche Tür.">
+    <p class="statement">Google Maps weiß, dass das Gebäude barrierefrei ist.<span class="second">Es weiß nicht, welche Tür.</span></p>
+  </section>
+
+  <!-- 3 · 0:25 · Hauptbahnhof, 109 Eingänge -->
+  <section class="slide" aria-roledescription="Folie" aria-label="Berlin Hauptbahnhof: 109 Eingänge">
+    <h2>Berlin Hauptbahnhof: 109&nbsp;Eingänge.</h2>
+    <div class="hbf-grid">
+      <svg id="waffle" viewBox="0 0 948 408" width="948" height="408" role="img"
+           aria-label="109 Quadrate, eines pro Eingang. 8 voll ausgefüllt: stufenlos. 11 schraffiert: nicht stufenlos. 90 nur als Umriss: ohne Angabe.">
+        <g id="waffle-cells"></g>
+      </svg>
+      <ul class="legend">
+        <li><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" fill="var(--stepfree)"/></svg>
+            <span><span class="n">8</span>stufenlos</span></li>
+        <li><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="2" y="2" width="60" height="60" fill="url(#hatch)" stroke="var(--barrier)" stroke-width="4"/></svg>
+            <span><span class="n">11</span>nicht stufenlos</span></li>
+        <li><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="2" y="2" width="60" height="60" fill="#FFFFFF" stroke="var(--unknown)" stroke-width="3"/></svg>
+            <span><span class="n">90</span>ohne Angabe</span></li>
+      </ul>
+    </div>
+    <p class="source">Quelle: OpenStreetMap, abgefragt am 23.09.2026</p>
+  </section>
+
+  <!-- 4 · 0:40 · Das Paar, 9,1 m -->
+  <section class="slide" aria-roledescription="Folie" aria-label="9,1 Meter. Die Adresse führt zur falschen Tür.">
+    <h2>9,1&nbsp;Meter. Die Adresse führt zur falschen&nbsp;Tür.</h2>
+    <figure class="pair">
+      <svg viewBox="0 0 1664 380" role="img"
+           aria-label="Skizze: zwei Türen an der Fassade des Hauptbahnhofs, 9,1 Meter voneinander entfernt. Links die Tür mit der Adresse Invalidenstraße 52, nicht stufenlos, als schraffiertes Quadrat. Rechts eine Tür ohne Namen und ohne Adresse, stufenlos, als voller Kreis.">
+        <!-- Fassade -->
+        <rect x="0" y="0" width="1664" height="96" fill="#E6E6E6"/>
+        <rect x="0" y="92" width="1664" height="8" fill="var(--ink)"/>
+        <text x="32" y="64" font-size="40" fill="var(--ink)" font-family="-apple-system, Helvetica, Arial, sans-serif">Berlin Hauptbahnhof</text>
+        <!-- Tür links: nicht stufenlos, schraffiertes Quadrat -->
+        <rect x="3" y="124" width="148" height="148" fill="url(#hatch)" stroke="var(--barrier)" stroke-width="6"/>
+        <!-- Tür rechts: stufenlos, voller Kreis -->
+        <circle cx="1586" cy="198" r="76" fill="var(--stepfree)"/>
+        <!-- Maßlinie -->
+        <line x1="77" y1="336" x2="1586" y2="336" stroke="var(--ink)" stroke-width="4"/>
+        <line x1="77" y1="308" x2="77" y2="364" stroke="var(--ink)" stroke-width="4"/>
+        <line x1="1586" y1="308" x2="1586" y2="364" stroke="var(--ink)" stroke-width="4"/>
+        <rect x="712" y="300" width="240" height="72" fill="var(--paper)"/>
+        <text x="832" y="356" font-size="56" font-weight="700" text-anchor="middle" fill="var(--ink)" font-family="-apple-system, Helvetica, Arial, sans-serif">9,1 m</text>
+      </svg>
+      <figcaption class="pair-labels">
+        <div><span class="k">Invalidenstraße 52</span><br>nicht stufenlos</div>
+        <div><span class="k">ohne Namen, ohne Adresse</span><br>stufenlos</div>
+      </figcaption>
+    </figure>
+    <p class="source">Quelle: OpenStreetMap, abgefragt am 23.09.2026</p>
+  </section>
+
+  <!-- 5 · 0:52 · Berlin Mitte -->
+  <section class="slide" aria-roledescription="Folie" aria-label="Berlin Mitte: 90 Prozent der Eingänge ohne Angabe">
+    <h2>Berlin Mitte: 3.061&nbsp;Eingänge.</h2>
+    <div class="mitte">
+      <p class="big-number">90&nbsp;%</p>
+      <p class="body">ohne Angabe. Nur 296 sagen überhaupt, ob man stufenlos hineinkommt.</p>
+    </div>
+    <p class="source">Quelle: OpenStreetMap, abgefragt am 23.09.2026</p>
+  </section>
+
+  <!-- 6 · 1:00 · Doorway, Film -->
+  <section class="slide film-slide compact" aria-roledescription="Folie" aria-label="Doorway zeigt Erdin die Tür.">
+    <h2>Doorway zeigt Erdin die Tür.</h2>
+    <figure class="clip">
+      <video preload="metadata" playsinline
+             aria-label="Film: Erdin öffnet Doorway, der stufenlose Eingang ist hervorgehoben. die Kameraansicht zeigt einen Pfeil, ein Tonsignal wird schneller, je näher er kommt. Ein langer Vibrationsimpuls, er steht an der stufenlosen Tür.">
+        <source src="../media/backup-video.mp4#t=25,85" type="video/mp4">
+        <track kind="captions" srclang="de" label="Deutsch" src="../captions/backup-video.de.vtt">
+      </video>
+      <figcaption class="missing"><strong>Film fehlt noch: Shot 3 bis 6</strong>App öffnen, Kameraansicht, Tonsignal, Ankunft. Datei: pitch/media/backup-video.mp4, 0:25 bis 1:25. Oder Live-Demo.</figcaption>
+    </figure>
+  </section>
+
+  <!-- 7 · 2:05 · Drehtür -->
+  <section class="slide" aria-roledescription="Folie" aria-label="Laut Karte stufenlos. In Wirklichkeit eine Drehtür.">
+    <div class="split">
+      <figure class="clip">
+        <video preload="metadata" playsinline
+               aria-label="Film: Doorway warnt Erdin vor der Drehtür am Eingang Europaplatz.">
+          <source src="../media/backup-video.mp4#t=85,95" type="video/mp4">
+          <track kind="captions" srclang="de" label="Deutsch" src="../captions/backup-video.de.vtt">
+        </video>
+        <figcaption class="missing"><strong>Film fehlt noch: Shot 7</strong>Drehtür-Warnung. Datei: backup-video.mp4, 1:25 bis 1:35.</figcaption>
+      </figure>
+      <div>
+        <h2>Eingang Europaplatz:<br>laut Karte stufenlos.</h2>
+        <p class="body">Es ist eine Drehtür. Ein Ja oder Nein kann das nicht sagen. Doorway warnt.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 · 2:15 · Der Agent -->
+  <section class="slide" aria-roledescription="Folie" aria-label="Gemini liest, was Menschen mit Behinderung längst geschrieben haben.">
+    <h2>Gemini liest, was Menschen mit Behinderung längst geschrieben haben.</h2>
+    <p class="body" style="margin-top:48px">Und liest es Erdin vor: wörtlich, mit Quelle.</p>
+    <blockquote class="placeholder quote-slot" style="margin-left:0">
+      <strong>Platzhalter: echtes Zitat einsetzen</strong>
+      Eine echte Rezension, wörtlich aus der Antwort von /api/lived, mit Quelle und Monat. Kein Beispielsatz, nichts umformuliert. Gibt es keins: diesen Kasten löschen.
+    </blockquote>
+  </section>
+
+  <!-- 9 · 2:28 · Sicherheitsregel -->
+  <section class="slide" aria-roledescription="Folie" aria-label="Der Agent zeichnet nie einen Pfeil.">
+    <h2>Der Agent zeichnet nie einen Pfeil.</h2>
+    <ol class="ladder">
+      <li><span class="what">Vermessen</span><span><span class="only">Pfeil zur Tür.</span> Nur hier.</span></li>
+      <li><span class="what">Gemeldet</span><span>Nur das Gebäude, kein Pfeil.</span></li>
+      <li><span class="what">Aus Rezensionen</span><span>Wörtliches Zitat mit Quelle, kein Pfeil.</span></li>
+      <li><span class="what">Unbekannt</span><span>Doorway sagt es offen.</span></li>
+    </ol>
+  </section>
+
+  <!-- 10 · 2:40 · Warum Google -->
+  <section class="slide close" aria-roledescription="Folie" aria-label="Places kennt das Gebäude. Doorway kennt die Tür.">
+    <h2>Places kennt das Gebäude. Doorway kennt die&nbsp;Tür.</h2>
+    <p class="body">Die Koordinate der Tür ist der fehlende Baustein. Mit Local Guides wächst sie überall mit.</p>
+    <div class="placeholder">
+      <strong>Platzhalter: nur wenn die CODE University heute Nacht vermessen wurde</strong>
+      „Für unsere eigene Uni gab es keine Daten. Wir haben sie in zwanzig Minuten vermessen.“ Anzahl der Eingänge (Brief: rund 37, ungeprüft) vor dem Pitch live prüfen. Sonst diesen Kasten löschen.
+    </div>
+  </section>
+
+</main>
+
+<script>
+(function () {
+  // Waffel: 109 Eingänge. Reihenfolge 8 stufenlos, 11 nicht stufenlos, 90 ohne Angabe.
+  // Zahlen aus pipeline/fixtures/hbf_groundtruth.json, counts.
+  var COUNTS = { stepFree: 8, notStepFree: 11, unknown: 90 };
+  var total = COUNTS.stepFree + COUNTS.notStepFree + COUNTS.unknown; // 109
+  var g = document.getElementById('waffle-cells');
+  var NS = 'http://www.w3.org/2000/svg';
+  for (var i = 0; i < total; i++) {
+    var r = Math.floor(i / 16), c = i % 16;
+    var rect = document.createElementNS(NS, 'rect');
+    var x = c * 60, y = r * 60;
+    if (i < COUNTS.stepFree) {
+      rect.setAttribute('x', x); rect.setAttribute('y', y);
+      rect.setAttribute('width', 48); rect.setAttribute('height', 48);
+      rect.setAttribute('fill', 'var(--stepfree)');
+    } else if (i < COUNTS.stepFree + COUNTS.notStepFree) {
+      rect.setAttribute('x', x + 2); rect.setAttribute('y', y + 2);
+      rect.setAttribute('width', 44); rect.setAttribute('height', 44);
+      rect.setAttribute('fill', 'url(#hatch)');
+      rect.setAttribute('stroke', 'var(--barrier)'); rect.setAttribute('stroke-width', 4);
+    } else {
+      rect.setAttribute('x', x + 1.5); rect.setAttribute('y', y + 1.5);
+      rect.setAttribute('width', 45); rect.setAttribute('height', 45);
+      rect.setAttribute('fill', '#FFFFFF');
+      rect.setAttribute('stroke', 'var(--unknown)'); rect.setAttribute('stroke-width', 3);
+    }
+    g.appendChild(rect);
+  }
+
+  var deck = document.getElementById('deck');
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var announce = document.getElementById('announce');
+  var current = 0;
+  var captionsOn = false;
+
+  function fit() {
+    var s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    var x = (window.innerWidth - 1920 * s) / 2;
+    var y = (window.innerHeight - 1080 * s) / 2;
+    deck.style.transform = 'translate(' + x + 'px,' + y + 'px) scale(' + s + ')';
+  }
+
+  function videosIn(el) { return Array.prototype.slice.call(el.querySelectorAll('video')); }
+
+  function show(n) {
+    n = Math.max(0, Math.min(slides.length - 1, n));
+    videosIn(slides[current]).forEach(function (v) { v.pause(); });
+    slides.forEach(function (s, i) {
+      s.classList.toggle('active', i === n);
+      s.setAttribute('aria-hidden', i === n ? 'false' : 'true');
+    });
+    current = n;
+    announce.textContent = 'Folie ' + (n + 1) + ' von ' + slides.length + ': ' + slides[n].getAttribute('aria-label');
+    if (history.replaceState) history.replaceState(null, '', '#' + (n + 1));
+    videosIn(slides[n]).forEach(function (v) {
+      if (v.readyState > 0) {
+        var p = v.play();
+        if (p && p.catch) p.catch(function () {});
+      }
+    });
+  }
+
+  function setCaptions(on) {
+    captionsOn = on;
+    document.querySelectorAll('video').forEach(function (v) {
+      if (v.textTracks[0]) v.textTracks[0].mode = on ? 'showing' : 'hidden';
+    });
+  }
+
+  // Film vorhanden? Dann Platzhalter-Text ausblenden.
+  document.querySelectorAll('.clip video').forEach(function (v) {
+    v.addEventListener('loadeddata', function () { v.closest('.clip').classList.add('ready'); });
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    var k = e.key;
+    if (k === 'ArrowRight' || k === 'PageDown' || (k === ' ' && !e.shiftKey) || k === 'Enter') { e.preventDefault(); show(current + 1); }
+    else if (k === 'ArrowLeft' || k === 'PageUp' || (k === ' ' && e.shiftKey) || k === 'Backspace') { e.preventDefault(); show(current - 1); }
+    else if (k === 'Home') { e.preventDefault(); show(0); }
+    else if (k === 'End') { e.preventDefault(); show(slides.length - 1); }
+    else if (k === 'c' || k === 'C') { setCaptions(!captionsOn); }
+    else if (k === 'f' || k === 'F') {
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+      else if (document.exitFullscreen) document.exitFullscreen();
+    }
+  });
+
+  window.addEventListener('resize', fit);
+  fit();
+  var start = parseInt((location.hash || '').slice(1), 10);
+  show(isNaN(start) ? 0 : start - 1);
+})();
+</script>
+</body>
+</html>

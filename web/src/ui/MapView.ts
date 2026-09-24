@@ -176,6 +176,10 @@ export function MapView(opts: {
   let buildings: Building[] = []
   let me: LatLon | null = null
   let map: google.maps.Map | null = null
+  // A deep link (?door=) shows the door card before the Maps script has loaded; a quick
+  // tap on Route then waits for the map instead of doing nothing.
+  let mapIsReady: () => void = () => {}
+  const mapReady = new Promise<void>((r) => (mapIsReady = r))
   let markers: google.maps.Marker[] = []
   let meMarker: google.maps.Marker | null = null
   let routeLine: google.maps.Polyline | null = null
@@ -1056,7 +1060,8 @@ export function MapView(opts: {
    * A straight line is never drawn: it read as a route and pointed through buildings.
    */
   async function drawRoute(to: LatLon, label?: string, target: Entrance | null = null): Promise<Route | null> {
-    if (!map) return null
+    if (!map) await Promise.race([mapReady, new Promise((r) => setTimeout(r, 10000))])
+    if (!map || gone) return null
     // Set here rather than at one call site: routing to a Google POI used to leave the
     // previous door in routeTarget, and Start would then guide to a door the user had
     // navigated away from.
@@ -1622,6 +1627,7 @@ export function MapView(opts: {
           mapTypeId: 'hybrid',
         })
         sharedMap = { el: mapEl, map }
+        mapIsReady()
         drawMe()
         if (opts.openDoor)
           void findEntrance(opts.openDoor).then((e) => {

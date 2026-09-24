@@ -38,6 +38,7 @@ import { exploreFeed } from './ExploreFeed'
 import { t } from '../strings'
 import { h, mount, s } from './dom'
 import { pathDoorName } from './doorName'
+import { approachModeFor, type ApproachMode } from './approachPort'
 
 const DEFAULT_CENTER: LatLon = { lat: 52.5251, lon: 13.3694 } // Berlin Hauptbahnhof
 const BASE_PIN = 32
@@ -171,6 +172,8 @@ export function MapView(opts: {
   openDoor?: string | null
   /** `name` is the distinguishable door name (doorName), shown and spoken in Live View. */
   onGuide: (target: ArrowTarget, name?: string, fromNav?: boolean) => void
+  /** Nav mode's "Zum Eingang führen": straight into the last-10-m approach. */
+  onApproach?: (door: Entrance, mode: ApproachMode) => void
   /** Back from a Live View that was opened in nav mode: navigate to this door again. */
   resumeNav?: Entrance | null
   onSettings: () => void
@@ -380,7 +383,7 @@ export function MapView(opts: {
     navBanner.hidden = false
     routeTop.hidden = true
     navNearBtn.hidden = true
-    navNearBtn.onclick = () => e && void beginGuidance(e, true)
+    navNearBtn.onclick = () => e && void beginApproach(e)
     liveThumb.hidden = true
     navCol.hidden = false
     navLiveBtn.hidden = !e
@@ -564,6 +567,26 @@ export function MapView(opts: {
     }
     teardown()
     opts.onGuide(g.target, name, fromNav)
+  }
+
+  /**
+   * Nav mode, last 10 m: the same approach LiveView's trigger and the arrival "Ja" open
+   * (guide for speech users, the door check for step-free profiles). No detour through
+   * Live View, which would ask a second time. Falls back to Live View without a mode.
+   */
+  async function beginApproach(e: Entrance) {
+    const mode = approachModeFor(opts.profile)
+    if (!mode || !opts.onApproach || guidanceFor(e, opts.profile).kind !== 'arrow') return beginGuidance(e, true)
+    if (guiding) return
+    guiding = true
+    try {
+      await unlockAll({ camera: true })
+    } catch (err) {
+      guiding = false
+      throw err
+    }
+    teardown()
+    opts.onApproach(e, mode)
   }
 
   const layersBtn = h('button', { class: 'gm-round gm-layers', type: 'button', 'aria-label': t.layers }, icon('layers'))

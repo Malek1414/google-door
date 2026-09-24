@@ -85,6 +85,7 @@ function showMap(p: Profile, resumeNav: Entrance | null = null) {
     profile: p,
     openDoor: params.openDoor,
     resumeNav,
+    onApproach: (door, mode) => showApproach(door, p, mode),
     onGuide: (target, name, fromNav) => showLive(target, p, name, fromNav),
     onSettings: () => Onboard({ initial: p, onDone: showMap }),
     onContribute: () => Recorder({ onBack: () => showMap(p) }),

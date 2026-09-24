@@ -24,7 +24,6 @@ import { openBusinessData } from './BusinessData'
 import { openBusinessEdit } from './BusinessEdit'
 import { openEntrancesManager } from './BusinessEntrances'
 import { businessHomeHeader } from './BusinessHome'
-import { accessProgress, openBusinessAccess } from './BusinessAccess'
 
 const S = {
   de: {
@@ -483,10 +482,6 @@ export const businessPanel: Panel = (el, ctx) => {
       return businessHomeHeader(ctx, b, {
         onEdit: () => sub(() => openBusinessEdit(el, ctx, b.id, back)),
         onData: () => sub(() => openBusinessData(el, ctx, b.id, back)),
-        onAccess: () => sub(() => openBusinessAccess(el, ctx, b.id, {
-          onDone: back,
-          onAddEntrance: () => sub(() => openEntrancesManager(el, ctx, b.id, back)),
-        })),
         onEntrances: () => sub(() => openEntrancesManager(el, ctx, b.id, back)),
         onRecord: () => ctx.openRecorder(),
         onPhotos: () => sub(() => openBusinessEdit(el, ctx, b.id, back)),
@@ -512,7 +507,6 @@ export const businessPanel: Panel = (el, ctx) => {
       }, {
         others: loadBusinessList().filter((x) => x.id !== b.id).map((x) => ({ id: x.id, name: x.name })),
         openTasks: TASKS.filter((t) => !isDone(b, t.id)).map((t) => t.label),
-        access: accessProgress(b),
       })
     } catch (err) {
       console.error('[doorway] business header failed', err)

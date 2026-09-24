@@ -76,7 +76,6 @@ const SCREENS = {
   'business-home': async () => { const p = await newPage(); await makeBusiness(p); return p },
   'business-edit': async () => { const p = await newPage(); await makeBusiness(p); await tap(p, '.bzh-action-btn', 'Profil'); return p },
   'business-data': async () => { const p = await newPage(); await makeBusiness(p); await tap(p, '.bzh-info'); return p },
-  'business-access': async () => { const p = await newPage(); await makeBusiness(p); await tap(p, '.bzh-access'); return p },
   'business-entrances': async () => { const p = await newPage(); await makeBusiness(p); await tap(p, '.bzh-action-btn', 'Eingänge'); return p },
   'business-editor': async () => { const p = await newPage(); await makeBusiness(p); await tap(p, '.bzh-action-btn', 'Eingänge'); await tap(p, '.bem-add'); return p },
   settings: async () => { const p = await newPage(); await tap(p, '.gm-avatar'); return p },

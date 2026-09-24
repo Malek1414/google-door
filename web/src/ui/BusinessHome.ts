@@ -20,8 +20,6 @@ export interface BusinessHomeActions {
   /** Opens "Gesammelte Daten" — everything stored about this business, with export
    *  and full delete. The info button only appears when this is provided. */
   onData?(): void
-  /** Opens "Barrierefreiheit bearbeiten", the manual questionnaire. */
-  onAccess?(): void
 }
 
 export interface BusinessHomeOptions {
@@ -29,8 +27,6 @@ export interface BusinessHomeOptions {
   others: { id: string; name: string }[]
   /** Labels of the open tasks, shown under the bell. */
   openTasks: string[]
-  /** Answered accessibility questions, for the "12 von 30 Angaben" line. */
-  access?: { done: number; total: number }
 }
 
 const S = {
@@ -58,8 +54,6 @@ const S = {
     profileScore: 'Profil vollständig',
     statScore: 'Vollständig',
     of: (a: number, b: number) => `${a} von ${b}`,
-    access: 'Barrierefreiheit bearbeiten',
-    accessLine: (a: number, b: number) => `${a} von ${b} Angaben`,
   },
   en: {
     collectedData: 'Collected data',
@@ -85,8 +79,6 @@ const S = {
     profileScore: 'Profile complete',
     statScore: 'Complete',
     of: (a: number, b: number) => `${a} of ${b}`,
-    access: 'Edit accessibility',
-    accessLine: (a: number, b: number) => `${a} of ${b} answers`,
   },
 }
 const L = S[lang === 'en' ? 'en' : 'de']
@@ -206,18 +198,6 @@ export function businessHomeHeader(_ctx: FeatureCtx, business: BusinessProfile, 
     action('visibility', L.preview, actions.onPreview),
   )
 
-  // ---------- "Barrierefreiheit bearbeiten": the manual questionnaire ----------
-  const access = actions.onAccess
-    ? h('button', { class: 'bzh-access', type: 'button', onclick: () => actions.onAccess?.() },
-        h('span', { class: 'bzh-access-icon', 'aria-hidden': 'true' }, icon('accessible', true)),
-        h('span', { class: 'bzh-access-text' },
-          h('span', { class: 'bzh-access-title' }, L.access),
-          opts.access ? h('span', { class: 'bzh-access-line' }, L.accessLine(opts.access.done, opts.access.total)) : null,
-        ),
-        h('span', { class: 'bzh-chev', 'aria-hidden': 'true' }, icon('chevron_right')),
-      )
-    : null
-
   // ---------- "Leistung": three stat circles ----------
   const stat = (label: string, value: string, aria: string, extra = '', style = '') =>
     h('li', { class: `bzh-stat${extra}` },
@@ -235,5 +215,5 @@ export function businessHomeHeader(_ctx: FeatureCtx, business: BusinessProfile, 
     ),
   )
 
-  return h('div', { class: 'bzh' }, top, switcher, h('div', { class: 'bzh-divider', 'aria-hidden': 'true' }), row, access, h('div', { class: 'bzh-divider', 'aria-hidden': 'true' }), perf)
+  return h('div', { class: 'bzh' }, top, switcher, h('div', { class: 'bzh-divider', 'aria-hidden': 'true' }), row, h('div', { class: 'bzh-divider', 'aria-hidden': 'true' }), perf)
 }

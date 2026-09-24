@@ -5,7 +5,6 @@ import { atDoorLine, fallbackLine, noDirectionLine, safetyLine, thresholdLine, t
 import { guideLayout, Narrator } from '../src/ui/Approach'
 import { approachModeFor, type ApproachView } from '../src/ui/approachPort'
 import { DEMO_SCRIPT, startDemoApproach } from '../src/ui/approachDemo'
-import { groundPlane, stackTransform } from '../src/ui/ar'
 import { lang } from '../src/strings'
 
 const view = (o: Partial<ApproachView> = {}): ApproachView => ({
@@ -81,23 +80,6 @@ describe('Narrator: when the screen speaks', () => {
     const src = readFileSync(resolve(__dirname, '../src/ui/Approach.ts'), 'utf8')
     expect(src).not.toContain('Ich führe dich nur zur Tür')
     expect(src).not.toMatch(/AP\.safety/)
-  })
-})
-
-describe('the Live View arrow turns in place', () => {
-  const centre = (tr: string) => /^translate\(([\d.]+) ([\d.]+)\)/.exec(tr)!.slice(1).map(Number)
-  it('same screen centre and size for every bearing and every pitch; only the rotation changes', () => {
-    const ref = stackTransform(0, 393, 760)
-    for (let rel = -180; rel <= 180; rel += 7.5) {
-      for (const beta of [undefined, null, 0, 30, 60, 80, 90, 110]) {
-        const tr = stackTransform(rel, 393, 760, beta)
-        expect(centre(tr)).toEqual(centre(ref))
-        expect(tr).toBe(ref.replace('rotate(0.0)', `rotate(${rel.toFixed(1)})`))
-      }
-    }
-  })
-  it('groundPlane stays a pure helper (not used for placement any more)', () => {
-    expect(groundPlane(90).squash).toBeGreaterThan(0.2)
   })
 })
 

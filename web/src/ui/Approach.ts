@@ -7,6 +7,7 @@
 //
 // GPS does not participate. The compass is started with the GPS fallback switched off.
 
+import { cameraVideo, mountCamera } from '../core/camera'
 import { BeaconAudio } from '../audio'
 import { apiBase } from '../config'
 import { beaconFor } from '../core/beacon'
@@ -129,24 +130,15 @@ function withoutMetres(instruction: string): string {
   return instruction.replace(TRAILING_METRES, '')
 }
 
+/** Stops the approach camera (core/camera releases the stream once no screen uses it). */
+let stopCam: (() => void) | null = null
+
 function cameraEl(): HTMLVideoElement {
-  const v = h('video', { class: 'apr-cam', playsinline: true, muted: true, autoplay: true, 'aria-hidden': 'true' }) as HTMLVideoElement
-  v.muted = true
-  const attach = (st: MediaStream) => {
-    v.srcObject = st
-    void v.play().catch(() => {})
-  }
-  if (session.stream) attach(session.stream)
-  else if (navigator.mediaDevices?.getUserMedia) {
-    // Opened without the Start screen (e.g. ?approach=demo): ask for the camera only.
-    void navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: 'environment' }, audio: false })
-      .then((st) => {
-        session.stream = st
-        attach(st)
-      })
-      .catch(() => {})
-  }
+  // core/camera: reuses Live View's session stream, iOS attributes, reveal on first
+  // frame, recovery after the background, retry notice if refused.
+  const v = cameraVideo('apr-cam')
+  stopCam?.()
+  stopCam = session.stream || typeof navigator.mediaDevices?.getUserMedia === 'function' ? mountCamera(v) : null
   return v
 }
 
@@ -190,6 +182,8 @@ export function Approach(opts: ApproachOpts): () => void {
     if (released) return
     released = true
     releaseScreen()
+    stopCam?.()
+    stopCam = null
   }
   const onExit = () => {
     release()

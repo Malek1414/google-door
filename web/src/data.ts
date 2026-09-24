@@ -115,6 +115,16 @@ export async function postLook(body: { frame: string; heading: number; distanceM
   return r.say
 }
 
+/** A spoken question the door data could not answer. Facts only; the key stays on the server. */
+export async function postAsk(body: { question: string; facts: Record<string, unknown>; distanceM: number | null; heading: number | null; frame?: string | null }): Promise<string> {
+  const r = await fetchJson<{ say: string }>(
+    `${apiBase()}/api/ask`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+    20000,
+  )
+  return r.say
+}
+
 export function bboxAround(lat: number, lon: number, radiusM: number): BBox {
   const dLat = radiusM / 111320
   const dLon = radiusM / (111320 * Math.cos((lat * Math.PI) / 180))

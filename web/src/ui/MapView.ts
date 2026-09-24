@@ -17,6 +17,8 @@ import type { Building, Entrance } from '../core/types'
 import { mapsKey } from '../config'
 import { bboxAround, fetchEntrances, fetchLived, findEntrance, type BBox } from '../data'
 import { announce } from '../session'
+import { isMuted } from './voiceCalm'
+import { voiceAsk, type VoiceAsk } from './voiceAsk'
 import { unlockAll } from './Start'
 import type { FeatureCtx, Panel } from './ctx'
 import { businessPanel } from './Business'
@@ -860,7 +862,11 @@ export function MapView(opts: {
     }
     panos = []
   }
+  /** The door card's Vorlesen/Fragen; stopped when the card is replaced or closed. */
+  let cardVa: VoiceAsk | null = null
   function showCard(item: Entrance | Building, ...children: (Node | null)[]) {
+    cardVa?.stop()
+    cardVa = null
     disposePanos()
     sheetEpoch++
     placeOpen = false
@@ -881,6 +887,8 @@ export function MapView(opts: {
     sheetBody.querySelector<HTMLElement>('h2')?.focus({ preventScroll: true })
   }
   function closeCard() {
+    cardVa?.stop()
+    cardVa = null
     disposePanos()
     panelCleanup?.()
     panelCleanup = null
@@ -1223,7 +1231,24 @@ export function MapView(opts: {
     // A revolving door or steps decide whether this door works at all for a wheelchair:
     // named in the subtitle and shown right under the actions, above the fold.
     const warnShort = e.warnings.map((w) => (t.warning[w] ?? w).split('.')[0])
-    showCard(e, cardHead(doorName(e, origin(), buildings), e), h('p', { class: 'gm-sheet-sub' }, [stepFreeLabel(e.stepFree), ...warnShort, t.metresShort(haversineM(origin(), e)), b?.name ?? b?.addr ?? null].filter(Boolean).join(' · ')), pills, warningsBlock(e), streetView(e), tabs, ...panels)
+    const shownName = doorName(e, origin(), buildings)
+    // Vorlesen and Fragen, right under the actions: the card read out, or asked about.
+    const va = voiceAsk({
+      live: false,
+      ctx: () => ({
+        entrance: e,
+        name: shownName,
+        distanceM: haversineM(origin(), e),
+        relDeg: null,
+        others: b
+          ? entrances.filter((x) => x.buildingId === b.id && x.id !== e.id && markerKind(x) !== 'no-marker').map((x) => ({ name: doorName(x, origin(), buildings), stepFree: x.stepFree }))
+          : null,
+      }),
+      // An explicit tap wants sound whatever the profile says; only "Ton aus" silences it.
+      voiceOn: () => !isMuted(),
+    })
+    showCard(e, cardHead(shownName, e), h('p', { class: 'gm-sheet-sub' }, [stepFreeLabel(e.stepFree), ...warnShort, t.metresShort(haversineM(origin(), e)), b?.name ?? b?.addr ?? null].filter(Boolean).join(' · ')), pills, h('div', { class: 'gm-voice' }, va.el, va.out), warningsBlock(e), streetView(e), tabs, ...panels)
+    cardVa = va
   }
 
   function openBuilding(b: Building) {

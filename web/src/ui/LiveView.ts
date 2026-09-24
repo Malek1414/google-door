@@ -18,7 +18,7 @@ import type { OutputConfig, Profile } from '../core/profile'
 import type { ArrowTarget } from '../core/target'
 import type { Entrance } from '../core/types'
 import { BeaconAudio, playApproachChime } from '../audio'
-import { postLook } from '../data'
+import { voiceAsk } from './voiceAsk'
 import { announce, primeSpeech, session, speak, vibrate } from '../session'
 import { preloadClips } from './clips'
 import { lang, t } from '../strings'
@@ -262,15 +262,6 @@ function compassWord(deg: number): string {
   return t.compass[Math.round(deg / 45) % 8]
 }
 
-function lookTargetText(target: ArrowTarget): string {
-  const e = target.entrance
-  const parts: string[] = []
-  parts.push(e.stepFree === true ? 'step-free entrance' : 'entrance')
-  if (e.door) parts.push(t.door[e.door]?.toLowerCase() ?? 'door')
-  if (e.name) parts.push(`named ${e.name}`)
-  return parts.join(', ')
-}
-
 export function grabFrame(el: HTMLVideoElement | HTMLImageElement | null): string | null {
   if (!el) return null
   const w = el instanceof HTMLVideoElement ? el.videoWidth : el.naturalWidth || 1024
@@ -341,10 +332,26 @@ export function LiveView(opts: {
     if (instrGlyph.textContent !== glyph) instrGlyph.textContent = glyph
   }
 
-  // The door card: full name (wraps), distance, and the camera question as an eye button.
+  // The door card: full name (wraps), distance, then Vorlesen and Fragen. Fragen also
+  // covers "Was sehe ich?": a question about the surroundings sends a camera frame.
   const distEl = h('span', { class: 'ar-dest-m' }, '')
   const accEl = h('span', { class: 'ar-meta' }, '')
-  const lookBtn = h('button', { class: 'ar-look', type: 'button', 'aria-label': t.look }, ms('visibility'))
+  const va = voiceAsk({
+    live: true,
+    ctx: () => ({
+      entrance: e,
+      name,
+      distanceM: Number.isFinite(dist) ? dist : null,
+      relDeg: heading && heading.source !== 'none' && Number.isFinite(rel) ? rel : null,
+      others: null,
+      instruction: dirEl.textContent || null,
+      routeNote: !noRouteEl.hidden && !noRouteEl.classList.contains('is-folded') ? noRouteEl.textContent : null,
+    }),
+    frame: () => grabFrame(mediaEl),
+    heading: () => (heading && heading.source !== 'none' ? heading.deg : null),
+    // An explicit tap wants sound whatever the profile says; only "Ton aus" silences it.
+    voiceOn: () => !isMuted(),
+  })
   // Only when no arrival sheet can offer it (a real walk whose GPS may never reach the
   // 3 m arrival): a quiet text button inside the card. The demo and ?sim replays always
   // reach the sheet, and "Ja, zeig mir den Eingang" there is the single way in.
@@ -356,7 +363,8 @@ export function LiveView(opts: {
   const destStrip = h('div', { class: 'ar-dest' },
     h('div', { class: 'ar-dest-pin' }, ms('location_on'), distEl),
     h('div', { class: 'ar-dest-body' }, h('span', { class: 'ar-dest-name' }, name), accEl),
-    lookBtn,
+    va.el,
+    va.out,
     nearBtn,
     endRow,
   )
@@ -398,12 +406,11 @@ export function LiveView(opts: {
     announce(noRouteEl.textContent ?? '')
   })
   const safeEl = h('p', { class: 'ar-safe', hidden: true, role: 'note' }, t.arSafeSub ?? 'Achte beim Gehen auf deine Umgebung.')
-  const lookOut = h('p', { class: 'ar-look-out', 'aria-live': 'polite' }, '')
   const warnEl =
     e.warnings.length > 0
       ? h('div', { class: 'warning', role: 'note' }, ...e.warnings.map((w) => h('p', {}, h('strong', {}, `${t.warningPrefix}: `), t.warning[w] ?? w)))
       : null
-  const statusEl = h('div', { class: 'ar-status' }, noRouteEl, warnEl, safeEl, lookOut)
+  const statusEl = h('div', { class: 'ar-status' }, noRouteEl, warnEl, safeEl)
 
   const root = h(
     'section',
@@ -433,7 +440,6 @@ export function LiveView(opts: {
   let lastHaptic = 0
   let lastWord = ''
   let calloutIdx = 0
-  let lookBusy = false
   let nearShown = false
   let pinShown = false
   // Know which approach clips exist before the tap, so a missing one is spoken at once.
@@ -669,7 +675,7 @@ export function LiveView(opts: {
     root.dataset.phase = arPhase // 'arrived' would otherwise stick and hide the guidance
     safeEl.hidden = true
     // Focus was on the card that just went away; put it somewhere a finger can find.
-    lookBtn.focus({ preventScroll: true })
+    va.readBtn.focus({ preventScroll: true })
     lastWord = ''
     if (voiceOn()) speak(ARR.resumed, { interrupt: true })
     announce(ARR.resumed)
@@ -967,36 +973,6 @@ export function LiveView(opts: {
     },
   )
 
-  lookBtn.addEventListener('click', async () => {
-    if (lookBusy) return
-    const frame64 = grabFrame(mediaEl)
-    const fail = (msg: string) => {
-      lookOut.textContent = msg
-      // The live region reaches VoiceOver; speech users without it must hear it too.
-      if (voiceOn()) speak(msg, { interrupt: true })
-    }
-    if (!frame64) {
-      fail(t.lookError)
-      return
-    }
-    lookBusy = true
-    lookBtn.setAttribute('aria-busy', 'true')
-    lookOut.textContent = t.lookBusy
-    try {
-      const say = await postLook({ frame: frame64, heading: heading?.deg ?? 0, distanceM: Number.isFinite(dist) ? dist : 0, target: lookTargetText(target) })
-      if (closed) return
-      lookOut.textContent = say
-      // Unpredictable text: worth waiting a little longer for the network voice.
-      if (voiceOn()) speak(say, { interrupt: true, apiTimeoutMs: 8000 })
-    } catch (err) {
-      if (closed) return
-      fail((err as { status?: number }).status === 503 ? t.lookNotConfigured : t.lookError)
-    } finally {
-      lookBusy = false
-      lookBtn.removeAttribute('aria-busy')
-    }
-  })
-
   function exit() {
     // Stop, "Zur Karte" and the countdown can all land at once; the map opens once.
     if (closed) return
@@ -1032,6 +1008,7 @@ export function LiveView(opts: {
   function teardown() {
     if (closed) return
     closed = true
+    va.stop()
     clearTimeout(noteTimer)
     document.removeEventListener('visibilitychange', onVisibility)
     clearInterval(gpsWatch)

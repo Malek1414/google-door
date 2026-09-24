@@ -27,7 +27,7 @@ const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Conte
 
 const browser = await chromium.launch({
   executablePath: CHROME,
-  args: ['--ignore-certificate-errors', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
+  args: ['--mute-audio', '--ignore-certificate-errors', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
 })
 const ctx = await browser.newContext({
   locale: 'de-DE', viewport: { width: 443, height: 960 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true,

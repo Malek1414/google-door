@@ -178,7 +178,12 @@ export function contradicts(ok: boolean, hl: Health | null): boolean {
 
 /** Check now, then every 60 s, whenever the page comes back, and as soon as an /api call
  *  says the last result is out of date. Returns a stop function. */
+let stopActive: (() => void) | null = null
+
 export function startHealthBanner(intervalMs = HEALTH_INTERVAL_MS): () => void {
+  // One poller per page. A second start (main.ts re-run by hot reload) used to add
+  // another interval and three more window listeners every time.
+  stopActive?.()
   let inFlight = false
   let lastRun = 0
   let pending: ReturnType<typeof setTimeout> | null = null
@@ -205,7 +210,8 @@ export function startHealthBanner(intervalMs = HEALTH_INTERVAL_MS): () => void {
   window.addEventListener('online', run)
   window.addEventListener('offline', run)
   document.addEventListener('visibilitychange', onVisible)
-  return () => {
+  const stop = () => {
+    if (stopActive === stop) stopActive = null
     clearInterval(id)
     stopWatch()
     if (pending) clearTimeout(pending)
@@ -215,4 +221,6 @@ export function startHealthBanner(intervalMs = HEALTH_INTERVAL_MS): () => void {
     bar?.remove()
     bar = null
   }
+  stopActive = stop
+  return stop
 }

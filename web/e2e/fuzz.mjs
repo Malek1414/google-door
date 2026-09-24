@@ -56,6 +56,8 @@ const INIT = () => {
   const ci = w.clearInterval.bind(w)
   w.setInterval = (...a) => {
     const id = si(...a)
+    // Vite's dev client polls for its socket while offline; that is the harness's server.
+    if (/@vite\/client/.test(String(new Error().stack).split('\n').slice(2, 3).join(''))) return id
     F.intervals.add(id)
     ;(F.where ||= {})[id] = String(new Error().stack).split('\n').slice(2, 4).map((l) => l.trim().replace(/\?[^:)]*/, '')).join(' < ')
     return id
@@ -218,7 +220,7 @@ async function runSeed(seed) {
   const browser = await chromium.launch({
     executablePath: CHROME,
     headless: !process.env.FUZZ_HEADED,
-    args: ['--ignore-certificate-errors', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--enable-blink-features=LongTaskTiming'],
+    args: ['--mute-audio', '--ignore-certificate-errors', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--enable-blink-features=LongTaskTiming'],
   })
   const ctx = await browser.newContext({
     locale: 'de-DE', viewport: { width: 402, height: 874 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true,
@@ -242,7 +244,12 @@ async function runSeed(seed) {
   const apiLog = { ok: 0, fail: 0 }
   await ctx.route('**/api/**', async (route) => {
     const mode = apiMode
-    if (mode === '500' || mode === '429') {
+    if (mode === '429') {
+      // A 429 is an answer from a working server: no snackbar expected.
+      apiLog.fail++
+      return route.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ error: 'quota' }) })
+    }
+    if (mode === '500') {
       // Only data.ts reports its answers to the health banner (entrances, lived).
       // Other callers (route, business, door-check) are listed for the join, not failed.
       const path = new URL(route.request().url()).pathname
@@ -257,7 +264,7 @@ async function runSeed(seed) {
       const st = resp.status()
       await route.fulfill({ response: resp })
       if (st < 500 && st !== 429) {
-        if (apiMode === 'ok' && !offline) lastApiOk = Date.now()
+        if (apiMode === 'ok' && !offline && /\/api\/(entrances|lived|health)/.test(route.request().url())) lastApiOk = Date.now()
         apiLog.ok++
       }
     } catch {

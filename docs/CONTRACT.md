@@ -393,7 +393,12 @@ orienting → walking → threshold → through
 
     POST /api/door-fix    one frame + heading -> DoorFix
     POST /api/door-check  one frame -> passability verdict (wheelchair path)
-    GET  /api/live-token  short-lived token for the Gemini Live session
+
+`GET /api/live-token` was listed here for a Gemini Live streaming session and has been
+withdrawn (Q5). Streaming needs a token broker and a socket that stays up for the whole
+approach; on a venue network that is one more thing that can fail live, and the failure
+mode is the guidance going quiet mid-walk. One frame at a time against `/api/door-fix`
+— every 1.5 s, on demand after two unstable fixes — is what ships.
 
 ### Rules that are not negotiable
 

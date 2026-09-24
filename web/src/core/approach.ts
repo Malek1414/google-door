@@ -21,6 +21,9 @@ export const AIMED_DEG = 8
  *  Without it a person swaying while walking would be bounced back to orienting. */
 export const LOST_AIM_DEG = 35
 /** Under this, the door is within reach. */
+/** Vision may only claim "inside" within this many metres of the door. (Q7) */
+export const INSIDE_MAX_M = 4
+
 export const THRESHOLD_M = 1.5
 /** Standing still this long at the threshold proposes that the user has gone through.
  *
@@ -56,10 +59,15 @@ export class Approach {
   private confirmedThrough = false
   private lastSteps = -1
   private stillSinceMs: number | null = null
+  private insideVetoedAtSteps: number | null = null
+  private lastDistanceM: number | null = null
 
   /** Feed a fresh vision (or fallback) fix. */
   setAnchor(a: Anchor): void {
     this.anchor = a
+    // Seed the distance before the first tick, so an `inside` arriving with the very
+    // first fix is judged on how far the door actually is.
+    if (this.lastDistanceM === null) this.lastDistanceM = a.distanceM
   }
 
   /** The user pressed "Noch draußen": the proposal was wrong, keep guiding.
@@ -68,11 +76,24 @@ export class Approach {
   stillOutside(): void {
     this.confirmedThrough = false
     this.stillSinceMs = null
+    // The user has just told us the last claim was wrong. Do not make it again until
+    // something has actually changed — that is, until they have walked further.
+    this.insideVetoedAtSteps = this.lastSteps
     if (this.phase === 'through') this.phase = 'threshold'
   }
 
-  /** Vision reports interior. Proposes, does not decide — see stillOutside. */
+  /**
+   * Vision reports interior. Proposes, does not decide — see stillOutside.
+   *
+   * Refused while the door is still metres away. (Q7) A camera pointed through a glass
+   * front from across the pavement sees a lobby, and "you are inside" there ends the
+   * mode before it began. Distance, not phase, is the discriminator: the user can be
+   * at the door in any phase, and the last good projection is still the best estimate
+   * of how far away they are even after vision has lost the door.
+   */
   visionSaysInside(): void {
+    if (this.lastDistanceM !== null && this.lastDistanceM > INSIDE_MAX_M) return
+    if (this.insideVetoedAtSteps !== null && this.lastSteps <= this.insideVetoedAtSteps) return
     this.confirmedThrough = true
   }
 
@@ -81,6 +102,11 @@ export class Approach {
   }
 
   tick(s: Sensors): ApproachState {
+    // Honoured before the anchor checks below, because walking through a door is
+    // exactly when vision loses the door: gating the one signal that ends the mode
+    // behind a fresh anchor means it can arrive too late to be worth anything. (Q6)
+    if (this.confirmedThrough) this.phase = 'through'
+
     if (!this.anchor) {
       return { phase: this.phase, projection: null, band: 'straight', speakDistanceM: null, lostFix: false, needsFix: true }
     }
@@ -95,6 +121,7 @@ export class Approach {
       return { phase: this.phase, projection: p, band: 'straight', speakDistanceM: null, lostFix, needsFix: true }
     }
     this.wasStale = false
+    this.lastDistanceM = p.distanceM
 
     const band = bandFor(p.relBearingDeg)
     const aimed = Math.abs(p.relBearingDeg) <= AIMED_DEG
@@ -102,6 +129,8 @@ export class Approach {
     // Stillness is only meaningful at the threshold; anywhere else a pause is just a
     // pause. Reset the clock on any step.
     if (s.steps !== this.lastSteps) {
+      // Walked on since rejecting a proposal: vision may claim "inside" again.
+      if (this.insideVetoedAtSteps !== null && s.steps > this.insideVetoedAtSteps) this.insideVetoedAtSteps = null
       this.lastSteps = s.steps
       this.stillSinceMs = null
     } else if (this.phase === 'threshold' && this.stillSinceMs === null) {

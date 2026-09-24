@@ -372,6 +372,8 @@ export function LiveView(opts: {
   let followPath: [number, number][] = []
   let routeAsked = false
   let routeBusy = false
+  /** Set by teardown: a reply that lands after the approach took over must not speak. */
+  let closed = false
   let lastRouteAt = 0
   let offRouteSince = 0
   /** Re-route after this long off the path, and never more often than REROUTE_EVERY_MS. */
@@ -384,6 +386,7 @@ export function LiveView(opts: {
     lastRouteAt = performance.now()
     void computeRoute(from, target).then((out) => {
       routeBusy = false
+      if (closed) return
       if (out.ok) {
         route = out.route
         followPath = connected(from, out.route.path, target)
@@ -572,7 +575,7 @@ export function LiveView(opts: {
   }
 
   function update() {
-    if (!fix) return
+    if (closed || !fix) return
     // CONTRACT v1 has no footway graph: snapToGraph passes the fix through (see core/match.ts).
     const pos = snapToGraph(fix, []).pos
 
@@ -829,6 +832,7 @@ export function LiveView(opts: {
   }
 
   function teardown() {
+    closed = true
     clearTimers()
     cancelAnimationFrame(raf)
     stopSensors()

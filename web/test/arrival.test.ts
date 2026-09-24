@@ -60,6 +60,12 @@ describe('nearTriggerShown: "Zum Eingang führen" in the Live View panel', () =>
     expect(src).toMatch(/nearBtn\?\.addEventListener\('click', startApproach\)/)
     expect(src).toMatch(/approachBtn\?\.addEventListener\('click', startApproach\)/)
   })
+  it('after teardown a late route reply or sensor tick cannot speak over the approach', () => {
+    const src = readFileSync(resolve(__dirname, '../src/ui/LiveView.ts'), 'utf8')
+    expect(src).toMatch(/function teardown\(\) \{\s*closed = true/)
+    expect(src).toMatch(/function update\(\) \{\s*if \(closed \|\| !fix\) return/)
+    expect(src).toMatch(/computeRoute\(from, target\)\.then\(\(out\) => \{\s*routeBusy = false\s*if \(closed\) return/)
+  })
 })
 
 describe('arrivalPlan: the arrival card does not bounce a blind user back to the map', () => {

@@ -34,6 +34,12 @@ export function knownLines(lang: string): SpokenPart[] {
 
 const METRES = /^(\d+) (Meter|metres?)$/
 
+/** Band and metres lines: only the newest one is worth saying. (The player's newest-line-wins
+ *  queue already drops them; this names the class of line for tests and callers.) */
+export function isTransient(part: SpokenPart, lang: string): boolean {
+  return METRES.test(part.text) || /^(Ein Meter|One metre)$/.test(part.text) || BANDS.some((b) => bandText(b, lang) === part.text)
+}
+
 /**
  * Split a joined instruction back into its lines. Longest known line wins at each
  * position, and only on a word boundary ("1 Meter" never matches inside "10 Meter").

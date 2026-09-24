@@ -6,7 +6,7 @@
 import { arrowPulseHz, ARRIVE_M, beaconFor, cuePan, hapticFor, HAPTIC_ARRIVED, ON_BEARING_DEG, shouldAnnounceApproach, shouldSpeakArrival } from '../core/beacon'
 import { bearingDeg, haversineM, relativeBearing } from '../core/geo'
 import { distanceKey, stopSpeech } from '../core/speech'
-import { HeadingSmoother } from '../core/smooth'
+import { SteadyAngle } from './arrowSteady'
 import { connected, tailLength, instructionLine, maneuverGlyph, nextManeuver, progressAlong, type Route } from '../core/route'
 import { cachedRoute, computeRoute, D } from './Directions'
 import { chevronStack, destinationPin, stackTransform, type ArPhase } from './ar'
@@ -68,6 +68,28 @@ export function nearTriggerShown(distM: number, shown: boolean): boolean {
   return distM <= (shown ? APPROACH_PIN_M * 1.3 : APPROACH_PIN_M)
 }
 export const ARRIVAL_EXIT_S = 20
+/** Worse GPS than this never announces arrival: a 60 m circle cannot tell "at the door" from "across the square". */
+export const ARRIVE_MAX_ACCURACY_M = 30
+/** No position for this long while guiding: say so (a frozen arrow is a lie). */
+export const GPS_LOST_MS = 5000
+/** How often an explained wait (no position yet, position lost) is said again. */
+export const WAIT_REPEAT_MS = 15000
+
+/** Pure. May this fix announce arrival? Unknown accuracy counts as good (replays, desktop). */
+export function arrivalTrusted(accuracy: number | null): boolean {
+  return accuracy === null || !(accuracy > ARRIVE_MAX_ACCURACY_M)
+}
+
+/** Pure. Has the user really walked away from the arrival point? A poor fix must move
+ *  further than its own error circle before the arrival card is taken away. */
+export function walkedAway(distM: number, accuracy: number | null): boolean {
+  return distM > Math.max(LEAVE_M, accuracy ?? 0)
+}
+
+/** Pure. The one line Live View opens with: the safety line first, then where to. */
+export function openingLine(name: string): string {
+  return `${t.arSafeSub ?? ''} ${t.guidingTo(name)}`.trim()
+}
 
 export interface TimedFix {
   lat: number
@@ -116,6 +138,8 @@ const ARR = {
     toMap: 'Zur Karte',
     backIn: (s: number) => `Zurück zur Karte in ${s} Sekunden.`,
     staying: 'Du bleibst hier. Zur Karte kommst du mit dem Knopf unten.',
+    gpsLost: 'Kein GPS-Signal. Die Richtung ist gerade nicht sicher. Bleib kurz stehen.',
+    gpsBack: 'GPS ist wieder da.',
     resumed: 'Du entfernst dich vom Eingang. Die Führung läuft weiter.',
     face: (dir: string) => `Zum Hineingehen nach ${dir} schauen.`,
   },
@@ -125,6 +149,8 @@ const ARR = {
     toMap: 'Back to map',
     backIn: (s: number) => `Back to the map in ${s} seconds.`,
     staying: 'You stay here. The button below takes you back to the map.',
+    gpsLost: 'No GPS signal. The direction is not reliable right now. Stop for a moment.',
+    gpsBack: 'GPS is back.',
     resumed: 'You are moving away from the entrance. Guidance continues.',
     face: (dir: string) => `To enter, face ${dir}.`,
   },
@@ -352,6 +378,9 @@ export function LiveView(opts: {
   // Know which approach clips exist before the tap, so a missing one is spoken at once.
   if (approachMode === 'guide') preloadClips(lang)
   let saidNear = false
+  /** Backgrounded: no voice, no beacon, no countdown; coming back says the direction again. */
+  let hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden'
+  let saidNoCompass = false
   // A magnetometer jitters several degrees at rest and fires ~60 Hz, so the raw
   // heading is fed through a circular low-pass with a deadband. Without it the
   // arrow renders sensor noise and visibly vibrates.
@@ -401,7 +430,10 @@ export function LiveView(opts: {
     })
   }
 
-  const smoother = new HeadingSmoother({ tau: 0.2, deadbandDeg: 1.5 })
+  // Smooth the RELATIVE bearing, not only the heading: close to the door the GPS makes
+  // the bearing to it jump as much as the magnetometer does. Wide deadband: small
+  // noise produces no motion at all (ui/arrowSteady.ts).
+  const steady = new SteadyAngle()
   const beacon = cfg.beacon && session.audio ? new BeaconAudio(session.audio) : null
   let beaconOn = false
 
@@ -466,7 +498,8 @@ export function LiveView(opts: {
 
   /** Both triggers (panel and arrival card) open the approach the same way. */
   function startApproach() {
-    if (!approachMode || !opts.onApproach) return
+    // Twice in a row (panel and card, or a double tap) would open two approach screens.
+    if (closed || !approachMode || !opts.onApproach) return
     teardown() // stops the arrival card's speech, so the unlock comes after it
     // Still synchronous inside the tap: iOS only unlocks speech and audio here.
     primeSpeech()
@@ -543,6 +576,7 @@ export function LiveView(opts: {
       announce(ARR.backIn(plan.exitAfterS)) // once, not every second
       let left = plan.exitAfterS
       countdown = window.setInterval(() => {
+        if (hidden) return // backgrounded: the countdown waits for the user
         left--
         secsEl.textContent = ARR.backIn(Math.max(0, left))
         if (left <= 0) exit()
@@ -568,6 +602,11 @@ export function LiveView(opts: {
     cardEl?.remove()
     cardEl = null
     root.classList.remove('is-arrived')
+    root.dataset.phase = arPhase // 'arrived' would otherwise stick and hide the guidance
+    safeEl.hidden = true
+    delete root.dataset.safe
+    // Focus was on the card that just went away; put it somewhere a finger can find.
+    lookBtn.focus({ preventScroll: true })
     lastWord = ''
     lastSpoken = 0
     if (cfg.speak) speak(ARR.resumed, { interrupt: true })
@@ -575,7 +614,7 @@ export function LiveView(opts: {
   }
 
   function update() {
-    if (closed || !fix) return
+    if (closed || hidden || !fix) return
     // CONTRACT v1 has no footway graph: snapToGraph passes the fix through (see core/match.ts).
     const pos = snapToGraph(fix, []).pos
 
@@ -615,8 +654,11 @@ export function LiveView(opts: {
     const ahead = onRoute && route ? nextManeuver(dist, route, tailLength(route.path, followPath)) : null
     const aheadText = ahead ? instructionLine(ahead.step) ?? D.thenArrive(name) : null
     const hasHeading = heading !== null && heading.source !== 'none'
-    const smoothedDeg = hasHeading ? smoother.push(heading!.deg) : 0
-    rel = hasHeading ? relativeBearing(toDoor, smoothedDeg) : 0
+    // GPS gone: freeze the arrow where it is rather than let a stale fix steer it.
+    if (hasHeading && !gpsLost) {
+      steady.push(relativeBearing(toDoor, heading!.deg), performance.now())
+      rel = steady.rel
+    } else if (!hasHeading) rel = 0
     // "Roughly this way" is for poor GPS only, and only when there is no route to follow.
     const cone = (fix.accuracy ?? 0) > CONE_ACCURACY_M
     const softHeading = heading?.source === 'gps-course'
@@ -633,16 +675,21 @@ export function LiveView(opts: {
 
     if (arrived) {
       // Walked away again before leaving: cancel arrival and guide on.
-      if (dist > LEAVE_M) cancelArrival()
+      if (walkedAway(dist, fix.accuracy)) cancelArrival()
       else return
     }
     setNear(nearTriggerShown(dist, nearShown))
-    if (isArrived(history, target)) {
+    if (isArrived(history, target) && arrivalTrusted(fix.accuracy)) {
       arrive()
       return
     }
 
     const showBanner = (glyph: string) => {
+      // GPS gone: the next turn is stale, and the banner would cover the status saying so.
+      if (gpsLost) {
+        manBanner.hidden = true
+        return
+      }
       if (ahead && aheadText && arPhase !== 'approach' && arPhase !== 'scanning') {
         manGlyph.textContent = ahead.step ? glyph : 'location_on'
         manDist.textContent = t.inMetres(ahead.toManeuverM)
@@ -656,6 +703,13 @@ export function LiveView(opts: {
     if (!hasHeading) {
       // No compass: the route still says what to do and how far away it is.
       dirEl.textContent = aheadText ? `${t.inMetres(ahead!.toManeuverM)}. ${aheadText}` : t.noCompass
+      if (!aheadText && !saidNoCompass) {
+        // Without a compass and without a route there is nothing to point with: say
+        // so once instead of leaving the user in silence.
+        saidNoCompass = true
+        if (cfg.speak) speak(t.noCompass)
+        announce(t.noCompass)
+      }
       const glyph = maneuverGlyph(ahead?.step?.maneuver ?? null) ?? 'straight'
       if (arPhase === 'scanning' && aheadText) setPhase('ready')
       showBanner(glyph)
@@ -703,7 +757,7 @@ export function LiveView(opts: {
         pinG.setAttribute('transform', `translate(${(196 + (rel / 35) * 150).toFixed(0)} 300) scale(${(0.6 + Math.max(0, (APPROACH_PIN_M - dist)) / APPROACH_PIN_M).toFixed(2)})`)
       } else pinG.setAttribute('visibility', 'hidden')
 
-      if (beacon) {
+      if (beacon && !gpsLost) {
         if (!beaconOn) {
           beacon.start()
           beaconOn = true
@@ -759,20 +813,55 @@ export function LiveView(opts: {
 
   // Continuous pulse: rate rises as |rel| falls. Render loop does arithmetic only.
   let phase = 0
+  const calmMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
   let last = performance.now()
   let raf = 0
   const frame = (now: number) => {
     const dt = (now - last) / 1000
     last = now
-    phase = (phase + dt * arrowPulseHz(rel)) % 1
-    const k = 1 + 0.12 * Math.sin(phase * Math.PI * 2) ** 2
+    // A breath, not a throb: at 4 Hz and 12 % the chevrons read as shaking. Still faster
+    // the better the aim, but at most ~1.2 Hz and 4 %; none with reduced motion.
+    phase = (phase + dt * arrowPulseHz(rel) * 0.3) % 1
+    const k = calmMotion ? 1 : 1 + 0.04 * Math.sin(phase * Math.PI * 2) ** 2
     stack.setAttribute('transform', `scale(${k.toFixed(3)})`)
     coneG.setAttribute('opacity', (0.65 + 0.35 * Math.sin(phase * Math.PI) ** 2).toFixed(2))
     raf = requestAnimationFrame(frame)
   }
   raf = requestAnimationFrame(frame)
 
-  if (cfg.speak) speak(t.guidingTo(name),{ interrupt: true })
+  // The safety line is the first thing said, on speech and on the live region alike.
+  if (cfg.speak) speak(openingLine(name), { interrupt: true })
+  announce(openingLine(name))
+
+  // Position watchdog: before the first fix and whenever fixes stop, say why nothing
+  // moves. Its own interval, not in `timers`, because an arrival cancel clears those.
+  const startedAt = performance.now()
+  let lastFixAt = 0
+  let gpsLost = false
+  let lastWaitSaid = 0
+  const sayWait = (text: string, now: number) => {
+    lastWaitSaid = now
+    if (cfg.speak) speak(text)
+    announce(text)
+  }
+  const gpsWatch = window.setInterval(() => {
+    if (closed || hidden || arrived) return
+    const now = performance.now()
+    if (!lastFixAt) {
+      if (now - startedAt >= GPS_LOST_MS && now - lastWaitSaid >= WAIT_REPEAT_MS) sayWait(t.waitingGps, now)
+      return
+    }
+    if (now - lastFixAt < GPS_LOST_MS) return
+    if (!gpsLost) {
+      gpsLost = true
+      noRouteEl.dataset.prev = noRouteEl.hidden ? '' : (noRouteEl.textContent ?? '')
+      noRouteEl.textContent = ARR.gpsLost
+      noRouteEl.hidden = false
+      beacon?.stop()
+      beaconOn = false
+      sayWait(ARR.gpsLost, now)
+    } else if (now - lastWaitSaid >= WAIT_REPEAT_MS) sayWait(ARR.gpsLost, now)
+  }, 1000)
 
   // Ground plane: re-project the chevrons as the phone tilts. Transform only, no redraw.
   const stopPitch = startPitch((b) => {
@@ -782,21 +871,35 @@ export function LiveView(opts: {
 
   const stopSensors = opts.sensors.start(
     (f) => {
+      if (closed) return
+      lastFixAt = performance.now()
+      if (gpsLost) {
+        gpsLost = false
+        const prev = noRouteEl.dataset.prev ?? ''
+        noRouteEl.textContent = prev
+        noRouteEl.hidden = !prev
+        lastWord = '' // say the direction again right away
+        lastSpoken = 0
+        if (cfg.speak) speak(ARR.gpsBack)
+        announce(ARR.gpsBack)
+      }
       fix = f
       history.push({ lat: f.lat, lon: f.lon, t: performance.now() })
       if (history.length > 5) history = history.slice(-5)
       update()
     },
     (hd) => {
+      if (closed) return
       heading = hd
       update()
     },
     () => {
+      if (closed) return
       endRow.replaceChildren(h('p', { class: 'hint' }, t.replayDone))
       if (opts.onReplay) {
         const again = opts.onReplay
         endRow.append(
-          h('button', { class: 'gm-pill gm-pill-primary', type: 'button', onclick: () => { teardown(); again() } }, t.replayAgain),
+          h('button', { class: 'gm-pill gm-pill-primary', type: 'button', onclick: () => { if (closed) return; teardown(); again() } }, t.replayAgain),
         )
       }
       announce(t.replayDone)
@@ -806,8 +909,13 @@ export function LiveView(opts: {
   lookBtn.addEventListener('click', async () => {
     if (lookBusy) return
     const frame64 = grabFrame(mediaEl)
+    const fail = (msg: string) => {
+      lookOut.textContent = msg
+      // The live region reaches VoiceOver; speech users without it must hear it too.
+      if (cfg.speak) speak(msg, { interrupt: true })
+    }
     if (!frame64) {
-      lookOut.textContent = t.lookError
+      fail(t.lookError)
       return
     }
     lookBusy = true
@@ -815,11 +923,13 @@ export function LiveView(opts: {
     lookOut.textContent = t.lookBusy
     try {
       const say = await postLook({ frame: frame64, heading: heading?.deg ?? 0, distanceM: Number.isFinite(dist) ? dist : 0, target: lookTargetText(target) })
+      if (closed) return
       lookOut.textContent = say
       // Unpredictable text: worth waiting a little longer for the network voice.
       if (cfg.speak) speak(say, { interrupt: true, apiTimeoutMs: 8000 })
     } catch (err) {
-      lookOut.textContent = (err as { status?: number }).status === 503 ? t.lookNotConfigured : t.lookError
+      if (closed) return
+      fail((err as { status?: number }).status === 503 ? t.lookNotConfigured : t.lookError)
     } finally {
       lookBusy = false
       lookBtn.removeAttribute('aria-busy')
@@ -827,12 +937,43 @@ export function LiveView(opts: {
   })
 
   function exit() {
+    // Stop, "Zur Karte" and the countdown can all land at once; the map opens once.
+    if (closed) return
     teardown()
     opts.onExit()
   }
 
+  // Backgrounded: beacon and voice stop at once. Back: the next update says the
+  // direction again, since the user may have turned while the screen was away.
+  const onVisibility = () => {
+    const nowHidden = document.visibilityState === 'hidden'
+    if (nowHidden === hidden) return
+    hidden = nowHidden
+    if (hidden) {
+      beacon?.stop()
+      beaconOn = false
+      stopSpeech() // and the pending device-voice fallback of an /api/speak line
+      try {
+        speechSynthesis?.cancel()
+      } catch {
+        /* ignored */
+      }
+    } else {
+      const a = session.audio
+      if (a && a.state !== 'running') void a.resume().catch(() => {})
+      lastWord = ''
+      lastSpoken = 0
+      if (lastFixAt) lastFixAt = performance.now() // the gap was ours, not the GPS's
+      update()
+    }
+  }
+  document.addEventListener('visibilitychange', onVisibility)
+
   function teardown() {
+    if (closed) return
     closed = true
+    document.removeEventListener('visibilitychange', onVisibility)
+    clearInterval(gpsWatch)
     clearTimers()
     cancelAnimationFrame(raf)
     stopSensors()

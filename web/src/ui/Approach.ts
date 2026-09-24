@@ -21,6 +21,7 @@ import { playInstruction, playLine, preloadClips, reportMissingClips, stopLines 
 import { checkDoor, runDoorCheckOnce, verdictNote, verdictRows } from './doorCheck'
 import { h, mount, s } from './dom'
 import { grabFrame } from './LiveView'
+import { SteadyAngle } from './arrowSteady'
 import './approach.css'
 
 // Screen chrome only. Everything spoken during guidance comes from the engine
@@ -61,6 +62,7 @@ export const AP = {
  */
 export class Narrator {
   private lastInstruction = ''
+  private lastSeq: number | undefined = undefined
   private hadAim = false
   private lostAim = false
   private spoke = false
@@ -75,8 +77,11 @@ export class Narrator {
     if (aim && this.lostAim) this.lastInstruction = ''
     this.lostAim = aim ? false : this.lostAim || this.hadAim
     this.hadAim = aim
-    if (!v.instruction || v.instruction === this.lastInstruction) return null
+    if (!v.instruction) return null
+    // A bumped seq is the engine's reminder after silence: the same words, said again.
+    if (v.instruction === this.lastInstruction && v.seq === this.lastSeq) return null
     this.lastInstruction = v.instruction
+    this.lastSeq = v.seq
     // The first line never interrupts: there is nothing of the approach to cut off, and
     // on iOS the cancel() it would trigger swallows the utterance spoken right after it
     // (the tap's speech primer is still pending then). The arrival card is stopped by
@@ -90,6 +95,7 @@ export class Narrator {
   reset(): void {
     this.lastInstruction = ''
     this.lostAim = false
+    this.lastSeq = undefined
   }
 }
 
@@ -212,7 +218,12 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
   const beacon = opts.config.beacon && session.audio ? new BeaconAudio(session.audio) : null
   let beaconOn = false
 
+  const steady = new SteadyAngle()
+  let shownDeg: number | null = null
+  let current: ApproachView | null = null
+  let hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden'
   const render = (v: ApproachView) => {
+    current = v
     const lay = guideLayout(v)
     const enteringThrough = lay.outsideButton && outsideBtn.hidden
     root.dataset.phase = v.phase
@@ -221,10 +232,17 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
     // Draw exactly the numbers the engine returns; rounding is display, not guidance.
     dirEl.hidden = !lay.arrow
     if (v.relBearingDeg !== null) {
-      arrow.style.transform = `rotate(${v.relBearingDeg.toFixed(1)}deg)`
+      // Steady, not raw: the engine's bearing follows every magnetometer twitch.
+      const deg = steady.push(v.relBearingDeg, performance.now())
+      if (deg !== shownDeg) {
+        shownDeg = deg
+        arrow.style.transform = `rotate(${deg.toFixed(1)}deg)`
+      }
       angleEl.textContent = `${Math.abs(Math.round(v.relBearingDeg))}°`
     } else {
       angleEl.textContent = ''
+      steady.reset() // no door: the next arrow starts where the door is, not where it was
+      shownDeg = null
     }
     distEl.textContent = lay.distance
     instrEl.textContent = lay.instruction
@@ -234,7 +252,8 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
     // VoiceOver: land on the only thing there is to do in `through`.
     if (enteringThrough) outsideBtn.focus()
 
-    const say = narrator.next(v)
+    // Backgrounded: draw, but say nothing and keep the beacon off; resume re-says it.
+    const say = hidden ? null : narrator.next(v)
     if (say) {
       // Speech AND the live region, so VoiceOver gets it even with speech off.
       // Each part of the instruction plays its pre-synthesised clip; a part with no
@@ -244,7 +263,7 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
     }
 
     if (beacon) {
-      if (v.beaconPitch === undefined || v.relBearingDeg === null) {
+      if (hidden || v.beaconPitch === undefined || v.relBearingDeg === null) {
         if (beaconOn) beacon.stop()
         beaconOn = false
       } else {
@@ -280,10 +299,36 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
     run.stillOutside()
   })
 
+  // App backgrounded (lock screen, call, app switch): silence the beacon and the voice
+  // at once instead of letting them run on behind the user's back. Coming back says
+  // where things stand, since the world moved while the screen was away.
+  const onVisibility = () => {
+    const nowHidden = document.visibilityState === 'hidden'
+    if (nowHidden === hidden) return
+    hidden = nowHidden
+    if (hidden) {
+      beacon?.stop()
+      beaconOn = false
+      stopLines(lang)
+      try {
+        speechSynthesis?.cancel()
+      } catch {
+        /* ignored */
+      }
+    } else {
+      const a = session.audio
+      if (a && a.state !== 'running') void a.resume().catch(() => {})
+      narrator.reset()
+      if (current) render(current)
+    }
+  }
+  document.addEventListener('visibilitychange', onVisibility)
+
   let done = false
   function teardown() {
     if (done) return
     done = true
+    document.removeEventListener('visibilitychange', onVisibility)
     unsubscribe()
     run.stop()
     stopHeading.forEach((f) => f())
@@ -295,7 +340,11 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
       /* ignored */
     }
   }
+  let exited = false
   function exit() {
+    // Exit is a big target a shaky hand can hit twice; the map must open once.
+    if (exited) return
+    exited = true
     teardown()
     opts.onExit()
   }
@@ -389,7 +438,10 @@ function DoorCheckScreen(opts: { door: Entrance; config: OutputConfig; onExit: (
       /* ignored */
     }
   }
+  let exited = false
   function exit() {
+    if (exited) return
+    exited = true
     teardown()
     opts.onExit()
   }

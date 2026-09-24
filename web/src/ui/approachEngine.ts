@@ -47,8 +47,14 @@ export const FALLBACK_AFTER = 3
  *  direction, not a distance, and GPS is not allowed to supply one. */
 export const FALLBACK_ASSUMED_M = 10
 export const TICK_MS = 100
-/** No compass reading this long after start: say so once instead of staying silent. */
+/** No compass reading this long after start: say so instead of staying silent. */
 export const NO_COMPASS_MS = 3000
+/** Longest stretch without a spoken line while guidance runs (blind user: silence reads as a crash). */
+export const QUIET_MS = 5000
+/** Once the reason for silence has been said (no compass), repeat it only this often. */
+export const EXPLAINED_QUIET_MS = 15000
+/** After a 429 from /api/door-fix, wait this long before the next request. */
+export const RATE_LIMIT_BACKOFF_MS = 5000
 /** A new band must hold this long before it is spoken: compass jitter across a band
  *  edge otherwise speaks a line per tick. The beacon still follows every tick. */
 export const BAND_HOLD_MS = 700
@@ -116,7 +122,14 @@ interface VisionReply {
   inside: boolean
 }
 
-async function requestFix(deps: EngineDeps, base: string, frame: string, headingDeg: number, ctl: AbortController): Promise<VisionReply | null> {
+/** null: no usable answer (network, 5xx, abort). 'rate-limited': 429, back off. */
+async function requestFix(
+  deps: EngineDeps,
+  base: string,
+  frame: string,
+  headingDeg: number,
+  ctl: AbortController,
+): Promise<VisionReply | 'rate-limited' | null> {
   try {
     const r = await deps.fetch(`${base}/api/door-fix`, {
       method: 'POST',
@@ -124,6 +137,7 @@ async function requestFix(deps: EngineDeps, base: string, frame: string, heading
       body: JSON.stringify({ frame, headingDeg }),
       signal: ctl.signal,
     })
+    if (r.status === 429) return 'rate-limited'
     if (!r.ok) return null
     const raw: unknown = await r.json()
     return { fix: parseDoorFix(raw), inside: saysInside(raw) }
@@ -148,6 +162,8 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     let anchor: Anchor | null = null
     let inFlight = false
     let lastRequestAt = -Infinity
+    /** 429 backoff: no request before this. */
+    let notBefore = -Infinity
     let failures = 0
     let saidUnsure = false
     let lastBand: Band | null = null
@@ -170,6 +186,9 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     let timedOut = false
     let saidSearching = false
     const startedAt = deps.now()
+    /** When a line was last handed to the screen to be spoken. */
+    let lastSaidAt = startedAt
+    let seq = 0
 
     // The safety line is the first thing the session ever says, and it is said once.
     let view: ApproachView = {
@@ -185,9 +204,16 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     const emit = (v: ApproachView) => {
       const key = JSON.stringify(v)
       if (key === viewKey) return
+      if (v.instruction !== view.instruction || v.seq !== view.seq) lastSaidAt = deps.now()
       view = v
       viewKey = key
       subs.forEach((cb) => cb(v))
+    }
+
+    /** Say `text` again (or for the first time) even if it equals the current instruction. */
+    const remind = (text: string, patch: Partial<ApproachView> = {}) => {
+      seq += 1
+      emit({ ...view, ...patch, instruction: text, seq })
     }
 
     const fallbackAnchor = (): Anchor | null => {
@@ -223,6 +249,7 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     const maybeRequest = (st: ApproachState) => {
       if (inFlight || heading === null || approach.currentPhase === 'through') return
       const now = deps.now()
+      if (now < notBefore) return
       const due = guard.mode === 'live' ? now - lastRequestAt >= LIVE_EVERY_MS : st.needsFix && now - lastRequestAt >= ONDEMAND_MIN_GAP_MS
       if (!due) return
       const frame = io.frame()
@@ -241,13 +268,16 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
       const at = { heading, steps, ts: now }
       inFlight = true
       lastRequestAt = now
-      const seq = ++reqSeq
+      const mine = ++reqSeq
       ctl = new AbortController()
-      void requestFix(deps, io.apiBase, frame, at.heading, ctl).then((reply) => {
-        if (seq !== reqSeq) return // timed out and abandoned
+      void requestFix(deps, io.apiBase, frame, at.heading, ctl).then((got) => {
+        if (mine !== reqSeq) return // timed out and abandoned
         inFlight = false
         ctl = null
         if (stopped) return
+        // 429: the quota is out; hammering it only extends the outage. Counts as a miss.
+        if (got === 'rate-limited') notBefore = deps.now() + RATE_LIMIT_BACKOFF_MS
+        const reply = got === 'rate-limited' ? null : got
         const fix = reply?.fix ?? null
         const wasLive = guard.mode === 'live'
         const verdict = fix ? guard.push({ bearingDeg: fix.bearingDeg, headingDeg: at.heading, confidence: fix.confidence, distanceM: fix.distanceM }) : null
@@ -272,9 +302,11 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
       if (stopped) return
       const now = deps.now()
       if (rawHeading === null) {
-        if (!saidNoCompass && now - startedAt >= NO_COMPASS_MS) {
+        // Said once after NO_COMPASS_MS, then repeated every EXPLAINED_QUIET_MS while the
+        // compass stays dark: a blind user must not be left with the safety line and silence.
+        if (now - startedAt >= NO_COMPASS_MS && (!saidNoCompass || now - lastSaidAt >= EXPLAINED_QUIET_MS)) {
           saidNoCompass = true
-          emit({ ...view, instruction: noCompassLine(L) })
+          remind(noCompassLine(L), { relBearingDeg: null, distanceM: null, beaconPitch: undefined })
         }
         return
       }
@@ -371,7 +403,7 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
 
       // In `through` there is nothing left to point at: no arrow, no metres, no beacon.
       const aim = st.phase === 'through' ? null : p
-      emit({
+      const next: ApproachView = {
         phase: st.phase,
         relBearingDeg: aim ? aim.relBearingDeg : null,
         distanceM: aim && aim.source !== 'osm-fallback' ? aim.distanceM : null,
@@ -379,7 +411,17 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
         source: source ?? view.source,
         unsure: guard.hasFallenBack,
         beaconPitch: aim ? pitchFor(aim.relBearingDeg) : undefined,
-      })
+        ...(view.seq !== undefined ? { seq: view.seq } : {}),
+      }
+      emit(next)
+      // Nothing said for QUIET_MS: repeat where the door is, or say that it is still
+      // being looked for. Never in `through`: there the job is done and the button waits.
+      if (!lines.length && st.phase !== 'through' && now - lastSaidAt >= QUIET_MS) {
+        // At the door the stillness path is running: "still looking" would contradict it.
+        if (!aim) remind(st.phase === 'threshold' ? thresholdLine(L) : searchingLine(L))
+        else if (st.phase === 'threshold' && aim.source !== 'osm-fallback') remind(thresholdLine(L))
+        else remind(aim.source === 'osm-fallback' ? bandText(st.band, L) : `${bandText(st.band, L)} ${metresLine(aim.distanceM, L)}`)
+      }
       maybeRequest(st)
     }
 
@@ -397,6 +439,7 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
         return () => subs.delete(cb)
       },
       stillOutside() {
+        if (stopped) return
         // Core takes the proposal back and restarts its stillness clock.
         approach.stillOutside()
         lastPhase = approach.currentPhase
@@ -404,6 +447,7 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
         tick()
       },
       stop() {
+        if (stopped) return
         stopped = true
         ctl?.abort()
         offTimer()

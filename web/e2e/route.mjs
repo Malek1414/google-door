@@ -234,9 +234,9 @@ async function survivesTickAndReload({ page, ctx, entranceCalls }, what, n) {
   const box = await page.locator('.gm-map').first().boundingBox()
   if (box) {
     const dir = n % 2 ? -1 : 1
-    await page.mouse.move(box.x + box.width / 2, box.y + 160)
+    await page.mouse.move(box.x + box.width / 2, box.y + 320)
     await page.mouse.down()
-    await page.mouse.move(box.x + box.width / 2 + 140 * dir, box.y + 260, { steps: 8 })
+    await page.mouse.move(box.x + box.width / 2 + 140 * dir, box.y + 420, { steps: 8 })
     await page.mouse.up()
   }
   await page.waitForTimeout(3000)

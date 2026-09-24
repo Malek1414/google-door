@@ -15,6 +15,7 @@
 
 import { approachClipBank, bandClipKey, bandText, clipKeyFor, type Band } from '../core/instruct'
 import { session } from '../session'
+import { stopSpeech } from '../core/speech'
 
 export interface SpokenPart {
   text: string
@@ -279,6 +280,9 @@ function browserDeps(lang: string): ClipDeps {
         }
       }
       sounding.clear()
+      // Also void a pending /api/speak line (arrival card): its late device-voice
+      // fallback would otherwise speak over the approach.
+      stopSpeech()
       try {
         // Only when something is queued: WebKit can drop an utterance spoken right after
         // a needless cancel(), and the first approach line comes straight after one.

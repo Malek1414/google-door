@@ -5,7 +5,7 @@
 
 import { arrowPulseHz, ARRIVE_M, beaconFor, cuePan, hapticFor, HAPTIC_ARRIVED, ON_BEARING_DEG, shouldAnnounceApproach, shouldSpeakArrival } from '../core/beacon'
 import { bearingDeg, haversineM, relativeBearing } from '../core/geo'
-import { distanceKey } from '../core/speech'
+import { distanceKey, stopSpeech } from '../core/speech'
 import { HeadingSmoother } from '../core/smooth'
 import { connected, tailLength, instructionLine, maneuverGlyph, nextManeuver, progressAlong, type Route } from '../core/route'
 import { cachedRoute, computeRoute, D } from './Directions'
@@ -834,6 +834,9 @@ export function LiveView(opts: {
     stopSensors()
     stopPitch()
     beacon?.stop()
+    // The arrival card goes through /api/speak with a device-voice fallback 2 s later;
+    // without this that late fallback queues the whole card ahead of the approach.
+    stopSpeech()
     try {
       // Only when something is queued: WebKit drops an utterance spoken right after a
       // needless cancel(), and the approach's speech primer comes straight after this.

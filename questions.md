@@ -13,7 +13,7 @@ This file is the channel; PR comments are only a mirror.
   `closed` with the commit that implemented it, and moved to *Closed*.
 - Never delete a question; the history is the point.
 
-Last updated: 2026-09-24 06:50, by Sami's agent: loop round 1 on `loop/ux` (PR "UI/UX"), new Q10-Q14. Q9 wired on our side (clips first), 21 clips still missing.
+Last updated: 2026-09-24 06:50, by Sami's agent: loop round 1 on `loop/ux` (PR #6): regression suite b14879a added; Q10-Q14 open.
 
 ---
 

@@ -17,6 +17,12 @@
 export const TOLERANCE_DEG = 25
 /** Consecutive unstable fixes before Live is abandoned. */
 export const STRIKES = 2
+/** Within this many metres of the door the tolerance is widened by NEAR_FACTOR.
+ *  Up close, a step sideways or the phone swinging on the wrist moves the door's
+ *  bearing far more than the compass turn (parallax), and a strict check there strikes
+ *  correct fixes exactly where the user needs them. */
+export const NEAR_M = 4
+export const NEAR_FACTOR = 2
 /** Below this the fix is treated as no door at all. */
 export const MIN_CONFIDENCE = 0.5
 
@@ -26,6 +32,8 @@ export interface Fix {
   /** Compass heading when the frame was taken. */
   headingDeg: number
   confidence: number
+  /** Metres to the door, when vision reported one. */
+  distanceM?: number
 }
 
 export type Mode = 'live' | 'ondemand'
@@ -83,7 +91,8 @@ export class StabilityGuard {
     // The phone turning right moves a fixed door's relative bearing left, so a
     // consistent pair has dBearing ≈ -dHeading.
     const disagreement = Math.abs(dBearing + dHeading)
-    const unstable = disagreement > this.tolerance
+    const near = fix.distanceM !== undefined && fix.distanceM <= NEAR_M
+    const unstable = disagreement > this.tolerance * (near ? NEAR_FACTOR : 1)
 
     if (unstable) {
       this.strikes += 1

@@ -250,7 +250,7 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
         if (stopped) return
         const fix = reply?.fix ?? null
         const wasLive = guard.mode === 'live'
-        const verdict = fix ? guard.push({ bearingDeg: fix.bearingDeg, headingDeg: at.heading, confidence: fix.confidence }) : null
+        const verdict = fix ? guard.push({ bearingDeg: fix.bearingDeg, headingDeg: at.heading, confidence: fix.confidence, distanceM: fix.distanceM }) : null
         if (fix && verdict?.trusted) {
           failures = 0
           saidSearching = false

@@ -83,3 +83,23 @@ describe('StabilityGuard', () => {
     expect(g2.push(fix(-(TOLERANCE_DEG + 5), 0)).unstable).toBe(true)
   })
 })
+
+describe('near the door (parallax)', () => {
+  it('within 4 m a bearing swing the compass does not explain is tolerated more widely', () => {
+    const g = new StabilityGuard()
+    g.push({ ...fix(0, 0), distanceM: 2 })
+    // A side-step at 2 m swings the door 35° with no compass turn: a real door, not a hallucination.
+    expect(g.push({ ...fix(35, 0), distanceM: 2 }).trusted).toBe(true)
+    expect(g.push({ ...fix(0, 0), distanceM: 2 }).trusted).toBe(true)
+    expect(g.hasFallenBack).toBe(false)
+  })
+
+  it('far away the same swing is still struck, and a wild jump near the door still is too', () => {
+    const far = new StabilityGuard()
+    far.push({ ...fix(0, 0), distanceM: 8 })
+    expect(far.push({ ...fix(35, 0), distanceM: 8 }).unstable).toBe(true)
+    const near = new StabilityGuard()
+    near.push({ ...fix(0, 0), distanceM: 2 })
+    expect(near.push({ ...fix(-(2 * TOLERANCE_DEG + 5), 0), distanceM: 2 }).unstable).toBe(true)
+  })
+})

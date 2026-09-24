@@ -13,6 +13,7 @@ a blind user must never be left in silence because a CDN blinked.
     GEMINI_API_KEY=... python3 pipeline/synth_speech.py --lang de
     GEMINI_API_KEY=... python3 pipeline/synth_speech.py --probe   # dump raw response
 """
+import shutil
 import base64, json, os, struct, sys, time, urllib.error, urllib.parse, urllib.request
 
 KEY   = os.environ.get("GEMINI_API_KEY", "")
@@ -44,13 +45,6 @@ PHRASES = {
         "band_sharp_left":      "Scharf links.",
         "band_sharp_right":     "Scharf rechts.",
         "band_turn_around":     "Dreh dich um.",
-        "ap_safety":            "Ich führe dich nur zur Tür. Achte weiter selbst auf deine Umgebung.",
-        "ap_fallback":          "Ich sehe den Eingang nicht. Laut Karte liegt er in dieser Richtung.",
-        "ap_unsure":            "Ich bin mir gerade unsicher.",
-        "ap_orient":            "Dreh dich, bis der Ton hoch und gleichmäßig ist.",
-        "ap_walk":              "Gut. Geh jetzt geradeaus.",
-        "ap_threshold":         "Die Tür ist direkt vor dir.",
-        "ap_through":           "Du müsstest jetzt drin sein.",
     },
     "en": {
         "turn_left":        "Left.",
@@ -71,13 +65,6 @@ PHRASES = {
         "band_sharp_left":      "Sharp left.",
         "band_sharp_right":     "Sharp right.",
         "band_turn_around":     "Turn around.",
-        "ap_safety":            "I'll guide you to the door only. Keep paying attention to your surroundings.",
-        "ap_fallback":          "I can't see the entrance. According to the map it's in this direction.",
-        "ap_unsure":            "I'm not certain right now.",
-        "ap_orient":            "Turn until the tone is high and steady.",
-        "ap_walk":              "Good. Now walk straight ahead.",
-        "ap_threshold":         "The door is right in front of you.",
-        "ap_through":           "You should be inside now.",
     },
 }
 # 1,2,3,8 are the approach ladder (core/instruct.ts DISTANCE_STEPS); the rest are
@@ -133,7 +120,12 @@ def main():
     outdir = os.path.join(OUTDIR, lang)
     os.makedirs(outdir, exist_ok=True)
 
-    jobs = dict(PHRASES[lang])
+    # The approach bank first: it is what a blind user hears at the door, and the
+    # daily TTS cap may run out part-way. Keys come from core/instruct.ts via
+    # `cd web && npx vite-node scripts/clip-bank.ts`, so they cannot drift.
+    bank = json.load(open(os.path.join(os.path.dirname(__file__), "approach_bank.json")))
+    jobs = dict(bank.get(lang, {}))
+    jobs.update(PHRASES[lang])
     for m in DISTANCES:
         jobs[f"dist_{m}"] = (f"{m} Meter." if lang == "de" else f"{m} metres.")
 
@@ -170,6 +162,15 @@ def main():
     with open(os.path.join(OUTDIR, f"manifest.{lang}.json"), "w") as f:
         json.dump({"lang": lang, "voice": VOICE, "model": MODEL, "clips": manifest},
                   f, indent=1, ensure_ascii=False)
+    # The app reads web/public/audio (built into web/dist). Mirror there, and into a
+    # built dist if one exists, so the running server serves the new clips at once.
+    for dest in ("web/public/audio", "web/dist/audio"):
+        if dest.endswith("dist/audio") and not os.path.isdir("web/dist"):
+            continue
+        os.makedirs(os.path.join(dest, lang), exist_ok=True)
+        for key in manifest:
+            shutil.copyfile(os.path.join(outdir, f"{key}.wav"), os.path.join(dest, lang, f"{key}.wav"))
+        shutil.copyfile(os.path.join(OUTDIR, f"manifest.{lang}.json"), os.path.join(dest, f"manifest.{lang}.json"))
     print(f"\nsynthesised {done}, cached {len(manifest)-done}, failed {failed}")
     print(f"manifest: {OUTDIR}/manifest.{lang}.json")
 

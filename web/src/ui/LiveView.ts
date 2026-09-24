@@ -64,15 +64,18 @@ export const ARRIVAL_CARD_DELAY_MS = 1500
 /** The red Maps pin takes over from the chevrons this close in, as Google's does. */
 export const APPROACH_PIN_M = 25
 
+/** Our last-10-metres guidance is offered from here in: normal Live View runs until then. */
+export const NEAR_TRIGGER_M = 10
+
 /**
- * Pure. Is "Zum Eingang führen" offered in the Live View panel? From APPROACH_PIN_M in,
- * with the same 1.3x hysteresis as the pin, so a jittering fix does not flash it.
+ * Pure. Is "Zum Eingang führen" offered in the Live View panel? From NEAR_TRIGGER_M in,
+ * with a 1.3x hysteresis, so a jittering fix does not flash it.
  * Real GPS next to a building is off by 5 to 30 m, so waiting for the 3 m arrival card
  * alone can mean the button never appears at all.
  */
 export function nearTriggerShown(distM: number, shown: boolean): boolean {
   if (!Number.isFinite(distM)) return shown
-  return distM <= (shown ? APPROACH_PIN_M * 1.3 : APPROACH_PIN_M)
+  return distM <= (shown ? NEAR_TRIGGER_M * 1.3 : NEAR_TRIGGER_M)
 }
 export const ARRIVAL_EXIT_S = 20
 /** Worse GPS than this never announces arrival: a 60 m circle cannot tell "at the door" from "across the square". */

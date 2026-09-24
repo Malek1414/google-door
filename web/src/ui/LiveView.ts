@@ -820,7 +820,9 @@ export function LiveView(opts: {
     if (!spokeApproach && shouldAnnounceApproach(dist)) {
       spokeApproach = true
       if ((cfg.beacon || cfg.haptics) && session.audio) playApproachChime(session.audio)
-      if (voiceOn()) speak(t.approaching, { interrupt: true, key: 'arrived' })
+      // No clip: the 'arrived' clip says "Sie haben den Eingang erreicht.", which is wrong
+      // ~10 m out and in the wrong register; the device voice reads the real sentence.
+      if (voiceOn()) speak(t.approaching, { interrupt: true })
       announce(t.approaching)
     }
 

@@ -115,14 +115,19 @@ import { h } from './dom'
 
 /** "Ton aus" toggle, aria-pressed = muted. Big (56 px) for one thumb. `onChange` stops what is sounding. */
 export function muteButton(onChange: (muted: boolean) => void, cls = ''): HTMLButtonElement {
+  // The accessible name stays "Ton aus" (aria-pressed says whether it is on); the visible
+  // text says the state, so a presenter can see at a glance that the sound is off.
   const label = lang === 'de' ? 'Ton aus' : 'Sound off'
+  const shown = (muted: boolean) => (muted ? (lang === 'de' ? 'Ton ist aus' : 'Sound is off') : label)
   const ic = h('span', { class: 'ms', 'aria-hidden': 'true' }, isMuted() ? 'volume_off' : 'volume_up')
-  const b = h('button', { class: `mute-btn ${cls}`.trim(), type: 'button', 'aria-pressed': String(isMuted()) }, ic, h('span', { class: 'mute-t' }, label)) as HTMLButtonElement
+  const txt = h('span', { class: 'mute-t', 'aria-hidden': 'true' }, shown(isMuted()))
+  const b = h('button', { class: `mute-btn ${cls}`.trim(), type: 'button', 'aria-label': label, 'aria-pressed': String(isMuted()) }, ic, txt) as HTMLButtonElement
   b.addEventListener('click', () => {
     const on = !isMuted()
     setMuted(on)
     b.setAttribute('aria-pressed', String(on))
     ic.textContent = on ? 'volume_off' : 'volume_up'
+    txt.textContent = shown(on)
     onChange(on)
   })
   return b

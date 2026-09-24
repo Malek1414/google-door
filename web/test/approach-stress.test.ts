@@ -12,6 +12,7 @@ import {
   EXPLAINED_QUIET_MS,
   NO_COMPASS_MS,
   QUIET_MS,
+  REPEAT_QUIET_MS,
   RATE_LIMIT_BACKOFF_MS,
   TIMEOUT_MS,
 } from '../src/ui/approachEngine'
@@ -114,26 +115,28 @@ describe('approach under stress: never silent without a reason', () => {
     expect(r.views.every((v) => v.relBearingDeg === null && v.beaconPitch === undefined)).toBe(true)
   })
 
-  it('standing still with a good fix: a reminder at least every QUIET_MS, never the safety line again', async () => {
+  // Policy (after the stage rehearsal): new information after QUIET_MS; the SAME words again
+  // only after EXPLAINED_QUIET_MS while the beacon sounds (an aim), REPEAT_QUIET_MS without.
+  it('standing still with a good fix: the same reminder at most every EXPLAINED_QUIET_MS (beacon sounds), never the safety line again', async () => {
     const r = rig(door(70, 8))
     r.heading(100)
     await r.run(30000)
-    expect(longestGap(r.said, 1000, r.t)).toBeLessThanOrEqual(QUIET_MS + 200)
+    expect(longestGap(r.said, 1000, r.t)).toBeLessThanOrEqual(EXPLAINED_QUIET_MS + 200)
     expect(r.said.filter((s) => s.text === safetyLine('de'))).toHaveLength(1)
     expect(r.said.at(-1)!.text).toMatch(/^Links \d+ Meter$/)
     // Reminders are reminders, not chatter: never two within QUIET_MS.
     for (let i = 2; i < r.said.length; i++) expect(r.said[i].t - r.said[i - 1].t).toBeGreaterThanOrEqual(QUIET_MS - 100)
   })
 
-  it('backend 500 on every door-fix: map fallback, and no gap over QUIET_MS', async () => {
+  it('backend 500 on every door-fix: map fallback (beacon sounds), no spoken gap over EXPLAINED_QUIET_MS', async () => {
     const r = rig(() => ({ status: 500 }))
     r.heading(100)
     await r.run(20000)
     expect(r.said.some((s) => s.text.includes(fallbackLine('de')))).toBe(true)
-    expect(longestGap(r.said, 1000, r.t)).toBeLessThanOrEqual(QUIET_MS + 200)
+    expect(longestGap(r.said, 1000, r.t)).toBeLessThanOrEqual(EXPLAINED_QUIET_MS + 200)
   })
 
-  it('backend that never answers (timeout): the user still hears something every QUIET_MS', async () => {
+  it('backend that never answers (timeout, no beacon): the user still hears something every REPEAT_QUIET_MS', async () => {
     const r = rig(() => new Promise<never>(() => {}))
     r.heading(100)
     await r.run(20000)
@@ -143,7 +146,17 @@ describe('approach under stress: never silent without a reason', () => {
     expect(r.calls.length).toBeGreaterThanOrEqual(2)
     for (let i = 1; i < r.calls.length; i++) expect(r.calls[i] - r.calls[i - 1]).toBeGreaterThanOrEqual(TIMEOUT_MS)
     expect(r.said.some((s) => s.text === searchingLine('de'))).toBe(true)
-    expect(longestGap(r.said, 1000, r.t)).toBeLessThanOrEqual(QUIET_MS + 200)
+    expect(longestGap(r.said, 1000, r.t)).toBeLessThanOrEqual(REPEAT_QUIET_MS + 200)
+  })
+
+  it('"Ich suche die Tür." is not said every 5 s: the same line waits REPEAT_QUIET_MS', async () => {
+    const r = rig(() => new Promise<never>(() => {}))
+    r.heading(100)
+    await r.run(45000)
+    const s = r.said.filter((x) => x.text === searchingLine('de'))
+    // The stage rehearsal heard it 9 times in 45 s.
+    expect(s.length).toBeLessThanOrEqual(5)
+    for (let i = 1; i < s.length; i++) expect(s[i].t - s[i - 1].t).toBeGreaterThanOrEqual(REPEAT_QUIET_MS - 100)
   })
 
   it('429 backs off for RATE_LIMIT_BACKOFF_MS instead of hammering the quota', async () => {

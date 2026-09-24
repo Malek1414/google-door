@@ -51,6 +51,8 @@ export const TICK_MS = 100
 export const NO_COMPASS_MS = 3000
 /** Longest stretch without a spoken line while guidance runs (blind user: silence reads as a crash). */
 export const QUIET_MS = 5000
+/** The same reminder again, when nothing sounds in between (no aim, so no beacon). */
+export const REPEAT_QUIET_MS = 10000
 /** Once the reason for silence has been said (no compass), repeat it only this often. */
 export const EXPLAINED_QUIET_MS = 15000
 /** After a 429 from /api/door-fix, wait this long before the next request. */
@@ -416,11 +418,20 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
       emit(next)
       // Nothing said for QUIET_MS: repeat where the door is, or say that it is still
       // being looked for. Never in `through`: there the job is done and the button waits.
+      // Something NEW is said after QUIET_MS; the SAME words again only after
+      // EXPLAINED_QUIET_MS, so standing still does not turn into "Ich suche die Tür." or
+      // "Geradeaus 8 Meter" every 5 s.
       if (!lines.length && st.phase !== 'through' && now - lastSaidAt >= QUIET_MS) {
         // At the door the stillness path is running: "still looking" would contradict it.
-        if (!aim) remind(st.phase === 'threshold' ? thresholdLine(L) : searchingLine(L))
-        else if (st.phase === 'threshold' && aim.source !== 'osm-fallback') remind(thresholdLine(L))
-        else remind(aim.source === 'osm-fallback' ? bandText(st.band, L) : `${bandText(st.band, L)} ${metresLine(aim.distanceM, L)}`)
+        const text = !aim
+          ? st.phase === 'threshold' ? thresholdLine(L) : searchingLine(L)
+          : st.phase === 'threshold' && aim.source !== 'osm-fallback'
+            ? thresholdLine(L)
+            : aim.source === 'osm-fallback' ? bandText(st.band, L) : `${bandText(st.band, L)} ${metresLine(aim.distanceM, L)}`
+        // A sounding beacon is not silence: with an aim the same words wait EXPLAINED_QUIET_MS;
+        // with no aim (beacon off) they wait REPEAT_QUIET_MS.
+        const repeatAfter = aim ? EXPLAINED_QUIET_MS : REPEAT_QUIET_MS
+        if (text !== view.instruction || now - lastSaidAt >= repeatAfter) remind(text)
       }
       maybeRequest(st)
     }

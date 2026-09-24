@@ -113,16 +113,18 @@ export function guideLayout(v: ApproachView, language: string = lang) {
     fromMap: v.source === 'osm-fallback',
     distance: v.distanceM === null ? '' : metresLine(v.distanceM, language),
     // The big distance line already says the metres; the words under it drop a repeat of it.
-    instruction: withoutMetres(v.instruction, v.distanceM === null ? '' : metresLine(v.distanceM, language)),
+    instruction: v.distanceM === null ? v.instruction : withoutMetres(v.instruction),
     // The disclaimer stays readable for the whole approach, except while it IS the instruction.
     safety: !v.instruction.startsWith(safetyLine(language)),
   }
 }
 
-function withoutMetres(instruction: string, metres: string): string {
-  if (!metres) return instruction
-  if (instruction === metres) return ''
-  return instruction.endsWith(` ${metres}`) ? instruction.slice(0, -metres.length - 1) : instruction
+// Any trailing metres phrase, not only the current one: the spoken metres line lags the
+// live distance, and "3 Meter" over "5 Meter" reads as two different distances.
+const TRAILING_METRES = /\s*(Ein Meter|One metre|\d+ (Meter|metres))\.?$/
+
+function withoutMetres(instruction: string): string {
+  return instruction.replace(TRAILING_METRES, '')
 }
 
 function cameraEl(): HTMLVideoElement {

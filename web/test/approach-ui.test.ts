@@ -61,6 +61,22 @@ describe('Narrator: when the screen speaks', () => {
     expect(n.next(view({ relBearingDeg: -18 }))).toBeNull()
     expect(n.next(view({ instruction: 'Geradeaus' }))).toEqual({ text: 'Geradeaus', interrupt: false })
   })
+  it('a band re-said after a lost fix is spoken again, not swallowed as a duplicate', () => {
+    const n = new Narrator('de')
+    expect(n.next(view({ instruction: 'Links' }))?.text).toBe('Links')
+    // Fix lost: no bearing, the engine keeps the old words.
+    expect(n.next(view({ instruction: 'Links', relBearingDeg: null }))).toBeNull()
+    // Fix back: the engine says the band again, the same word.
+    expect(n.next(view({ instruction: 'Links', relBearingDeg: -30 }))?.text).toBe('Links')
+    // ...but only once.
+    expect(n.next(view({ instruction: 'Links', relBearingDeg: -28 }))).toBeNull()
+  })
+  it('the opening safety line (no bearing yet) is still said only once', () => {
+    const n = new Narrator('de')
+    const s0 = view({ instruction: safetyLine('de'), relBearingDeg: null, source: null })
+    expect(n.next(s0)).not.toBeNull()
+    expect(n.next({ ...s0, unsure: true })).toBeNull()
+  })
   it('the screen holds no spoken wording of its own', () => {
     const src = readFileSync(resolve(__dirname, '../src/ui/Approach.ts'), 'utf8')
     expect(src).not.toContain('Ich führe dich nur zur Tür')

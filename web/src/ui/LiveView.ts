@@ -17,7 +17,8 @@ import type { OutputConfig, Profile } from '../core/profile'
 import type { ArrowTarget } from '../core/target'
 import { BeaconAudio, playApproachChime } from '../audio'
 import { postLook } from '../data'
-import { announce, session, speak, vibrate } from '../session'
+import { announce, primeSpeech, session, speak, vibrate } from '../session'
+import { preloadClips } from './clips'
 import { lang, t } from '../strings'
 import { h, mount, s } from './dom'
 import './arrival.css'
@@ -336,6 +337,8 @@ export function LiveView(opts: {
   let calloutIdx = 0
   let lookBusy = false
   let nearShown = false
+  // Know which approach clips exist before the tap, so a missing one is spoken at once.
+  if (approachMode === 'guide') preloadClips(lang)
   let saidNear = false
   // A magnetometer jitters several degrees at rest and fires ~60 Hz, so the raw
   // heading is fed through a circular low-pass with a deadband. Without it the
@@ -449,7 +452,9 @@ export function LiveView(opts: {
   /** Both triggers (panel and arrival card) open the approach the same way. */
   function startApproach() {
     if (!approachMode || !opts.onApproach) return
-    teardown()
+    teardown() // cancels speechSynthesis, so the unlock comes after it
+    // Still synchronous inside the tap: iOS only unlocks speech and audio here.
+    primeSpeech()
     opts.onApproach(approachMode)
   }
 
@@ -791,7 +796,8 @@ export function LiveView(opts: {
     try {
       const say = await postLook({ frame: frame64, heading: heading?.deg ?? 0, distanceM: Number.isFinite(dist) ? dist : 0, target: lookTargetText(target) })
       lookOut.textContent = say
-      if (cfg.speak) speak(say, { interrupt: true })
+      // Unpredictable text: worth waiting a little longer for the network voice.
+      if (cfg.speak) speak(say, { interrupt: true, apiTimeoutMs: 8000 })
     } catch (err) {
       lookOut.textContent = (err as { status?: number }).status === 503 ? t.lookNotConfigured : t.lookError
     } finally {

@@ -1,18 +1,20 @@
-// Approach voice: pre-synthesised clips first, /api/speak only for what has no clip. (Q9)
+// Approach voice: pre-synthesised clips first, the device voice for what has no clip. (Q9)
 //
-// The TTS tier allows 100 requests a day and one approach speaks a dozen lines, so a
-// line that has a clip must never reach the network. A missing clip is silent-but-safe:
-// the line is spoken live instead, it just costs one request.
+// The TTS tier allows 100 requests a day, the server retries 429 for up to a minute and
+// the street has patchy signal, so nothing on this path goes to /api/speak. A part with
+// no clip is spoken by speechSynthesis: zero latency, offline, in the UI language.
 //
 // The engine hands the screen one joined instruction ("Ich sehe den Eingang nicht. ...
 // Links 5 Meter"). splitInstruction() takes it apart into the lines it was built from,
 // using the same wording functions the engine used, so every part gets its own clip key.
 //
-// Lines queue: the next one starts when the previous one has finished. Only an
-// interrupting line (the safety line) cuts off what is playing and drops the queue.
+// Latest wins: every line gets a sequence number and nothing older than the newest line
+// ever plays. The parts of one line play in order; a newer line replaces whatever is
+// still waiting. Only an interrupting line (the safety line) also cuts off what is
+// sounding, clip sources and speechSynthesis alike.
 
 import { approachClipBank, bandClipKey, bandText, clipKeyFor, type Band } from '../core/instruct'
-import { session, speak } from '../session'
+import { session } from '../session'
 
 export interface SpokenPart {
   text: string
@@ -67,34 +69,44 @@ export function splitInstruction(text: string, lang: string): SpokenPart[] {
 
 /** What the player needs from the outside world; injectable so the queue is testable. */
 export interface ClipDeps {
-  /** Play the clip to the end. Resolves false when no clip exists for the key. */
-  playClip(key: string): Promise<boolean>
-  /** Speak live (/api/speak, then speechSynthesis). Resolves when it is roughly done. */
+  /**
+   * Synchronous: is there a clip for this key? false = known missing (speak on the device
+   * at once, still inside the tap that started the approach); undefined = not known yet.
+   */
+  hasClip?(key: string): boolean | undefined
+  /**
+   * Play the clip to the end. Resolves false when no clip exists for the key. `live()`
+   * turns false when a newer line took over while the clip was loading: then it must
+   * not start.
+   */
+  playClip(key: string, live: () => boolean): Promise<boolean>
+  /** Speak on the device (speechSynthesis). Resolves when it is done. */
   speakLive(text: string): Promise<void>
-  /** Cut off whatever is sounding now. */
+  /** Cut off whatever is sounding now: clip sources and speechSynthesis. */
   stop(): void
 }
 
+interface Queued extends SpokenPart {
+  seq: number
+}
+
 export class ClipPlayer {
-  private queue: SpokenPart[] = []
+  private queue: Queued[] = []
   private running = false
   private gen = 0
+  /** Sequence number of the newest line accepted. Nothing older ever plays. */
+  private latest = 0
 
   constructor(private readonly deps: ClipDeps) {}
 
   /** Queue a line. `interrupt` drops the queue and cuts off the current line first. Never throws. */
-  playLine(text: string, key: string | null, opts: { interrupt?: boolean } = {}): Promise<void> {
-    if (opts.interrupt) this.stop()
-    this.queue.push({ text, key })
-    return this.drain()
+  playLine(text: string, key: string | null, opts: { interrupt?: boolean; seq?: number } = {}): Promise<void> {
+    return this.enqueue([{ text, key }], opts)
   }
 
   /** Queue every part of a joined engine instruction, in order. */
-  playInstruction(text: string, lang: string, opts: { interrupt?: boolean } = {}): Promise<void> {
-    const parts = splitInstruction(text, lang)
-    if (opts.interrupt) this.stop()
-    this.queue.push(...parts)
-    return this.drain()
+  playInstruction(text: string, lang: string, opts: { interrupt?: boolean; seq?: number } = {}): Promise<void> {
+    return this.enqueue(splitInstruction(text, lang), opts)
   }
 
   stop(): void {
@@ -108,22 +120,41 @@ export class ClipPlayer {
     }
   }
 
+  /**
+   * Latest wins. A line whose `seq` is not newer than one already accepted is dropped
+   * (a stale direction must never play after a newer one). A new line replaces what is
+   * still waiting; the part sounding now finishes unless the line interrupts.
+   */
+  private enqueue(parts: SpokenPart[], opts: { interrupt?: boolean; seq?: number }): Promise<void> {
+    const seq = opts.seq ?? this.latest + 1
+    if (seq <= this.latest) return Promise.resolve()
+    this.latest = seq
+    if (opts.interrupt) this.stop()
+    else this.queue = []
+    this.queue.push(...parts.map((p) => ({ ...p, seq })))
+    return this.drain()
+  }
+
   private async drain(): Promise<void> {
     if (this.running) return
     this.running = true
     const gen = this.gen
     while (this.queue.length && gen === this.gen) {
       const part = this.queue.shift()!
+      const live = () => gen === this.gen && part.seq === this.latest
+      if (!live()) continue
       let played = false
-      if (part.key) {
+      // A clip known to be missing goes straight to the device voice, with no await in
+      // between: the first line then still runs inside the tap (iOS speech unlock).
+      if (part.key && this.deps.hasClip?.(part.key) !== false) {
         try {
-          played = await this.deps.playClip(part.key)
+          played = await this.deps.playClip(part.key, live)
         } catch {
           played = false
         }
       }
       if (gen !== this.gen) return
-      if (!played) {
+      if (!played && live()) {
         try {
           await this.deps.speakLive(part.text)
         } catch {
@@ -143,24 +174,69 @@ interface Manifest {
 
 const BASE: string = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/'
 const manifests = new Map<string, Promise<Manifest | null>>()
+const loaded = new Map<string, Manifest | null>()
 const buffers = new Map<string, AudioBuffer>()
-let current: AudioBufferSourceNode | null = null
+const sounding = new Set<AudioBufferSourceNode>()
+
+const langKey = (lang: string) => (lang.startsWith('de') ? 'de' : 'en')
 
 function manifestFor(lang: string): Promise<Manifest | null> {
-  const l = lang.startsWith('de') ? 'de' : 'en'
+  const l = langKey(lang)
   let m = manifests.get(l)
   if (!m) {
     m = fetch(`${BASE}audio/manifest.${l}.json`)
       .then((r) => (r.ok ? (r.json() as Promise<Manifest>) : null))
       .catch(() => null)
+      .then((v) => {
+        loaded.set(l, v)
+        return v
+      })
     manifests.set(l, m)
   }
   return m
 }
 
+/** Fetch the clip manifest ahead of the approach, so "no clip" is known synchronously. */
+export function preloadClips(lang: string): void {
+  void manifestFor(lang)
+}
+
+/** BCP 47 tag for the device voice. */
+export const voiceLang = (lang: string): string => (lang.startsWith('de') ? 'de-DE' : 'en-US')
+
+/** On-device speech: no network, no quota, native queue. Resolves when it has finished. */
+export function speakOnDevice(text: string, lang: string): Promise<void> {
+  return new Promise((resolve) => {
+    const synth = typeof speechSynthesis === 'undefined' ? null : speechSynthesis
+    if (!synth || typeof SpeechSynthesisUtterance === 'undefined') return resolve()
+    let cap = 0
+    const done = () => {
+      clearTimeout(cap)
+      resolve()
+    }
+    // onend can go missing (WebKit, a cancelled utterance); never hold the queue forever.
+    cap = window.setTimeout(done, Math.min(12000, 1500 + text.length * 90))
+    try {
+      const u = new SpeechSynthesisUtterance(text)
+      u.lang = voiceLang(lang)
+      u.rate = 1.05
+      u.onend = done
+      u.onerror = done
+      synth.speak(u)
+    } catch {
+      done()
+    }
+  })
+}
+
 function browserDeps(lang: string): ClipDeps {
   return {
-    async playClip(key) {
+    hasClip(key) {
+      const m = loaded.get(langKey(lang))
+      if (m === undefined) return undefined
+      return !!m?.clips[key] && !!session.audio
+    },
+    async playClip(key, live) {
       const ctx = session.audio
       const entry = (await manifestFor(lang))?.clips[key]
       if (!ctx || !entry) return false
@@ -172,10 +248,12 @@ function browserDeps(lang: string): ClipDeps {
         buf = await ctx.decodeAudioData(await r.arrayBuffer())
         buffers.set(id, buf)
       }
+      // A newer line arrived while this one was loading: it must not start now.
+      if (!live()) return true
       const src = ctx.createBufferSource()
       src.buffer = buf
       src.connect(ctx.destination)
-      current = src
+      sounding.add(src)
       await new Promise<void>((done) => {
         // onended can go missing on a suspended context; never wait longer than the clip.
         const t = setTimeout(done, buf!.duration * 1000 + 500)
@@ -185,23 +263,26 @@ function browserDeps(lang: string): ClipDeps {
         }
         src.start()
       })
-      if (current === src) current = null
+      sounding.delete(src)
       return true
     },
-    async speakLive(text) {
-      speak(text)
-      // speak() does not report the end; hold the queue for roughly the spoken length.
-      await new Promise((r) => setTimeout(r, Math.min(8000, 600 + text.length * 65)))
-    },
+    // Every part without a clip is spoken on the device, never via /api/speak: that is
+    // slow (the server retries 429 for up to a minute), capped at 100 a day and silent
+    // without signal. (Q9 follow-up)
+    speakLive: (text) => speakOnDevice(text, lang),
     stop() {
-      try {
-        current?.stop()
-      } catch {
-        /* already ended */
+      for (const src of sounding) {
+        try {
+          src.stop()
+        } catch {
+          /* already ended */
+        }
       }
-      current = null
+      sounding.clear()
       try {
-        speechSynthesis?.cancel()
+        // Only when something is queued: WebKit can drop an utterance spoken right after
+        // a needless cancel(), and the first approach line comes straight after one.
+        if (speechSynthesis && (speechSynthesis.speaking || speechSynthesis.pending)) speechSynthesis.cancel()
       } catch {
         /* no synth */
       }
@@ -220,12 +301,12 @@ function player(lang: string): ClipPlayer {
 }
 
 /** Speak one line: its clip if there is one, else live. Queued; never throws. */
-export function playLine(line: string, key: string | null, opts: { interrupt?: boolean; lang: string }): void {
+export function playLine(line: string, key: string | null, opts: { interrupt?: boolean; seq?: number; lang: string }): void {
   void player(opts.lang).playLine(line, key, opts).catch(() => {})
 }
 
 /** Speak an engine instruction part by part, each with its own clip key. */
-export function playInstruction(text: string, opts: { interrupt?: boolean; lang: string }): void {
+export function playInstruction(text: string, opts: { interrupt?: boolean; seq?: number; lang: string }): void {
   void player(opts.lang).playInstruction(text, opts.lang, opts).catch(() => {})
 }
 
@@ -246,6 +327,6 @@ export function reportMissingClips(lang: string): void {
   reported = true
   void manifestFor(lang).then((m) => {
     const missing = missingClipKeys(lang, m)
-    if (missing.length) console.info(`[clips] ${lang}: ${missing.length} approach clips not synthesised yet (spoken via /api/speak):`, missing.join(', '))
+    if (missing.length) console.info(`[clips] ${lang}: ${missing.length} approach clips not synthesised yet (spoken on the device):`, missing.join(', '))
   })
 }

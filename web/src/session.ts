@@ -1,4 +1,4 @@
-import { say } from './core/speech'
+import { say, stopSpeech } from './core/speech'
 import { apiBase } from './config'
 // Shared runtime state across screens, plus the output helpers (speech, vibration, live region).
 
@@ -44,22 +44,59 @@ export function announce(text: string): void {
   requestAnimationFrame(() => (el.textContent = text))
 }
 
-export function speak(text: string, opts: { interrupt?: boolean; key?: string } = {}): void {
+export function speak(text: string, opts: { interrupt?: boolean; key?: string; apiTimeoutMs?: number } = {}): void {
   // Routes through the three-tier chain (cached Gemini clip -> /api/speak ->
   // speechSynthesis). Callers keep passing text; `key` upgrades a line to its
   // pre-synthesised clip, which is the zero-latency, works-offline path.
-  if (opts.interrupt && 'speechSynthesis' in window) {
-    try {
-      speechSynthesis.cancel()
-    } catch {
-      /* ignore */
+  // Interrupt cuts off both voices: a playing clip as well as speechSynthesis.
+  if (opts.interrupt) {
+    stopSpeech()
+    if ('speechSynthesis' in window) {
+      try {
+        speechSynthesis.cancel()
+      } catch {
+        /* ignore */
+      }
     }
   }
-  void say(opts.key ?? null, text, apiBase()).then((tier) => {
+  void say(opts.key ?? null, text, apiBase(), { apiTimeoutMs: opts.apiTimeoutMs }).then((tier) => {
     if (tier === 'failed') announce(text) // at minimum it reaches the screen reader
   })
 }
 
+
+/**
+ * Call synchronously inside a tap that is about to start speech (the approach trigger).
+ * iOS only lets speechSynthesis talk after a call made inside a user gesture, and the
+ * approach's first line may come after an await; a silent utterance here unlocks it.
+ * Also resumes the AudioContext for the clips.
+ */
+export function primeSpeech(): void {
+  setPlaybackSession()
+  const a = session.audio
+  if (a && a.state === 'suspended') void a.resume().catch(() => {})
+  try {
+    if (typeof speechSynthesis !== 'undefined' && typeof SpeechSynthesisUtterance !== 'undefined') {
+      const u = new SpeechSynthesisUtterance(' ')
+      u.volume = 0
+      speechSynthesis.speak(u)
+    }
+  } catch {
+    /* no synth */
+  }
+}
+
+/**
+ * iOS 17+ Safari: play through the silent switch, like a navigation app. Unknown
+ * elsewhere, hence the try.
+ */
+export function setPlaybackSession(): void {
+  try {
+    ;(navigator as unknown as { audioSession: { type: string } }).audioSession.type = 'playback'
+  } catch {
+    /* not supported */
+  }
+}
 
 export const canVibrate = (): boolean => typeof navigator.vibrate === 'function'
 

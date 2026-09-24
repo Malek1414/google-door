@@ -17,7 +17,7 @@ import type { Entrance } from '../core/types'
 import { announce, session, speak } from '../session'
 import { lang, t } from '../strings'
 import { engine, type ApproachMode, type ApproachView } from './approachPort'
-import { playInstruction, reportMissingClips, stopLines } from './clips'
+import { playInstruction, preloadClips, reportMissingClips, stopLines } from './clips'
 import { checkDoor, runDoorCheckOnce, verdictNote, verdictRows } from './doorCheck'
 import { h, mount, s } from './dom'
 import { grabFrame } from './LiveView'
@@ -52,15 +52,24 @@ export const AP = {
  * Pure. Decides WHEN to speak, never what: the engine's instruction is spoken verbatim
  * each time it changes. The engine already opens with the safety line and names the
  * map fallback (core/instruct.ts), so nothing is added here. Only the safety line may
- * cut off what was playing (the arrival card); every later line queues behind the
- * previous one so a joined "Links 5 Meter" is never clipped by the next view.
+ * cut off what was playing (the arrival card); the parts of a joined "Links 5 Meter"
+ * play in order, and a newer line replaces a stale one that has not started (ui/clips.ts).
  */
 export class Narrator {
   private lastInstruction = ''
+  private hadAim = false
+  private lostAim = false
 
   constructor(private readonly language: string = lang) {}
 
   next(v: ApproachView): { text: string; interrupt: boolean } | null {
+    // Lost fix: the engine keeps the old words on screen and says the band again once a
+    // fix is back, often the very same "Links". Dedupe on text would swallow it, so the
+    // first view with a direction after a stretch without one always speaks.
+    const aim = v.relBearingDeg !== null
+    if (aim && this.lostAim) this.lastInstruction = ''
+    this.lostAim = aim ? false : this.lostAim || this.hadAim
+    this.hadAim = aim
     if (!v.instruction || v.instruction === this.lastInstruction) return null
     this.lastInstruction = v.instruction
     return { text: v.instruction, interrupt: v.instruction.startsWith(safetyLine(this.language)) }
@@ -69,6 +78,7 @@ export class Narrator {
   /** After "Noch draußen": the engine's next line is spoken even if it repeats an earlier one. */
   reset(): void {
     this.lastInstruction = ''
+    this.lostAim = false
   }
 }
 
@@ -161,6 +171,7 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
   mount(root)
 
   const narrator = new Narrator()
+  preloadClips(lang)
   reportMissingClips(lang)
   const beacon = opts.config.beacon && session.audio ? new BeaconAudio(session.audio) : null
   let beaconOn = false
@@ -190,8 +201,8 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
     const say = narrator.next(v)
     if (say) {
       // Speech AND the live region, so VoiceOver gets it even with speech off.
-      // Each part of the instruction plays its pre-synthesised clip; only a part with
-      // no clip goes to /api/speak (Q9).
+      // Each part of the instruction plays its pre-synthesised clip; a part with no
+      // clip is spoken by the device voice, never /api/speak (Q9).
       if (opts.config.speak) playInstruction(say.text, { interrupt: say.interrupt, lang })
       announce(say.text)
     }

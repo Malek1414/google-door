@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   approachClipBank, bandText, clipKeyFor, fallbackLine, metresLine, noDirectionLine,
@@ -80,9 +82,11 @@ describe('ClipPlayer', () => {
     const { deps, log, finish } = fakeDeps(['m_5'])
     const p = new ClipPlayer(deps)
     p.playLine('5 Meter', 'm_5')
+    await finish()
     p.playLine('Die Tür ist direkt vor dir.', 'approach_threshold')
+    await finish()
     p.playLine('42 Meter', null)
-    for (let i = 0; i < 4; i++) await finish()
+    await finish()
     expect(log).toEqual(['clip:m_5', 'live:Die Tür ist direkt vor dir.', 'live:42 Meter'])
   })
   it('queues: the next line starts only after the previous one ends', async () => {
@@ -114,6 +118,70 @@ describe('ClipPlayer', () => {
     }
     const p = new ClipPlayer(deps)
     await expect(p.playLine('Links', 'turn_left', { interrupt: true })).resolves.toBeUndefined()
+  })
+})
+
+describe('ClipPlayer: latest wins (approach speech ordering)', () => {
+  it('a line emitted after a newer one is dropped', async () => {
+    const { deps, log, finish } = fakeDeps([])
+    const p = new ClipPlayer(deps)
+    p.playLine('Rechts', null, { seq: 2 })
+    p.playLine('Links', null, { seq: 1 }) // arrived late: older than what is playing
+    for (let i = 0; i < 3; i++) await finish()
+    expect(log).toEqual(['live:Rechts'])
+  })
+  it('a newer line replaces the parts still waiting; the sounding part finishes', async () => {
+    const { deps, log, finish } = fakeDeps(['turn_left', 'm_5'])
+    const p = new ClipPlayer(deps)
+    p.playInstruction('Links 5 Meter', 'de')
+    await Promise.resolve()
+    p.playLine('Geradeaus', null)
+    for (let i = 0; i < 3; i++) await finish()
+    expect(log).toEqual(['clip:turn_left', 'live:Geradeaus'])
+  })
+  it('interrupt stops clip playback, including a clip that is still loading', async () => {
+    const log: string[] = []
+    let loaded: () => void = () => {}
+    const deps: ClipDeps = {
+      async playClip(key, live) {
+        await new Promise<void>((r) => (loaded = r)) // fetch + decode
+        if (!live()) return true
+        log.push(`start:${key}`)
+        return true
+      },
+      async speakLive(text) {
+        log.push(`live:${text}`)
+      },
+      stop() {
+        log.push('stop')
+      },
+    }
+    const p = new ClipPlayer(deps)
+    p.playLine('Links', 'turn_left')
+    await Promise.resolve()
+    p.playLine(safetyLine('de'), null, { interrupt: true })
+    loaded()
+    for (let i = 0; i < 5; i++) await Promise.resolve()
+    expect(log).toEqual(['stop', `live:${safetyLine('de')}`])
+  })
+  it('a known-missing clip is spoken on the device synchronously (iOS unlock inside the tap)', () => {
+    const log: string[] = []
+    const deps: ClipDeps = {
+      hasClip: () => false,
+      playClip: async () => {
+        log.push('clip')
+        return false
+      },
+      speakLive: async (text) => void log.push(`live:${text}`),
+      stop: () => {},
+    }
+    new ClipPlayer(deps).playInstruction(safetyLine('de'), 'de', { interrupt: true })
+    expect(log).toEqual([`live:${safetyLine('de')}`])
+  })
+  it('the approach path never calls /api/speak', () => {
+    const src = readFileSync(resolve(__dirname, '../src/ui/clips.ts'), 'utf8')
+    expect(src).not.toMatch(/fetch\([^)]*api\/speak/)
+    expect(src).not.toMatch(/import \{[^}]*\bspeak\b[^}]*\} from '\.\.\/session'/)
   })
 })
 

@@ -10,6 +10,7 @@ import { SteadyAngle } from './arrowSteady'
 import { CalmWord, isMuted, LineGate, muteButton } from './voiceCalm'
 import { connected, tailLength, instructionLine, maneuverGlyph, nextManeuver, progressAlong, type Route } from '../core/route'
 import { cachedRoute, computeRoute, D } from './Directions'
+import { streetOf } from '../core/nav'
 import { destinationPin, groundArrows, type ArPhase } from './ar'
 import { cameraVideo, mountCamera } from '../core/camera'
 import './ar.css'
@@ -20,7 +21,7 @@ import type { ArrowTarget } from '../core/target'
 import type { Entrance } from '../core/types'
 import { BeaconAudio, playApproachChime } from '../audio'
 import { postLook } from '../data'
-import { announce, primeSpeech, session, speak, vibrate } from '../session'
+import { announce, keepScreenOn, primeSpeech, session, speak, vibrate } from '../session'
 import { preloadClips } from './clips'
 import { lang, t } from '../strings'
 import { h, mount, s } from './dom'
@@ -166,6 +167,7 @@ const ARR = {
     sheetTitle: 'Du bist angekommen',
     ask: 'Sollen wir dir zeigen, wo du reinkommst?',
     yes: 'Ja, zeig mir den Eingang',
+    yesCheck: 'Ja, Tür prüfen',
     no: 'Nein, danke',
     noGuide: 'Für diesen Eingang haben wir noch keine genaue Führung.',
     stay: 'Hier bleiben',
@@ -182,6 +184,7 @@ const ARR = {
     sheetTitle: 'You have arrived',
     ask: 'Shall we show you where to get in?',
     yes: 'Yes, show me the entrance',
+    yesCheck: 'Yes, check the door',
     no: 'No, thanks',
     noGuide: 'We have no exact guidance for this entrance yet.',
     stay: 'Stay here',
@@ -238,11 +241,15 @@ export function directionWord(rel: number): string {
   return t.behind
 }
 
-/** Clip key for a turn, on the same bands as turnGlyph and directionWord. */
-function turnKey(rel: number): string {
-  const a = Math.abs(rel)
-  if (a <= ON_BEARING_DEG) return 'straight'
-  return rel < 0 ? 'turn_left' : 'turn_right'
+/**
+ * Clip key for the word actually shown. The word is hysteresis-held (CalmWord); a key
+ * from the raw bearing could say "Links" while the screen says "Geradeaus".
+ */
+export function wordKey(word: string): string | undefined {
+  if (word === t.ahead) return 'straight'
+  if (word === t.turnLeft) return 'turn_left'
+  if (word === t.turnRight) return 'turn_right'
+  return undefined
 }
 
 /** Material Symbols turn glyph for the green instruction card, same bands as directionWord. */
@@ -325,10 +332,15 @@ export function LiveView(opts: {
 
   // scanning
   const scanText = h('p', { class: 'ar-scan-text' }, t.arScan ?? 'Richte die Kamera auf Gebäude, Geschäfte und Schilder um dich herum.')
-  const scanArt = s('svg', { class: 'ar-scan-art', viewBox: '0 0 120 120', 'aria-hidden': 'true' },
-    s('rect', { x: '44', y: '18', width: '32', height: '58', rx: '6', fill: 'none', stroke: '#a8c7fa', 'stroke-width': '4' }),
-    s('rect', { x: '50', y: '26', width: '20', height: '38', rx: '2', fill: '#a8c7fa', opacity: '0.35' }),
-    s('path', { d: 'M28 92 q32 -16 64 0', fill: 'none', stroke: '#a8c7fa', 'stroke-width': '4', 'stroke-linecap': 'round' }),
+  // Phone in a hand, as in the Maps Live View intro: blue hand, white phone, a dot on screen.
+  const scanArt = s('svg', { class: 'ar-scan-art', viewBox: '0 0 160 200', 'aria-hidden': 'true' },
+    s('path', { d: 'M18 196 L40 120 q6 -18 24 -18 L96 102 L96 196 Z', fill: '#2c5bd8' }),
+    s('rect', { x: '46', y: '8', width: '76', height: '150', rx: '14', fill: '#e8eaed', transform: 'rotate(8 84 83)' }),
+    s('rect', { x: '52', y: '16', width: '64', height: '134', rx: '10', fill: '#ffffff', transform: 'rotate(8 84 83)' }),
+    s('circle', { cx: '84', cy: '80', r: '16', fill: '#d2e3fc' }),
+    s('circle', { cx: '84', cy: '80', r: '7', fill: '#1a73e8' }),
+    s('path', { d: 'M120 60 q16 4 14 20 q14 4 10 20 q12 6 6 22 q-6 14 -24 10', fill: '#4f7df0', stroke: '#2c5bd8', 'stroke-width': '3' }),
+    s('path', { d: 'M40 120 q-8 -26 10 -34', fill: 'none', stroke: '#2c5bd8', 'stroke-width': '10', 'stroke-linecap': 'round' }),
   ) as unknown as HTMLElement
   const pill = h('div', { class: 'ar-pill' }, t.arScanning ?? 'Scanning …')
   const follow = h('p', { class: 'ar-follow', hidden: true }, t.arFollow ?? 'Folge dem Pfeil')
@@ -336,9 +348,13 @@ export function LiveView(opts: {
   // destination strip
   const distEl = h('span', { class: 'ar-dest-m' }, '')
   const dirEl = h('span', { class: 'sr-only' }, t.waitingGps)
+  // Bottom card, as in the Maps recording: the next manoeuvre while on the route
+  // (turn glyph + metres left, street right), the door itself in the last stretch.
+  const destIc = ms('location_on')
+  const destName = h('span', { class: 'ar-dest-name' }, name)
   const destStrip = h('div', { class: 'ar-dest' },
-    h('div', { class: 'ar-dest-pin' }, ms('location_on'), distEl),
-    h('span', { class: 'ar-dest-name' }, name),
+    h('div', { class: 'ar-dest-pin' }, destIc, distEl),
+    destName,
   )
 
   // safety interstitial
@@ -435,6 +451,9 @@ export function LiveView(opts: {
   )
 
   mount(root)
+  root.dataset.phase = 'scanning'
+  // The phone must not auto-lock mid-walk (Approach already holds one of these).
+  const releaseScreen = keepScreenOn()
 
   // ---- state ----
   let fix: Fix | null = null
@@ -454,6 +473,13 @@ export function LiveView(opts: {
   // Know which approach clips exist before the tap, so a missing one is spoken at once.
   if (approachMode === 'guide') preloadClips(lang)
   let saidNear = false
+  /** "Zum Eingang führen" appeared: announced with whatever else this frame says. */
+  let pendingNear = ''
+  const takeNear = () => {
+    const x = pendingNear
+    pendingNear = ''
+    return x
+  }
   /** Backgrounded: no voice, no beacon, no countdown; coming back says the direction again. */
   let hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden'
   let saidNoCompass = false
@@ -467,6 +493,12 @@ export function LiveView(opts: {
   const SAFE_EVERY_MS = 45000
   const SAFE_SHOW_MS = 4000
   let arPhase: ArPhase = 'scanning'
+  const SCAN_MIN_MS = 2500
+  const openedAt = performance.now()
+  const scanUntil = openedAt + SCAN_MIN_MS
+  /** The first compass event can take a moment (permission, sensor start): no "Kein Kompass" before this. */
+  const NO_COMPASS_GRACE_MS = 2000
+  let readyQueued = false
   // Device pitch (beta), low-passed. null until the first orientation event: then the
   // chevrons keep today's fixed screen placement.
   let pitch: number | null = null
@@ -520,6 +552,8 @@ export function LiveView(opts: {
 
   let history: TimedFix[] = []
   const timers: number[] = []
+  // Re-check once the intro may end: without a new sensor event nothing would.
+  timers.push(window.setTimeout(() => { if (!closed && arPhase === 'scanning') update() }, SCAN_MIN_MS + 50))
   let countdown = 0
   let cardEl: HTMLElement | null = null
 
@@ -532,6 +566,17 @@ export function LiveView(opts: {
   /** scanning -> ready -> guiding, then approach once the pin takes over. */
   function setPhase(next: ArPhase) {
     if (next === arPhase) return
+    // The scanning intro holds at least SCAN_MIN_MS, as in Maps, even with a fix at once.
+    if (next === 'ready' && arPhase === 'scanning') {
+      const wait = scanUntil - performance.now()
+      if (wait > 0) {
+        if (!readyQueued) {
+          readyQueued = true
+          timers.push(window.setTimeout(() => { if (!closed && arPhase === 'scanning') setPhase('ready') }, wait))
+        }
+        return
+      }
+    }
     arPhase = next
     root.dataset.phase = next
     const scanning = next === 'scanning'
@@ -547,7 +592,10 @@ export function LiveView(opts: {
     destStrip.hidden = scanning
     if (ready) {
       // "Ready" holds briefly, then the chevrons take the screen, as in the recording.
-      timers.push(window.setTimeout(() => setPhase('guiding'), 1400))
+      timers.push(window.setTimeout(() => {
+        setPhase('guiding')
+        if (!closed) update() // paint the guiding card now, not at the next sensor event
+      }, 1400))
     }
   }
 
@@ -573,7 +621,13 @@ export function LiveView(opts: {
     else delete root.dataset.near
     if (show && !saidNear) {
       saidNear = true
-      announce(t.nearTrigger(APPROACH_TRIGGER))
+      // Two announce() calls in one frame: the second replaces the first. Hold this one
+      // until the frame is done; the approach and arrival lines below take it along.
+      pendingNear = t.nearTrigger(APPROACH_TRIGGER)
+      queueMicrotask(() => {
+        const x = takeNear()
+        if (x) announce(x)
+      })
     }
   }
 
@@ -621,7 +675,7 @@ export function LiveView(opts: {
     const secsEl = h('p', { class: 'arrival-count', hidden: plan.exitAfterS === null }, plan.exitAfterS === null ? '' : ARR.backIn(plan.exitAfterS))
     // An ordinary button: VoiceOver's own double-tap activates it; a custom double-tap
     // handler would be swallowed by VoiceOver.
-    const approachBtn = promptMode ? h('button', { class: 'arrival-yes', type: 'button' }, ARR.yes) : null
+    const approachBtn = promptMode ? h('button', { class: 'arrival-yes', type: 'button' }, promptMode === 'check' ? ARR.yesCheck : ARR.yes) : null
     const noBtn = promptMode ? h('button', { class: 'arrival-no', type: 'button' }, ARR.no) : null
     const stayBtn = promptMode ? null : h('button', { class: 'gm-pill gm-pill-primary', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'pan_tool'), ARR.stay)
     const mapBtn = promptMode ? null : h('button', { class: 'gm-pill', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'map'), ARR.toMap)
@@ -654,10 +708,10 @@ export function LiveView(opts: {
     // were already said by the early arrival line when that one ran.
     lines.push(`${ARR.sheetTitle}. ${name}.`)
     if (doorType) lines.push(`${doorType}.`)
-    if (!spokeArrival) {
-      for (const w of warns) lines.push(`${t.warningPrefix}. ${w}`)
-      if (face) lines.push(face)
-    }
+    // Warnings are always said again: the sheet interrupts, and that can cut the early
+    // arrival line that carried them ("Achtung: Drehtür" must never be lost).
+    for (const w of warns) lines.push(`${t.warningPrefix}. ${w}`)
+    if (!spokeArrival && face) lines.push(face)
     lines.push(question)
     if (!spokeSheet && voiceOn()) speak(lines.join(' '), { interrupt: true })
     spokeSheet = true
@@ -766,6 +820,9 @@ export function LiveView(opts: {
     maybeSafety(now)
 
     distEl.textContent = t.metres(dist)
+    destIc.textContent = 'location_on'
+    destName.textContent = name
+    root.classList.remove('ar-turncard')
     // Good GPS needs no note; poor GPS is worth reading (fix-live.css: 16 px, 7:1).
     accEl.textContent = fix.accuracy !== null && fix.accuracy > 10 ? t.accuracy(fix.accuracy) : ''
 
@@ -794,12 +851,20 @@ export function LiveView(opts: {
       } else {
         manBanner.hidden = true
       }
+      // Bottom card: next turn while one is ahead, otherwise the door.
+      const turnCard = !!(ahead?.step && aheadText && arPhase === 'guiding')
+      root.classList.toggle('ar-turncard', turnCard)
+      if (turnCard) {
+        destIc.textContent = glyph
+        distEl.textContent = `${Math.round(ahead!.toManeuverM)} m`
+        destName.textContent = streetOf(aheadText) ?? name
+      }
     }
 
     if (!hasHeading) {
       // No compass: the route still says what to do and how far away it is.
       dirEl.textContent = aheadText ? `${t.inMetres(ahead!.toManeuverM)}. ${aheadText}` : t.noCompass
-      if (!aheadText && !saidNoCompass) {
+      if (!aheadText && !saidNoCompass && now - openedAt > NO_COMPASS_GRACE_MS) {
         // Without a compass and without a route there is nothing to point with: say
         // so once instead of leaving the user in silence.
         saidNoCompass = true
@@ -876,7 +941,7 @@ export function LiveView(opts: {
           const line = `${t.inMetres(ahead!.toManeuverM)}. ${aheadText}`
           if (voiceOn()) speak(line)
           else announce(line)
-        } else if (voiceOn()) speak(word, { key: turnKey(rel) })
+        } else if (voiceOn()) speak(word, { key: wordKey(word) })
         else announce(word)
       }
     }
@@ -895,17 +960,21 @@ export function LiveView(opts: {
       // No clip: the 'arrived' clip says "Sie haben den Eingang erreicht.", which is wrong
       // ~10 m out and in the wrong register; the device voice reads the real sentence.
       if (voiceOn()) speak(t.approaching, { interrupt: true })
-      announce(t.approaching)
+      const near = takeNear()
+      announce(near ? `${t.approaching} ${near}` : t.approaching)
     }
 
     // Spoken arrival line fires 2.5 m early to hide speech latency.
-    if (!spokeArrival && shouldSpeakArrival(dist)) {
+    // Not while "Zum Eingang führen" or the arrival sheet is up: they speak for the door,
+    // and the sheet always carries the warnings.
+    if (!spokeArrival && shouldSpeakArrival(dist) && !nearShown && !cardEl) {
       spokeArrival = true
       const parts = [t.arrivingSoon]
       if (e.approachBearing !== null) parts.push(t.faceToEnter(compassWord(e.approachBearing)))
       for (const w of e.warnings) parts.push(`${t.warningPrefix}. ${t.warning[w] ?? w}`)
       if (voiceOn()) speak(parts.join(' '), { interrupt: true })
-      announce(parts.join(' '))
+      const near = takeNear()
+      announce([...parts, near].filter(Boolean).join(' '))
     }
   }
 
@@ -1069,6 +1138,7 @@ export function LiveView(opts: {
   function teardown() {
     if (closed) return
     closed = true
+    releaseScreen()
     clearTimeout(noteTimer)
     document.removeEventListener('visibilitychange', onVisibility)
     clearInterval(gpsWatch)

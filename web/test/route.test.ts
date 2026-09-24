@@ -107,6 +107,16 @@ describe('next manoeuvre (what the banner shows)', () => {
     expect(n.toManeuverM).toBe(40)
   })
 
+  it('a trailing step with no text and no manoeuvre is arriving, not "In 50 m Ziel erreichen"', () => {
+    const tail: Route = { ...route, distanceM: 300, steps: [...route.steps, { distanceM: 50, maneuver: null, text: null, endLat: null, endLon: null }] }
+    // 240 m left: we are before the right turn onto Invalidenstraße, which is next.
+    expect(nextManeuver(240, tail)!.step?.maneuver).toBe('TURN_RIGHT')
+    // On the Invalidenstraße leg the empty step ahead means: arriving, the whole rest counts.
+    const n = nextManeuver(120, tail)!
+    expect(n.step).toBeNull()
+    expect(n.toManeuverM).toBe(120)
+  })
+
   it('reads the duration and the first instruction line', () => {
     expect(durationSeconds(route)).toBe(206)
     expect(walkMinutes(route)).toBe(3)

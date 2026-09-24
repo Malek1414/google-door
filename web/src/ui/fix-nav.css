@@ -33,28 +33,66 @@
 .gm[data-nav='on'] .gm-nav,
 .gm[data-nav='on'] .gm-go,
 .gm[data-nav='on'] .gm-routetop { display: none; }
+.gm-navwrap { position: absolute; left: 10px; right: 10px; top: var(--top); z-index: 5; }
+.gm-navwrap[hidden] { display: none; }
 .gm-navbanner {
-  position: absolute; left: 10px; right: 10px; top: var(--top); z-index: 5;
-  display: flex; align-items: center; gap: 14px; padding: 14px 16px; min-height: 76px;
-  background: #0f5132; color: #fff; border-radius: 16px; box-shadow: 0 2px 6px rgb(0 0 0 / 0.5);
+  display: flex; align-items: center; gap: 14px; padding: 14px 16px; min-height: 84px;
+  background: #0f5d4e; color: #fff; border-radius: 16px; box-shadow: 0 2px 6px rgb(0 0 0 / 0.5);
 }
-.gm-navbanner[hidden] { display: none; }
+.gm-navthen {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: -6px; padding: 12px 16px 10px;
+  background: #0b4a3e; color: #fff; border-radius: 0 0 14px 14px; font: 500 17px/1 'Google Sans Flex', Roboto, sans-serif;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.4);
+}
+.gm-navthen[hidden] { display: none; }
+.gm-navthen-ic .ms { font-size: 24px; display: block; }
 .gm-navbanner-ic .ms { font-size: 44px; color: #fff; display: block; }
 .gm-navbanner-txt { display: flex; flex-direction: column; min-width: 0; }
 .gm-navbanner-m { font: 500 26px/1.15 'Google Sans Flex', Roboto, sans-serif; }
 .gm-navbanner-t { font: 400 17px/1.25 'Google Sans Flex', Roboto, sans-serif; color: #e6f4ea; }
-.gm[data-nav='on'] .gm-layers { top: calc(var(--top) + 96px); }
+.gm[data-nav='on'] .gm-layers,
+.gm[data-nav='on'] .gm-right,
+.gm[data-nav='on'] .gm-livethumb { display: none; }
+
+/* Nav right column: round white 56 px buttons stacked on the right edge. */
+.gm-navcol {
+  position: absolute; right: 12px; z-index: 3; display: flex; flex-direction: column; gap: 14px;
+  bottom: calc(var(--nav-h) + var(--sheet-h) + 16px); transition: bottom 0.25s ease;
+}
+.gm-navcol[hidden] { display: none; }
+.gm-navbtn {
+  width: 56px; height: 56px; border: 0; border-radius: 50%; background: #fff; color: #202124;
+  display: grid; place-items: center; box-shadow: 0 1px 4px rgb(0 0 0 / 0.45); cursor: pointer;
+}
+.gm-navbtn[hidden] { display: none; }
+.gm-navbtn .ms { font-size: 28px; }
+.gm-navbtn.is-muted { color: #d93025; }
+.gm-navbtn-live-ic { position: relative; display: grid; place-items: center; }
+.gm-navbtn-live-ic .ms { grid-area: 1 / 1; }
+.gm-navbtn-live-ic .ms + .ms { font-size: 14px; }
+.gm[data-sheet='full'] .gm-navcol { display: none; }
 
 .gm-navsheet { display: flex; align-items: center; gap: 12px; padding: 6px 4px 8px; }
 .gm-navsheet-txt { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.gm-navsheet-t { margin: 0; font: 500 22px/1.2 'Google Sans Flex', Roboto, sans-serif; color: #81c995; }
-.gm-navsheet-sub { font-size: 14px; color: var(--fg2); }
+.gm-navsheet-row { display: flex; align-items: center; gap: 8px; }
+.gm-navsheet-t { margin: 0; font: 400 30px/1.15 'Google Sans Flex', Roboto, sans-serif; color: var(--fg); }
+.gm-navsheet-walk .ms { font-size: 26px; color: #8ab4f8; display: block; }
+.gm-navsheet-sub { font-size: 19px; color: var(--fg2); margin-top: 2px; }
 .gm-navend {
-  width: 52px; height: 52px; flex: none; border: 0; border-radius: 50%;
-  background: #8c1d18; color: #fff; display: grid; place-items: center; cursor: pointer;
+  min-width: 92px; height: 56px; flex: none; border: 0; border-radius: 28px; padding: 0 20px;
+  background: #d93025; color: #fff; cursor: pointer; font: 500 20px/1 'Google Sans Flex', Roboto, sans-serif;
 }
-.gm-navend .ms { font-size: 26px; }
+.gm-navsteps[hidden] { display: none; }
+.gm-navsteps { margin-top: 8px; }
 .gm-navnear { width: 100%; justify-content: center; min-height: 48px; margin-top: 4px; }
 .gm-navnear[hidden] { display: none; }
-.gm[data-nav='on'][data-sheet='route'] { --sheet-h: 96px; }
+.gm[data-nav='on'][data-sheet='route'] { --sheet-h: 104px; }
 .gm[data-nav='on'][data-sheet='route']:has(.gm-navnear:not([hidden])) { --sheet-h: 156px; }
+
+/* Route preview mode tabs (Auto, ÖPNV, Zu Fuß, Fahrrad), walk selected. */
+.gm-modetabs { display: flex; gap: 4px; margin: 0 -4px 6px; border-bottom: 1px solid rgb(255 255 255 / 0.12); overflow-x: auto; scrollbar-width: none; }
+.gm-modetab { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px; font-size: 14px; color: var(--fg2); opacity: 0.6; white-space: nowrap; border-bottom: 3px solid transparent; }
+.gm-modetab .ms { font-size: 20px; }
+.gm-modetab.is-on { color: var(--teal); opacity: 1; border-bottom-color: var(--teal); font-weight: 500; }
+.gm[data-sheet='route']:not([data-nav='on']) { --sheet-h: 206px; }
+.gm[data-sheet='route']:not([data-nav='on']):has(.gm-route-why) { --sheet-h: 276px; }

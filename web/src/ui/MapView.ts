@@ -10,10 +10,11 @@
 
 import { haversineM, type LatLon } from '../core/geo'
 import { CONNECTOR_MIN_M, connected, instructionLine, tailLength, walkMinutes, type Route } from '../core/route'
-import { arrivalClock, navState, roundNavM, secondsLeft, startEnabled } from '../core/nav'
+import { arrivalClock, navSheetLines, navState, roundNavM, secondsLeft, startEnabled, thenGlyph, viaStreets } from '../core/nav'
+import { isMuted, setMuted } from './voiceCalm'
 import { NEAR_TRIGGER_M } from './LiveView'
 import { computeRoute, D, formatDistance, routeSubline, startBlockedReason, stepsList, type RouteOutcome } from './Directions'
-import type { Profile } from '../core/profile'
+import { outputFor, type Profile } from '../core/profile'
 import { guidanceFor, markerKind, type ArrowTarget } from '../core/target'
 import type { Building, Entrance } from '../core/types'
 import { mapsKey } from '../config'
@@ -37,6 +38,7 @@ import { exploreFeed } from './ExploreFeed'
 import { t } from '../strings'
 import { h, mount, s } from './dom'
 import { pathDoorName } from './doorName'
+import { approachModeFor, type ApproachMode } from './approachPort'
 
 const DEFAULT_CENTER: LatLon = { lat: 52.5251, lon: 13.3694 } // Berlin Hauptbahnhof
 const BASE_PIN = 32
@@ -169,7 +171,11 @@ export function MapView(opts: {
   profile: Profile
   openDoor?: string | null
   /** `name` is the distinguishable door name (doorName), shown and spoken in Live View. */
-  onGuide: (target: ArrowTarget, name?: string) => void
+  onGuide: (target: ArrowTarget, name?: string, fromNav?: boolean) => void
+  /** Nav mode's "Zum Eingang führen": straight into the last-10-m approach. */
+  onApproach?: (door: Entrance, mode: ApproachMode) => void
+  /** Back from a Live View that was opened in nav mode: navigate to this door again. */
+  resumeNav?: Entrance | null
   onSettings: () => void
   onContribute: () => void
 }): () => void {
@@ -294,9 +300,11 @@ export function MapView(opts: {
   // below, round X to end). The square Live View tile bottom-left switches to the
   // camera on the same route, from the preview and from navigation alike.
   const NV = lang === 'de'
-    ? { live: 'Live View', end: 'Navigation beenden', arrive: 'Ankunft', dest: 'Ziel erreichen', inM: (m: number) => `In ${m} m`, you: 'Dein Standort', started: 'Navigation gestartet', near: 'Zum Eingang führen', nearSay: 'Du bist fast da. Zum Eingang führen?' }
-    : { live: 'Live View', end: 'End navigation', arrive: 'Arrival', dest: 'Arrive at destination', inM: (m: number) => `In ${m} m`, you: 'Your location', started: 'Navigation started', near: 'Guide me to the entrance', nearSay: 'You are almost there. Guide you to the entrance?' }
+    ? { live: 'Live View', end: 'Navigation beenden', exit: 'Beenden', then: 'Dann', compass: 'Kompass, nach Norden ausrichten', mute: 'Ton aus', options: 'Routenoptionen und Schritte', arrive: 'Ankunft', dest: 'Ziel erreichen', inM: (m: number) => `In ${m} m`, you: 'Dein Standort', started: 'Navigation gestartet', near: 'Zum Eingang führen', nearSay: 'Du bist fast da. Zum Eingang führen?' }
+    : { live: 'Live View', end: 'End navigation', exit: 'Exit', then: 'Then', compass: 'Compass, north up', mute: 'Mute', options: 'Route options and steps', arrive: 'Arrival', dest: 'Arrive at destination', inM: (m: number) => `In ${m} m`, you: 'Your location', started: 'Navigation started', near: 'Guide me to the entrance', nearSay: 'You are almost there. Guide you to the entrance?' }
   let navOn = false
+  /** Nav speaks only when the profile speaks and nobody muted it (voiceCalm, shared with Live View). */
+  const voiceOn = () => outputFor(opts.profile).speak && !isMuted()
   let navRoute: Route | null = null
   /** Where nav mode is going. `door` is set only for a door that may carry guidance:
    *  the Live View button and the last-10-m handover need it; places navigate without. */
@@ -316,7 +324,45 @@ export function MapView(opts: {
   const navIc = h('span', { class: 'gm-navbanner-ic', 'aria-hidden': 'true' })
   const navDist = h('span', { class: 'gm-navbanner-m' }, '')
   const navText = h('span', { class: 'gm-navbanner-t' }, '')
-  const navBanner = h('div', { class: 'gm-navbanner', hidden: true }, navIc, h('div', { class: 'gm-navbanner-txt' }, navDist, navText))
+  const navThenIc = h('span', { class: 'gm-navthen-ic', 'aria-hidden': 'true' })
+  const navThen = h('div', { class: 'gm-navthen', hidden: true }, h('span', {}, NV.then), navThenIc)
+  const navBanner = h('div', { class: 'gm-navwrap', hidden: true },
+    h('div', { class: 'gm-navbanner' }, navIc, h('div', { class: 'gm-navbanner-txt' }, navDist, navText)),
+    navThen,
+  )
+  // Right column in nav mode, top to bottom as in Maps: Live View, compass, search,
+  // mute, route options.
+  const navRound = (ic: string, label: string, on: () => void) =>
+    h('button', { class: 'gm-navbtn', type: 'button', 'aria-label': label, title: label, onclick: on }, icon(ic))
+  const navLiveBtn = navRound('center_focus_weak', NV.live, () => navDest?.door && void beginGuidance(navDest.door, true))
+  navLiveBtn.classList.add('gm-navbtn-live')
+  navLiveBtn.replaceChildren(h('span', { class: 'gm-navbtn-live-ic', 'aria-hidden': 'true' }, icon('center_focus_weak'), icon('photo_camera', true)))
+  const muteBtn = navRound('volume_up', NV.mute, () => {
+    setMuted(!isMuted())
+    paintMute()
+  })
+  function paintMute() {
+    const m = isMuted()
+    muteBtn.classList.toggle('is-muted', m)
+    muteBtn.setAttribute('aria-pressed', String(m))
+    muteBtn.replaceChildren(icon(m ? 'volume_off' : 'volume_up'))
+  }
+  paintMute()
+  const navStepsEl = h('div', { class: 'gm-navsteps', hidden: true })
+  const navCol = h('div', { class: 'gm-navcol', hidden: true },
+    navLiveBtn,
+    navRound('explore', NV.compass, () => {
+      map?.setHeading(0)
+      const p = origin()
+      map?.panTo({ lat: p.lat, lng: p.lon })
+    }),
+    navRound('search', t.searchPlaceholder, () => searchInput.click()),
+    muteBtn,
+    navRound('alt_route', NV.options, () => {
+      navStepsEl.hidden = !navStepsEl.hidden
+      setSheet(navStepsEl.hidden ? 'route' : 'full')
+    }),
+  )
   const navSummary = h('h2', { id: 'sheet-title', class: 'gm-navsheet-t', tabindex: '-1' }, '')
   const navSub = h('span', { class: 'gm-navsheet-sub' }, '')
   const navNearBtn = h('button', { class: 'gm-pill gm-pill-primary gm-navnear', type: 'button', hidden: true }, icon('door_front', true), NV.near)
@@ -337,14 +383,20 @@ export function MapView(opts: {
     navBanner.hidden = false
     routeTop.hidden = true
     navNearBtn.hidden = true
-    navNearBtn.onclick = () => e && void beginGuidance(e)
-    liveThumb.hidden = !e
+    navNearBtn.onclick = () => e && void beginApproach(e)
+    liveThumb.hidden = true
+    navCol.hidden = false
+    navLiveBtn.hidden = !e
+    paintMute()
+    navStepsEl.hidden = true
+    navStepsEl.replaceChildren(stepsList(r, dest.name))
     sheetBody.replaceChildren(
       h('div', { class: 'gm-navsheet' },
-        h('div', { class: 'gm-navsheet-txt' }, navSummary, navSub),
-        h('button', { class: 'gm-navend', type: 'button', 'aria-label': NV.end, onclick: () => endNav() }, icon('close')),
+        h('div', { class: 'gm-navsheet-txt' }, h('div', { class: 'gm-navsheet-row' }, navSummary, h('span', { class: 'gm-navsheet-walk', 'aria-hidden': 'true' }, icon('directions_walk', true))), navSub),
+        h('button', { class: 'gm-navend', type: 'button', 'aria-label': NV.end, onclick: () => endNav() }, NV.exit),
       ),
       navNearBtn,
+      navStepsEl,
     )
     setSheet('route')
     if (map) {
@@ -364,13 +416,17 @@ export function MapView(opts: {
     navDist.textContent = NV.inM(m)
     navText.textContent = st.text ?? `${NV.dest}: ${navDest.name}`
     const secs = secondsLeft(navRoute, st.remainingM)
-    navSummary.textContent = `${t.walkMin(Math.max(1, Math.round(secs / 60)))} · ${formatDistance(st.remainingM)}`
-    navSub.textContent = `${NV.arrive} ${arrivalClock(new Date(), secs)}`
+    const lines = navSheetLines(secs, st.remainingM, new Date(), lang === 'de')
+    navSummary.textContent = lines.big
+    navSub.textContent = lines.small
+    const then = thenGlyph(navRoute, st.walking)
+    navThen.hidden = !then
+    if (then) navThenIc.replaceChildren(icon(then, true))
     if (st.walking !== navSpoken) {
       navSpoken = st.walking
       const line = `${NV.inM(m)} ${st.text ?? NV.dest}`
       announce(line)
-      speak(line, { interrupt: true })
+      if (voiceOn()) speak(line, { interrupt: true })
     }
     // The last-10-m handover is ours only for a door that may carry guidance.
     const near = !!navDest.door && haversineM(pos, { lat: navDest.lat, lon: navDest.lon }) <= NEAR_TRIGGER_M
@@ -378,7 +434,7 @@ export function MapView(opts: {
     if (near && !navNearSaid) {
       navNearSaid = true
       announce(NV.nearSay)
-      speak(NV.nearSay, { interrupt: true })
+      if (voiceOn()) speak(NV.nearSay, { interrupt: true })
     }
     map?.panTo({ lat: pos.lat, lng: pos.lon })
   }
@@ -389,6 +445,7 @@ export function MapView(opts: {
     navRoute = null
     delete root.dataset.nav
     navBanner.hidden = true
+    navCol.hidden = true
   }
 
   /** X in navigation: back to the route preview, as in Maps. */
@@ -397,6 +454,14 @@ export function MapView(opts: {
     stopNav()
     if (back) back()
     else clearRoute()
+  }
+
+  /** "Ankunft 09:25 · über Ganghoferstraße und Karl-Marx-Straße", or the old subline. */
+  function previewSub(r: Route, label: string | null): string {
+    const secs = secondsLeft(r, r.distanceM ?? 0)
+    const via = viaStreets(r, lang === 'de')
+    const arrive = `${lang === 'de' ? 'Ankunft' : 'Arrive'} ${arrivalClock(new Date(), secs)}`
+    return via ? `${arrive} · ${via}` : `${arrive} · ${routeSubline(label)}`
   }
 
   function showRoutePreview(summary: string, label: string | null, out: RouteOutcome, retry: () => void, crowM: number) {
@@ -450,13 +515,23 @@ export function MapView(opts: {
     liveThumb.hidden = !guidable || !e
     liveThumb.onclick = () => e && void beginGuidance(e)
     const whyLine = why ? [h('p', { id: 'route-start-why', class: 'gm-route-why' }, icon('info'), why)] : []
+    // Mode tabs as in Maps. Doorway guides on foot; the others are shown, not offered.
+    const modeTab = (ic: string, text: string, on = false) =>
+      h('span', { class: `gm-modetab${on ? ' is-on' : ''}`, 'aria-disabled': String(!on), ...(on ? { 'aria-current': 'true' } : {}) }, icon(ic, on), text)
+    const modeTabs = h('div', { class: 'gm-modetabs', role: 'group', 'aria-label': lang === 'de' ? 'Verkehrsmittel' : 'Travel mode' },
+      modeTab('directions_car', lang === 'de' ? 'Auto' : 'Car'),
+      modeTab('directions_transit', lang === 'de' ? 'ÖPNV' : 'Transit'),
+      modeTab('directions_walk', lang === 'de' ? 'Zu Fuß' : 'Walk', true),
+      modeTab('directions_bike', lang === 'de' ? 'Fahrrad' : 'Bike'),
+    )
     sheetBody.replaceChildren(
+      modeTabs,
       h(
         'div',
         { class: 'gm-routehead' },
         h('span', { class: 'gm-routehead-ic', 'aria-hidden': 'true' }, icon(r ? 'directions_walk' : 'wrong_location', true)),
         h('h2', { id: 'sheet-title', class: 'gm-routehead-t', tabindex: '-1' }, summary),
-        h('span', { class: 'gm-routehead-sub' }, r ? routeSubline(label) : label ?? ''),
+        h('span', { class: 'gm-routehead-sub' }, r ? previewSub(r, label) : label ?? ''),
         h('div', { class: 'gm-routehead-btns' },
           e ? h('button', { class: 'gm-round-s', type: 'button', 'aria-label': t.share, onclick: () => void share(e) }, icon('ios_share')) : null,
           h('button', { class: 'gm-round-s', type: 'button', 'aria-label': t.clearRoute, onclick: () => clearRoute() }, icon('close')),
@@ -478,7 +553,7 @@ export function MapView(opts: {
   /** The one gesture that unlocks compass, camera and sound. Must await first. */
   // A double tap on Start must open one Live View, not two stacked ones.
   let guiding = false
-  async function beginGuidance(e: Entrance) {
+  async function beginGuidance(e: Entrance, fromNav = false) {
     if (guiding) return
     const g = guidanceFor(e, opts.profile)
     if (g.kind !== 'arrow') return
@@ -491,7 +566,27 @@ export function MapView(opts: {
       throw err
     }
     teardown()
-    opts.onGuide(g.target, name)
+    opts.onGuide(g.target, name, fromNav)
+  }
+
+  /**
+   * Nav mode, last 10 m: the same approach LiveView's trigger and the arrival "Ja" open
+   * (guide for speech users, the door check for step-free profiles). No detour through
+   * Live View, which would ask a second time. Falls back to Live View without a mode.
+   */
+  async function beginApproach(e: Entrance) {
+    const mode = approachModeFor(opts.profile)
+    if (!mode || !opts.onApproach || guidanceFor(e, opts.profile).kind !== 'arrow') return beginGuidance(e, true)
+    if (guiding) return
+    guiding = true
+    try {
+      await unlockAll({ camera: true })
+    } catch (err) {
+      guiding = false
+      throw err
+    }
+    teardown()
+    opts.onApproach(e, mode)
   }
 
   const layersBtn = h('button', { class: 'gm-round gm-layers', type: 'button', 'aria-label': t.layers }, icon('layers'))
@@ -548,6 +643,7 @@ export function MapView(opts: {
     liveThumb,
     routeTop,
     navBanner,
+    navCol,
     sheet,
     nav,
     // Last in the DOM, first on screen (absolute, under every z-indexed overlay): Tab
@@ -1671,6 +1767,7 @@ export function MapView(opts: {
         me = { lat: p.coords.latitude, lon: p.coords.longitude }
         drawMe()
         if (navOn) updateNav()
+        resumeNav()
         if (first) {
           if (!opts.openDoor) map?.setCenter({ lat: me.lat, lng: me.lon })
           if (!map) void load(bboxAround(me.lat, me.lon, 500))
@@ -1706,6 +1803,7 @@ export function MapView(opts: {
         })
         sharedMap = { el: mapEl, map }
         drawMe()
+        resumeNav()
         if (opts.openDoor)
           void findEntrance(opts.openDoor).then((e) => {
             if (e) map?.setCenter({ lat: e.lat, lng: e.lon })
@@ -1745,6 +1843,18 @@ export function MapView(opts: {
   }
   renderSheet()
   announce(t.mapTitle)
+
+  /** Live View closed from nav mode: straight back into nav on the same door. */
+  let resumed = !opts.resumeNav
+  function resumeNav() {
+    const e = opts.resumeNav
+    if (resumed || !e || !map || !me) return
+    resumed = true
+    const name = pathDoorName(e)
+    void drawRoute({ lat: e.lat, lon: e.lon }, name, e).then((r) => {
+      if (r && !gone) startNav({ lat: e.lat, lon: e.lon, name, door: e }, r, () => drawRouteToEntrance(e))
+    })
+  }
 
   function teardown() {
     if (gone) return

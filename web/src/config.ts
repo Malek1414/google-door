@@ -54,6 +54,7 @@ export function readParams(search = location.search): Params {
     // Only same-origin relative track paths: never load an arbitrary URL from the query string.
     track: /^[\w./-]+\.json$/.test(track) && !track.includes('..') ? track : DEFAULT_TRACK,
     speed: Number.isFinite(speed) && speed > 0 && speed <= 20 ? speed : 1,
-    openDoor: /^(node|way)\/\d+$/.test(q.get('door') ?? '') ? q.get('door') : null,
+    // ?demo=1 alone opens the demo door, so the stage URL cannot be typed wrong.
+    openDoor: /^(node|way)\/\d+$/.test(q.get('door') ?? '') ? q.get('door') : q.get('demo') === '1' ? DEFAULT_SIM_DOOR : null,
   }
 }

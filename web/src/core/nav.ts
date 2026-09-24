@@ -79,3 +79,29 @@ export function navSheetLines(seconds: number, remainingM: number, now: Date, de
 export function startEnabled(routeOk: boolean, guidableDoor: boolean): boolean {
   return routeOk || guidableDoor
 }
+
+/**
+ * The street a manoeuvre leads onto, for the Live View bottom card ("Werbellinstraße").
+ * Google's German/English instruction lines end in "auf X", "in die X", "Richtung X",
+ * "onto X", "toward X". Falls back to the whole line.
+ */
+export function streetOf(text: string | null): string | null {
+  if (!text) return null
+  const m = /\b(?:auf|in die|in den|in das|Richtung|onto|toward|towards)\s+(.+)$/i.exec(text.trim())
+  return (m ? m[1] : text).trim() || null
+}
+
+/** "über Ganghoferstraße und Karl-Marx-Straße": the first two distinct streets turned onto. */
+export function viaStreets(route: Route, de = true): string | null {
+  const names: string[] = []
+  for (const st of route.steps) {
+    if (st.maneuver === 'DEPART') continue
+    const n = streetOf(instructionLine(st))
+    // Only real street names: an instruction without "auf/onto X" is not one.
+    if (!n || n === instructionLine(st) || names.includes(n)) continue
+    names.push(n)
+    if (names.length === 2) break
+  }
+  if (!names.length) return null
+  return `${de ? 'über' : 'via'} ${names.join(de ? ' und ' : ' and ')}`
+}

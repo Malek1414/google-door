@@ -79,25 +79,28 @@ function withProfile(next: (p: Profile) => void) {
 // speech and large visuals); the accessibility button top right opens the three questions.
 const DEFAULT_PROFILE: Profile = { stepFreeRequired: false, channels: ['speech', 'visual'] }
 
-function showMap(p: Profile) {
+function showMap(p: Profile, resumeNav: Entrance | null = null) {
   applyContrast(outputFor(p).contrast)
   MapView({
     profile: p,
     openDoor: params.openDoor,
-    onGuide: (target, name) => showLive(target, p, name),
+    resumeNav,
+    onApproach: (door, mode) => showApproach(door, p, mode),
+    onGuide: (target, name, fromNav) => showLive(target, p, name, fromNav),
     onSettings: () => Onboard({ initial: p, onDone: showMap }),
     onContribute: () => Recorder({ onBack: () => showMap(p) }),
   })
 }
 
-function showLive(target: ArrowTarget, p: Profile, name?: string) {
+function showLive(target: ArrowTarget, p: Profile, name?: string, fromNav = false) {
   if (params.demo) return showDemoLive(target, p, name, demoWalkTrack(target.entrance))
   LiveView({
     target,
     ...(name ? { name } : {}),
     sensors: realSensors(),
     config: outputFor(p),
-    onExit: () => showMap(p),
+    // Opened from nav mode: X goes back to nav mode, as in Maps.
+    onExit: () => showMap(p, fromNav ? target.entrance : null),
     profile: p,
     onApproach: (mode) => showApproach(target.entrance, p, mode),
   })

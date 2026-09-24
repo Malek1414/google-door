@@ -244,6 +244,10 @@ export function MapView(opts: {
   /** Bumped by every draw and clear, so a route that lands after a close is dropped. */
   let routeSeq = 0
   let routeTarget: Entrance | null = null
+  /** Reopens the card a route was drawn from, when the user removes the route. */
+  let routeReturn: (() => void) | null = null
+  /** The place card currently (or last) open, so a place route can return to it. */
+  let lastPlace: PlaceHit | null = null
 
   function showRoutePreview(summary: string, label: string | null, out: RouteOutcome, retry: () => void, crowM: number) {
     routePreview = true
@@ -766,7 +770,7 @@ export function MapView(opts: {
     panelCleanup?.()
     panelCleanup = null
     selected = null
-    clearRoute()
+    clearRoute(false)
     renderMarkers()
     renderSheet()
     // Back to a result list: show the list, not a peek that hides every row.
@@ -803,7 +807,13 @@ export function MapView(opts: {
     }]
   }
 
-  function clearRoute() {
+  /**
+   * Remove the route from the map. With `restore` (the user's "Route entfernen"), the
+   * sheet goes back to what the route was drawn from: the door card or the place card,
+   * not a stale "2 Min. · 160 m". Internal clears (a new draw, closing the card,
+   * teardown) pass false and leave the sheet to their caller.
+   */
+  function clearRoute(restore = true) {
     routeSeq++
     routeLine?.setMap(null)
     routeCasing?.setMap(null)
@@ -815,10 +825,17 @@ export function MapView(opts: {
     routeCasing = null
     routeEnd = null
     routeBadge = null
-    if (routePreview) {
-      routePreview = false
-      renderSheet()
-      setSheet('peek')
+    const back = routeReturn
+    const wasPreview = routePreview
+    routeReturn = null
+    routePreview = false
+    if (!restore) return
+    if (wasPreview) {
+      if (back) back()
+      else {
+        renderSheet()
+        setSheet('peek')
+      }
     }
   }
 
@@ -875,13 +892,16 @@ export function MapView(opts: {
     // navigated away from.
     routeTarget = target
     const from = origin()
-    clearRoute()
+    clearRoute(false)
     const seq = ++routeSeq
+    const place = placeOpen ? lastPlace : null
+    const back = target ? () => openEntrance(target) : place ? () => openPlace(place) : null
 
     const out = await computeRoute(from, to)
     // Closed, or another route asked for, while this one was in flight.
     if (seq !== routeSeq || !map) return out.ok ? out.route : null
-    clearRoute()
+    clearRoute(false)
+    routeReturn = back
     const retry = () => void drawRoute(to, label, target)
     endCap(to)
 
@@ -1186,6 +1206,7 @@ export function MapView(opts: {
   function openPlace(p: PlaceHit) {
     selected = null
     placeOpen = true
+    lastPlace = p
     panelCleanup?.()
     chips.hidden = true
     morePill.hidden = false
@@ -1481,7 +1502,7 @@ export function MapView(opts: {
     if (geoWatch !== null) navigator.geolocation.clearWatch(geoWatch)
     markers.forEach((m) => m.setMap(null))
     meMarker?.setMap(null)
-    clearRoute()
+    clearRoute(false)
   }
   return teardown
 }

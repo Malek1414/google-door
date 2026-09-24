@@ -16,6 +16,7 @@ import { startHeading, startPitch, type Heading } from '../core/heading'
 import { snapToGraph } from '../core/match'
 import type { OutputConfig, Profile } from '../core/profile'
 import type { ArrowTarget } from '../core/target'
+import type { Entrance } from '../core/types'
 import { BeaconAudio, playApproachChime } from '../audio'
 import { postLook } from '../data'
 import { announce, primeSpeech, session, speak, vibrate } from '../session'
@@ -127,13 +128,29 @@ export function isArrived(history: readonly TimedFix[], target: { lat: number; l
 }
 
 /**
- * Pure. How the arrival card behaves for an approach mode. A speech (guide) user must
- * not be bounced back to the map while still finding the door: focus lands on
- * "Zum Eingang führen", there is no auto-exit, and the spoken line names the button.
- * Everyone else keeps "Hier bleiben" focused and the countdown to the map.
+ * Pure. Does the arrival sheet ask "Sollen wir dir zeigen, wo du reinkommst?", and which
+ * screen does "Ja" open? Every profile is asked, but only at a tier-1 door: the safety rule
+ * lets only tier 1 carry arrows. The door is read, never changed (stepFree null stays null).
+ * `canApproach` is false when the caller wired no approach screen.
+ */
+export function arrivalPrompt(
+  door: Pick<Entrance, 'tier'>,
+  profile: Profile | null | undefined,
+  canApproach: boolean,
+): { mode: ApproachMode | null } {
+  if (!canApproach || door.tier !== 1) return { mode: null }
+  // Deaf-only profiles have no approach mode of their own; the guide screen is visual too.
+  return { mode: approachModeFor(profile) ?? 'guide' }
+}
+
+/**
+ * Pure. How the arrival sheet behaves for an approach mode. With the guide question the
+ * app waits for the user's answer: focus lands on "Ja, zeig mir den Eingang", there is no
+ * auto-exit, and the spoken line ends with the question. Without it "Hier bleiben" is
+ * focused and the countdown to the map runs.
  */
 export function arrivalPlan(mode: ApproachMode | null): { focus: 'approach' | 'stay'; exitAfterS: number | null; nameTrigger: boolean } {
-  return mode === 'guide'
+  return mode !== null
     ? { focus: 'approach', exitAfterS: null, nameTrigger: true }
     : { focus: 'stay', exitAfterS: ARRIVAL_EXIT_S, nameTrigger: false }
 }
@@ -142,6 +159,11 @@ export function arrivalPlan(mode: ApproachMode | null): { focus: 'approach' | 's
 const ARR = {
   de: {
     title: 'Angekommen',
+    sheetTitle: 'Du bist angekommen',
+    ask: 'Sollen wir dir zeigen, wo du reinkommst?',
+    yes: 'Ja, zeig mir den Eingang',
+    no: 'Nein, danke',
+    noGuide: 'Für diesen Eingang haben wir noch keine genaue Führung.',
     stay: 'Hier bleiben',
     toMap: 'Zur Karte',
     backIn: (s: number) => `Zurück zur Karte in ${s} Sekunden.`,
@@ -153,6 +175,11 @@ const ARR = {
   },
   en: {
     title: 'Arrived',
+    sheetTitle: 'You have arrived',
+    ask: 'Shall we show you where to get in?',
+    yes: 'Yes, show me the entrance',
+    no: 'No, thanks',
+    noGuide: 'We have no exact guidance for this entrance yet.',
     stay: 'Stay here',
     toMap: 'Back to map',
     backIn: (s: number) => `Back to the map in ${s} seconds.`,
@@ -411,6 +438,8 @@ export function LiveView(opts: {
   let dist = NaN
   let arrived = false
   let spokeArrival = false
+  /** The arrival sheet speaks once per arrival; walking away and back is a new arrival. */
+  let spokeSheet = false
   let spokeApproach = false
   let lastHaptic = 0
   let lastWord = ''
@@ -543,14 +572,18 @@ export function LiveView(opts: {
     }
   }
 
-  /** Both triggers (panel and arrival card) open the approach the same way. */
+  /** Set by the arrival sheet: the mode its "Ja" opens (every profile at a tier-1 door). */
+  let promptMode: ApproachMode | null = null
+
+  /** Both triggers (panel and arrival sheet) open the approach the same way. */
   function startApproach() {
+    const mode = promptMode ?? approachMode
     // Twice in a row (panel and card, or a double tap) would open two approach screens.
-    if (closed || !approachMode || !opts.onApproach) return
+    if (closed || !mode || !opts.onApproach) return
     teardown() // stops the arrival card's speech, so the unlock comes after it
     // Still synchronous inside the tap: iOS only unlocks speech and audio here.
     primeSpeech()
-    opts.onApproach(approachMode)
+    opts.onApproach(mode)
   }
 
   function arrive() {
@@ -566,8 +599,7 @@ export function LiveView(opts: {
     coneG.replaceChildren()
     pinG.setAttribute('visibility', 'hidden')
     root.dataset.phase = 'arrived'
-    if (!spokeArrival && cfg.speak) speak(t.arrived, { interrupt: true })
-    spokeArrival = true
+    // The sheet says it, once, 1.5 s later ("Du bist angekommen" plus the question).
     announce(t.arrived)
     timers.push(window.setTimeout(showArrivalCard, ARRIVAL_CARD_DELAY_MS))
   }
@@ -577,48 +609,54 @@ export function LiveView(opts: {
     const doorType = e.door ? t.door[e.door] ?? null : null
     const face = e.approachBearing !== null ? ARR.face(compassWord(e.approachBearing)) : null
     const warns = e.warnings.map((w) => t.warning[w] ?? w)
-    const plan = arrivalPlan(approachMode)
+    // Google Maps style: "Du bist angekommen", then one question. Only a tier-1 door gets
+    // the guide button; the question is asked for every profile there.
+    promptMode = arrivalPrompt(e, opts.profile, !!opts.onApproach).mode
+    const plan = arrivalPlan(promptMode)
     const secsEl = h('p', { class: 'arrival-count', hidden: plan.exitAfterS === null }, plan.exitAfterS === null ? '' : ARR.backIn(plan.exitAfterS))
-    const stayBtn = h('button', { class: 'gm-pill gm-pill-primary', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'pan_tool'), ARR.stay)
-    const mapBtn = h('button', { class: 'gm-pill', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'map'), ARR.toMap)
-    // The last 10 metres. An ordinary button: VoiceOver's own double-tap activates it,
-    // a custom double-tap handler would be swallowed by VoiceOver.
-    const mode = approachMode
-    const approachBtn = mode
-      ? h('button', { class: 'apr-trigger', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'door_front'), APPROACH_TRIGGER)
-      : null
+    // An ordinary button: VoiceOver's own double-tap activates it; a custom double-tap
+    // handler would be swallowed by VoiceOver.
+    const approachBtn = promptMode ? h('button', { class: 'arrival-yes', type: 'button' }, ARR.yes) : null
+    const noBtn = promptMode ? h('button', { class: 'arrival-no', type: 'button' }, ARR.no) : null
+    const stayBtn = promptMode ? null : h('button', { class: 'gm-pill gm-pill-primary', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'pan_tool'), ARR.stay)
+    const mapBtn = promptMode ? null : h('button', { class: 'gm-pill', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'map'), ARR.toMap)
+    const meta = [doorType, face].filter(Boolean).join(' · ')
+    const question = promptMode ? ARR.ask : ARR.noGuide
     cardEl = h(
       'div',
-      { class: 'arrival', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'arrival-title' },
+      { class: 'arrival-scrim' },
       h(
         'div',
-        { class: 'arrival-head' },
-        h('span', { class: 'ms', 'aria-hidden': 'true' }, 'where_to_vote'),
-        h('h2', { id: 'arrival-title' }, ARR.title),
-        h('p', { class: 'arrival-name' }, name),
-      ),
-      h(
-        'div',
-        { class: 'arrival-body' },
-        doorType ? h('p', { class: 'arrival-door' }, doorType) : null,
+        { class: 'arrival', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'arrival-title', 'aria-describedby': 'arrival-ask' },
+        h('span', { class: 'arrival-handle', 'aria-hidden': 'true' }),
+        h('h2', { id: 'arrival-title', class: 'arrival-title' }, ARR.sheetTitle),
+        h('p', { class: 'arrival-name' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'where_to_vote'), name),
+        meta ? h('p', { class: 'arrival-door' }, meta) : null,
         ...warns.map((w) => h('p', { class: 'arrival-warn', role: 'note' }, h('strong', {}, `${t.warningPrefix}: `), w)),
-        face ? h('p', { class: 'arrival-face' }, face) : null,
+        h('p', { id: 'arrival-ask', class: 'arrival-ask' }, question),
         approachBtn,
+        noBtn,
         secsEl,
-        h('div', { class: 'nav-row' }, mapBtn, stayBtn),
+        mapBtn && stayBtn ? h('div', { class: 'nav-row' }, mapBtn, stayBtn) : null,
       ),
     )
     root.classList.add('is-arrived') // camera and overlay leave the screen
     root.append(cardEl)
     if (plan.focus === 'approach' && approachBtn) approachBtn.focus({ preventScroll: true })
-    else stayBtn.focus({ preventScroll: true })
+    else stayBtn?.focus({ preventScroll: true })
 
-    lines.push(`${ARR.title}. ${name}.`)
+    // Spoken once, when the sheet opens; nothing repeats it. Warnings and the facing line
+    // were already said by the early arrival line when that one ran.
+    lines.push(`${ARR.sheetTitle}. ${name}.`)
     if (doorType) lines.push(`${doorType}.`)
-    for (const w of warns) lines.push(`${t.warningPrefix}. ${w}`)
-    if (face) lines.push(face)
-    if (plan.nameTrigger && approachBtn) lines.push(t.triggerSelected(APPROACH_TRIGGER))
-    if (voiceOn()) speak(lines.join(' '))
+    if (!spokeArrival) {
+      for (const w of warns) lines.push(`${t.warningPrefix}. ${w}`)
+      if (face) lines.push(face)
+    }
+    lines.push(question)
+    if (!spokeSheet && voiceOn()) speak(lines.join(' '), { interrupt: true })
+    spokeSheet = true
+    spokeArrival = true
     if (plan.exitAfterS !== null) {
       announce(ARR.backIn(plan.exitAfterS)) // once, not every second
       let left = plan.exitAfterS
@@ -629,7 +667,7 @@ export function LiveView(opts: {
         if (left <= 0) exit()
       }, 1000)
     }
-    stayBtn.addEventListener('click', () => {
+    stayBtn?.addEventListener('click', () => {
       if (countdown) clearInterval(countdown)
       countdown = 0
       secsEl.hidden = false
@@ -637,7 +675,8 @@ export function LiveView(opts: {
       announce(ARR.staying)
       stayBtn.remove()
     })
-    mapBtn.addEventListener('click', exit)
+    mapBtn?.addEventListener('click', exit)
+    noBtn?.addEventListener('click', exit)
     approachBtn?.addEventListener('click', startApproach)
   }
 
@@ -648,6 +687,8 @@ export function LiveView(opts: {
     history = history.slice(-1)
     cardEl?.remove()
     cardEl = null
+    promptMode = null
+    spokeSheet = false
     root.classList.remove('is-arrived')
     root.dataset.phase = arPhase // 'arrived' would otherwise stick and hide the guidance
     safeEl.hidden = true

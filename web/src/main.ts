@@ -4,12 +4,13 @@ import { arrowTargetFor, type ArrowTarget } from './core/target'
 import { readParams } from './config'
 import { findEntrance } from './data'
 import { loadProfile, output, session } from './session'
-import { loadTrack, Recorder, replaySensors } from './sim/replay'
+import { demoWalkTrack, loadTrack, Recorder, replaySensors, type TrackPoint } from './sim/replay'
 import { t } from './strings'
 import { h, mount } from './ui/dom'
 import { LiveView, realSensors, applyContrast } from './ui/LiveView'
 import { Approach } from './ui/Approach'
 import type { ApproachMode } from './ui/approachPort'
+import { startDemoApproach } from './ui/approachDemo'
 import type { Entrance } from './core/types'
 import { MapView } from './ui/MapView'
 import { Onboard } from './ui/Onboard'
@@ -89,6 +90,7 @@ function showMap(p: Profile) {
 }
 
 function showLive(target: ArrowTarget, p: Profile, name?: string) {
+  if (params.demo) return showDemoLive(target, p, name, demoWalkTrack(target.entrance))
   LiveView({
     target,
     ...(name ? { name } : {}),
@@ -102,6 +104,34 @@ function showLive(target: ArrowTarget, p: Profile, name?: string) {
 
 function showApproach(door: Entrance, p: Profile, mode: ApproachMode) {
   Approach({ door, mode, config: outputFor(p), onExit: () => showMap(p) })
+}
+
+/** After `through` the demo holds this long (the line is said), then the map is back. */
+const DEMO_THROUGH_EXIT_MS = 4000
+
+/**
+ * ?demo=1: the whole loop in one go. A short simulated walk to the door, the arrival
+ * sheet, and "Ja" opens the scripted approach (the same engine as ?approach=demo), which
+ * ends at the door and returns to the map, ready for the next run.
+ */
+function showDemoLive(target: ArrowTarget, p: Profile, name: string | undefined, track: TrackPoint[]) {
+  LiveView({
+    target,
+    ...(name ? { name } : {}),
+    sensors: replaySensors(track, { speed: params.speed, imageUrl: `${import.meta.env.BASE_URL}sim/placeholder-facade.svg`, label: t.simBanner }),
+    config: outputFor(p),
+    onExit: () => showMap(p),
+    profile: p,
+    onApproach: () =>
+      Approach({
+        door: target.entrance,
+        mode: 'guide',
+        config: outputFor(p),
+        onExit: () => showMap(p),
+        start: startDemoApproach,
+        exitAfterThroughMs: DEMO_THROUGH_EXIT_MS,
+      }),
+  })
 }
 
 /** ?approach=demo (guidance, scripted engine) or ?approach=check (wheelchair verdict), straight in. */
@@ -120,6 +150,7 @@ async function startSim(p: Profile) {
     console.warn('[doorway] sim door without arrow', { door: door.id, tier: door.tier, stepFree: door.stepFree })
     return fatal(t.simNoArrow(params.door))
   }
+  if (params.demo) return showDemoLive(target, p, undefined, demoWalkTrack(door))
   const run = () =>
     LiveView({
       target,

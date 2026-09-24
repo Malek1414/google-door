@@ -28,6 +28,9 @@ export function mapsKey(): string | null {
 
 export interface Params {
   sim: boolean
+  /** ?demo=1: View on the map plays a short simulated walk, the arrival sheet, then the
+   *  scripted approach (ui/approachDemo.ts), and returns to the map. Also with ?sim=1. */
+  demo: boolean
   record: boolean
   door: string
   track: string
@@ -45,6 +48,7 @@ export function readParams(search = location.search): Params {
   const track = q.get('track') ?? DEFAULT_TRACK
   return {
     sim: q.get('sim') === '1',
+    demo: q.get('demo') === '1',
     record: q.get('record') === '1',
     door: q.get('door') ?? DEFAULT_SIM_DOOR,
     // Only same-origin relative track paths: never load an arbitrary URL from the query string.

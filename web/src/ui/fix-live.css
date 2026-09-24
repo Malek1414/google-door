@@ -28,8 +28,8 @@
 .nav-bottom .look-out { color: #e3e3e3; font-size: 1.15rem; font-weight: 500; }
 
 /* Pills: Maps dark-mode teal. #60c4c7 on #1f1f1f is 8.4:1, #00363a on #60c4c7 is 7.9:1. */
-.nav-bottom .gm-pill, .arrival .gm-pill { color: #60c4c7; border: 1px solid #8e918f; background: transparent; border-radius: 26px; }
-.nav-bottom .gm-pill-primary, .arrival .gm-pill-primary { background: #60c4c7; color: #00363a; border-color: transparent; }
+.nav-bottom .gm-pill { color: #60c4c7; border: 1px solid #8e918f; background: transparent; border-radius: 26px; }
+.nav-bottom .gm-pill-primary { background: #60c4c7; color: #00363a; border-color: transparent; }
 .nav-bottom .gm-pill:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 
 /* Round red exit on the left of the bottom sheet. White on #d93025 is 4.6:1, icon is large. */
@@ -38,8 +38,6 @@
 .nav-exit:active { background: #b3261e; }
 .nav-exit:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 
-/* Arrival card uses the same guidance green. */
-.arrival-head { background: #137333; }
 
 /* Manoeuvre banner: the card Maps puts at the top of a navigation screen.
    Sits under the round buttons, above everything the camera shows. */

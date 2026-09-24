@@ -129,6 +129,22 @@ print(json.dumps({"status": res.status_code, "body": res.json(), "calls": len(CA
     expect(r.calls).toBeLessThanOrEqual(5)
   })
 
+  it('/api/door-fix: each upstream try fits inside the client\'s 5 s door-fix budget', () => {
+    const r = py(`${PRELUDE([200], GEMINI)}${client('server.approach')}
+import server.upstream as up
+KW = []
+_real = up.request
+async def _spy(*a, **k):
+    KW.append(k.get("timeout"))
+    return await _real(*a, **k)
+up.request = _spy
+res = client.post("/api/door-fix", json={"frame": "AAAA", "headingDeg": 90})
+print(json.dumps({"status": res.status_code, "timeout": KW[0]}))
+`, { GEMINI_API_KEY: 'test' }) as { status: number; timeout: number }
+    expect(r.status).toBe(200)
+    expect(r.timeout).toBeLessThan(5)
+  })
+
   it('/api/door-fix: a 400 is not retried', () => {
     expect(doorFix([400, 200]).calls).toBe(1)
   })

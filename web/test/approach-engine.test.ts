@@ -6,10 +6,10 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { STEP_M } from '../src/core/anchor'
 import { STILL_MS } from '../src/core/approach'
-import { bandText, fallbackLine, noCameraLine, noCompassLine, noDirectionLine, pitchFor, safetyLine, thresholdLine, throughLine, unsureLine } from '../src/core/instruct'
+import { bandText, fallbackLine, noCameraLine, noCompassLine, noDirectionLine, pitchFor, safetyLine, searchingLine, thresholdLine, throughLine, unsureLine } from '../src/core/instruct'
 import { angleDelta } from '../src/core/stability'
 import type { Entrance } from '../src/core/types'
-import { createApproachEngine, FALLBACK_AFTER, INSIDE_MIN_CONFIDENCE, parseDoorFix, saysInside } from '../src/ui/approachEngine'
+import { createApproachEngine, FALLBACK_AFTER, TIMEOUT_MS, INSIDE_MIN_CONFIDENCE, parseDoorFix, saysInside } from '../src/ui/approachEngine'
 import { engine, type ApproachView, type CompassReading } from '../src/ui/approachPort'
 import { startDemoApproach } from '../src/ui/approachDemo'
 import { MIN_STEP_MS, StepDetector } from '../src/ui/stepCounter'
@@ -189,7 +189,7 @@ describe('the real engine, driven through ApproachIO', () => {
     let release!: (v: unknown) => void
     const r = rig(() => new Promise((res) => (release = res)))
     r.heading(100)
-    for (let i = 0; i < 100; i++) await r.tick()
+    for (let i = 0; i < 45; i++) await r.tick() // under TIMEOUT_MS
     expect(r.calls).toHaveLength(1)
     release({ found: true, bearingDeg: 0, distanceM: 5, confidence: 0.9, source: 'gemini-frame' })
     await r.tick()
@@ -412,6 +412,40 @@ describe('no camera frame', () => {
     const said = r.spoken().join(' ')
     expect(said.split(fallbackLine('de'))).toHaveLength(2)
     expect(said.split(noCameraLine('de'))).toHaveLength(2)
+  })
+})
+
+describe('a slow or rate-limited model', () => {
+  const hang = () => new Promise(() => {})
+
+  it('a request that never answers is abandoned after TIMEOUT_MS and retried', async () => {
+    const r = rig(hang)
+    r.heading(100)
+    await r.tick()
+    expect(r.calls).toHaveLength(1)
+    for (let ms = 0; ms < TIMEOUT_MS + 200; ms += 100) await r.tick()
+    expect(r.calls).toHaveLength(2)
+  })
+
+  it('after the fix, a model that never answers again is heard within 10 s', async () => {
+    let n = 0
+    const r = rig(() => (n++ === 0 ? { found: true, bearingDeg: -40, distanceM: 8, confidence: 0.9, source: 'gemini-frame' } : hang()))
+    r.heading(100)
+    await r.tick()
+    expect(r.views.at(-1)!.source).toBe('gemini-frame')
+    const t0 = r.t
+    while (r.t - t0 < 10000) await r.tick()
+    expect(r.spoken().filter((x) => x.includes(searchingLine('de')))).toHaveLength(1)
+  })
+
+  it('with no fix ever, the first timeout is heard (well before the map fallback)', async () => {
+    const r = rig(hang)
+    r.heading(100)
+    for (let ms = 0; ms <= TIMEOUT_MS + 500; ms += 100) await r.tick()
+    expect(r.spoken()).toEqual([safetyLine('de'), searchingLine('de')])
+    for (let i = 0; i < 300; i++) await r.tick()
+    expect(r.spoken().filter((x) => x.includes(searchingLine('de')))).toHaveLength(1)
+    expect(r.spoken().some((x) => x.includes(fallbackLine('de')))).toBe(true)
   })
 })
 

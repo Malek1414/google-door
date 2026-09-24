@@ -24,6 +24,7 @@ import {
   noDirectionLine,
   pitchFor,
   safetyLine,
+  searchingLine,
   thresholdLine,
   throughLine,
   unsureLine,
@@ -103,16 +104,17 @@ export function parseDoorFix(raw: unknown): VisionFix | null {
   return { bearingDeg, distanceM, confidence, source }
 }
 
-const TIMEOUT_MS = 15000
+/** A door fix slower than this is abandoned and counts as a miss. Three misses hand
+ *  over to the map bearing, so this bounds the silence a slow or rate-limited model
+ *  can cause. Measured on the engine clock, so it is testable. */
+export const TIMEOUT_MS = 5000
 
 interface VisionReply {
   fix: VisionFix | null
   inside: boolean
 }
 
-async function requestFix(deps: EngineDeps, base: string, frame: string, headingDeg: number): Promise<VisionReply | null> {
-  const ctl = new AbortController()
-  const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS)
+async function requestFix(deps: EngineDeps, base: string, frame: string, headingDeg: number, ctl: AbortController): Promise<VisionReply | null> {
   try {
     const r = await deps.fetch(`${base}/api/door-fix`, {
       method: 'POST',
@@ -125,8 +127,6 @@ async function requestFix(deps: EngineDeps, base: string, frame: string, heading
     return { fix: parseDoorFix(raw), inside: saysInside(raw) }
   } catch {
     return null
-  } finally {
-    clearTimeout(timer)
   }
 }
 
@@ -162,6 +162,11 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     let noFrames = 0
     let pendingNoCamera = false
     let saidNoCamera = false
+    // The request in flight, so a timeout can abandon it and a late answer is ignored.
+    let ctl: AbortController | null = null
+    let reqSeq = 0
+    let timedOut = false
+    let saidSearching = false
     const startedAt = deps.now()
 
     // The safety line is the first thing the session ever says, and it is said once.
@@ -234,14 +239,19 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
       const at = { heading, steps, ts: now }
       inFlight = true
       lastRequestAt = now
-      void requestFix(deps, io.apiBase, frame, at.heading).then((reply) => {
+      const seq = ++reqSeq
+      ctl = new AbortController()
+      void requestFix(deps, io.apiBase, frame, at.heading, ctl).then((reply) => {
+        if (seq !== reqSeq) return // timed out and abandoned
         inFlight = false
+        ctl = null
         if (stopped) return
         const fix = reply?.fix ?? null
         const wasLive = guard.mode === 'live'
         const verdict = fix ? guard.push({ bearingDeg: fix.bearingDeg, headingDeg: at.heading, confidence: fix.confidence }) : null
         if (fix && verdict?.trusted) {
           failures = 0
+          saidSearching = false
           anchor = { bearingDeg: fix.bearingDeg, distanceM: fix.distanceM, headingDeg: at.heading, steps: at.steps, ts: at.ts, source: fix.source }
           approach.setAnchor(anchor)
         } else {
@@ -267,6 +277,14 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
         return
       }
       heading = smoother.push(rawHeading, now)
+      if (inFlight && now - lastRequestAt >= TIMEOUT_MS) {
+        ctl?.abort()
+        ctl = null
+        reqSeq += 1
+        inFlight = false
+        timedOut = true
+        miss()
+      }
       // A map anchor that has aged out is simply re-minted: the surveyed bearing does
       // not go stale, and letting it lapse drops the beacon every MAX_AGE_MS.
       if (anchor?.source === 'osm-fallback' && !anchorFresh() && approach.currentPhase !== 'threshold') {
@@ -283,6 +301,15 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
         saidUnsure = true
         pendingUnsure = false
         lines.push(unsureLine(L))
+      }
+      // Vision has gone quiet: the fix went stale, or a request timed out with nothing
+      // fresh to speak from. Said once per loss; not at the door, where the stillness
+      // path is already running and "looking for the door" would contradict it.
+      const lost = st.lostFix || (timedOut && !anchorFresh())
+      timedOut = false
+      if (lost && !saidSearching && st.phase !== 'threshold' && st.phase !== 'through') {
+        saidSearching = true
+        lines.push(searchingLine(L))
       }
       if (pendingNoCamera && !saidNoCamera) {
         saidNoCamera = true
@@ -370,6 +397,7 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
       },
       stop() {
         stopped = true
+        ctl?.abort()
         offTimer()
         offHeading()
         offSteps()

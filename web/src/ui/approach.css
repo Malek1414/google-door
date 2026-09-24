@@ -99,3 +99,10 @@
 .apr-rows dd.is-unclear { color: #9aa0a6; font-style: italic; font-weight: 400; }
 /* The model's own short note under the rows, only when the verdict is confident. */
 .apr-note { margin: 0; padding: 14px 0 12px; border-top: 1px solid var(--apr-line); font-size: 17px; line-height: 1.35; color: var(--apr-fg2); }
+
+/* Settle, don't snap: the angle is unwrapped (ui/arrowSteady.ts), so this always takes
+   the short way round. The deadband, not the transition, is what stops the shaking. */
+.apr-arrow { transition: transform 200ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .apr-arrow { transition: none; }
+}

@@ -21,6 +21,7 @@ import { playInstruction, reportMissingClips, stopLines } from './clips'
 import { checkDoor, runDoorCheckOnce, verdictNote, verdictRows } from './doorCheck'
 import { h, mount, s } from './dom'
 import { grabFrame } from './LiveView'
+import { SteadyAngle } from './arrowSteady'
 import './approach.css'
 
 // Screen chrome only. Everything spoken during guidance comes from the engine
@@ -170,6 +171,8 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
   const beacon = opts.config.beacon && session.audio ? new BeaconAudio(session.audio) : null
   let beaconOn = false
 
+  const steady = new SteadyAngle()
+  let shownDeg: number | null = null
   let current: ApproachView | null = null
   let hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden'
   const render = (v: ApproachView) => {
@@ -182,10 +185,17 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
     // Draw exactly the numbers the engine returns; rounding is display, not guidance.
     dirEl.hidden = !lay.arrow
     if (v.relBearingDeg !== null) {
-      arrow.style.transform = `rotate(${v.relBearingDeg.toFixed(1)}deg)`
+      // Steady, not raw: the engine's bearing follows every magnetometer twitch.
+      const deg = steady.push(v.relBearingDeg, performance.now())
+      if (deg !== shownDeg) {
+        shownDeg = deg
+        arrow.style.transform = `rotate(${deg.toFixed(1)}deg)`
+      }
       angleEl.textContent = `${Math.abs(Math.round(v.relBearingDeg))}°`
     } else {
       angleEl.textContent = ''
+      steady.reset() // no door: the next arrow starts where the door is, not where it was
+      shownDeg = null
     }
     distEl.textContent = lay.distance
     instrEl.textContent = v.instruction

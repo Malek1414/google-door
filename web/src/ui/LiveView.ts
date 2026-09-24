@@ -6,7 +6,7 @@
 import { arrowPulseHz, ARRIVE_M, beaconFor, cuePan, hapticFor, HAPTIC_ARRIVED, ON_BEARING_DEG, shouldAnnounceApproach, shouldSpeakArrival } from '../core/beacon'
 import { bearingDeg, haversineM, relativeBearing } from '../core/geo'
 import { distanceKey } from '../core/speech'
-import { HeadingSmoother } from '../core/smooth'
+import { SteadyAngle } from './arrowSteady'
 import { connected, tailLength, instructionLine, maneuverGlyph, nextManeuver, progressAlong, type Route } from '../core/route'
 import { cachedRoute, computeRoute, D } from './Directions'
 import { chevronStack, destinationPin, stackTransform, type ArPhase } from './ar'
@@ -395,7 +395,10 @@ export function LiveView(opts: {
     })
   }
 
-  const smoother = new HeadingSmoother({ tau: 0.2, deadbandDeg: 1.5 })
+  // Smooth the RELATIVE bearing, not only the heading: close to the door the GPS makes
+  // the bearing to it jump as much as the magnetometer does. Wide deadband: small
+  // noise produces no motion at all (ui/arrowSteady.ts).
+  const steady = new SteadyAngle()
   const beacon = cfg.beacon && session.audio ? new BeaconAudio(session.audio) : null
   let beaconOn = false
 
@@ -592,8 +595,11 @@ export function LiveView(opts: {
     const ahead = onRoute && route ? nextManeuver(dist, route, tailLength(route.path, followPath)) : null
     const aheadText = ahead ? instructionLine(ahead.step) ?? D.thenArrive(name) : null
     const hasHeading = heading !== null && heading.source !== 'none'
-    const smoothedDeg = hasHeading ? smoother.push(heading!.deg) : 0
-    rel = hasHeading ? relativeBearing(toDoor, smoothedDeg) : 0
+    // GPS gone: freeze the arrow where it is rather than let a stale fix steer it.
+    if (hasHeading && !gpsLost) {
+      steady.push(relativeBearing(toDoor, heading!.deg), performance.now())
+      rel = steady.rel
+    } else if (!hasHeading) rel = 0
     // "Roughly this way" is for poor GPS only, and only when there is no route to follow.
     const cone = (fix.accuracy ?? 0) > CONE_ACCURACY_M
     const softHeading = heading?.source === 'gps-course'
@@ -747,13 +753,16 @@ export function LiveView(opts: {
 
   // Continuous pulse: rate rises as |rel| falls. Render loop does arithmetic only.
   let phase = 0
+  const calmMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
   let last = performance.now()
   let raf = 0
   const frame = (now: number) => {
     const dt = (now - last) / 1000
     last = now
-    phase = (phase + dt * arrowPulseHz(rel)) % 1
-    const k = 1 + 0.12 * Math.sin(phase * Math.PI * 2) ** 2
+    // A breath, not a throb: at 4 Hz and 12 % the chevrons read as shaking. Still faster
+    // the better the aim, but at most ~1.2 Hz and 4 %; none with reduced motion.
+    phase = (phase + dt * arrowPulseHz(rel) * 0.3) % 1
+    const k = calmMotion ? 1 : 1 + 0.04 * Math.sin(phase * Math.PI * 2) ** 2
     stack.setAttribute('transform', `scale(${k.toFixed(3)})`)
     coneG.setAttribute('opacity', (0.65 + 0.35 * Math.sin(phase * Math.PI) ** 2).toFixed(2))
     raf = requestAnimationFrame(frame)

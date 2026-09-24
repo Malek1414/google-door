@@ -9,11 +9,10 @@
 import { describe, expect, it } from 'vitest'
 import { bearingDeg, relativeBearing, type LatLon } from '../src/core/geo'
 import { HeadingSmoother } from '../src/core/smooth'
-import { stackTransform } from '../src/ui/ar'
+import { groundChevrons, pathPoint, pathTurn } from '../src/ui/ar'
 
 /** Android reports alpha; heading.ts converts with 360 - alpha. */
 const headingFromAlpha = (alpha: number) => (360 - alpha + 360) % 360
-const rotOf = (t: string) => { const m = /rotate\((-?[\d.]+)/.exec(t); return m ? parseFloat(m[1]) : NaN }
 const angDiff = (a: number, b: number) => Math.abs(((a - b + 540) % 360) - 180)
 
 const me: LatLon = { lat: 52.5272, lon: 13.3706 }
@@ -36,7 +35,8 @@ describe('compass → arrow, end to end', () => {
 
   it('turning the phone N degrees rotates the arrow N degrees', () => {
     const toDoor = bearingDeg(me, door)
-    const arrowAt = (h: number) => rotOf(stackTransform(relativeBearing(toDoor, settled(h)), 393, 760))
+    // The ground path ends up heading the way of the door: its far end's direction.
+    const arrowAt = (h: number) => pathPoint(12, pathTurn(relativeBearing(toDoor, settled(h)))).heading
     for (const turn of [15, 45, 90, 135]) {
       const moved = angDiff(arrowAt(turn), arrowAt(0))
       expect(Math.abs(moved - turn)).toBeLessThan(2)
@@ -47,8 +47,11 @@ describe('compass → arrow, end to end', () => {
     const toDoor = bearingDeg(me, door)
     const rel = relativeBearing(toDoor, settled(toDoor))
     expect(Math.abs(rel)).toBeLessThan(2)
-    // the arrow path points up, so no rotation at all means straight ahead
-    expect(rotOf(stackTransform(rel, 393, 760))).toBeCloseTo(0, 0)
+    // the painted path runs straight ahead, every chevron centred on the screen axis
+    for (const c of groundChevrons(rel, 80)) {
+      expect(Math.abs(c.heading)).toBeLessThan(2)
+      expect(Math.abs(c.cx - 196.5)).toBeLessThan(12)
+    }
   })
 
   it('the arrow points left when the door is left, right when right', () => {

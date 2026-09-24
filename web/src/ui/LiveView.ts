@@ -11,7 +11,8 @@ import { CalmWord, isMuted, LineGate, muteButton } from './voiceCalm'
 import { connected, tailLength, instructionLine, maneuverGlyph, nextManeuver, progressAlong, type Route } from '../core/route'
 import { cachedRoute, computeRoute, D } from './Directions'
 import { streetOf } from '../core/nav'
-import { chevronStack, destinationPin, stackTransform, type ArPhase } from './ar'
+import { destinationPin, groundArrows, type ArPhase } from './ar'
+import { cameraVideo, mountCamera } from '../core/camera'
 import './ar.css'
 import { startHeading, startPitch, type Heading } from '../core/heading'
 import { snapToGraph } from '../core/match'
@@ -308,11 +309,11 @@ export function LiveView(opts: {
 
   // ---- DOM ----
   let mediaEl: HTMLVideoElement | HTMLImageElement | null = null
-  if (opts.sensors.media.kind === 'stream') {
-    const v = h('video', { class: 'cam', playsinline: true, muted: true, autoplay: true, 'aria-hidden': 'true' }) as HTMLVideoElement
-    v.muted = true
-    v.srcObject = opts.sensors.media.stream
-    void v.play().catch(() => {})
+  let stopCamera = () => {}
+  if (opts.sensors.media.kind === 'stream' || (opts.sensors.media.kind === 'none' && typeof navigator.mediaDevices?.getUserMedia === 'function')) {
+    // core/camera: session stream reuse, iOS attributes, reveal on first frame, recovery.
+    const v = cameraVideo('cam')
+    stopCamera = mountCamera(v)
     mediaEl = v
   } else if (opts.sensors.media.kind === 'image') {
     mediaEl = h('img', { class: 'cam', src: opts.sensors.media.url, alt: '', 'aria-hidden': 'true' }) as HTMLImageElement
@@ -321,8 +322,8 @@ export function LiveView(opts: {
   // ── Live View, measured from a Google Maps Live View recording ─────────────
   // Phases: scanning -> ready -> guiding -> approach -> arrived.
   // Chevrons are extruded solids (see ui/ar.ts); the red pin replaces them close in.
-  const stack = chevronStack()
-  const stackG = s('g', { class: 'ar-stack-wrap' }, stack)
+  const ground = groundArrows()
+  const stackG = s('g', { class: 'ar-stack-wrap' }, ground.el)
   const pinG = s('g', { class: 'ar-pin-wrap', visibility: 'hidden' }, destinationPin())
   const coneG = s('g', { class: 'cone' })
   const svg = s('svg', { class: 'ar-svg', viewBox: '0 0 393 760', preserveAspectRatio: 'xMidYMid slice', 'aria-hidden': 'true' }, coneG, stackG, pinG)
@@ -897,7 +898,7 @@ export function LiveView(opts: {
       showBanner(glyph)
       // Chevrons foreshorten as they swing away, the way an extruded plate would.
       // Attribute rather than CSS transform: the group lives in the SVG user space.
-      stackG.setAttribute('transform', stackTransform(rel, 393, 760, pitch))
+      ground.set(rel, pitch)
       if (cone || softHeading) {
         // Poor localisation dims the chevrons rather than hiding them: Google keeps
         // guidance on screen and softens the wording, and an empty screen tells a
@@ -979,17 +980,14 @@ export function LiveView(opts: {
 
   // Continuous pulse: rate rises as |rel| falls. Render loop does arithmetic only.
   let phase = 0
-  const calmMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
   let last = performance.now()
   let raf = 0
   const frame = (now: number) => {
     const dt = (now - last) / 1000
     last = now
-    // A breath, not a throb: at 4 Hz and 12 % the chevrons read as shaking. Still faster
-    // the better the aim, but at most ~1.2 Hz and 4 %; none with reduced motion.
+    // The ground chevrons flow forward along the path (static with reduced motion).
     phase = (phase + dt * arrowPulseHz(rel) * 0.3) % 1
-    const k = calmMotion ? 1 : 1 + 0.04 * Math.sin(phase * Math.PI * 2) ** 2
-    stack.setAttribute('transform', `scale(${k.toFixed(3)})`)
+    ground.tick(dt)
     coneG.setAttribute('opacity', (0.65 + 0.35 * Math.sin(phase * Math.PI) ** 2).toFixed(2))
     raf = requestAnimationFrame(frame)
   }
@@ -1033,7 +1031,7 @@ export function LiveView(opts: {
   // Ground plane: re-project the chevrons as the phone tilts. Transform only, no redraw.
   const stopPitch = startPitch((b) => {
     pitch = pitch === null ? b : pitch + 0.25 * (b - pitch)
-    if (heading && heading.source !== 'none') stackG.setAttribute('transform', stackTransform(rel, 393, 760, pitch))
+    if (heading && heading.source !== 'none') ground.set(rel, pitch)
   })
 
   const stopSensors = opts.sensors.start(
@@ -1148,6 +1146,7 @@ export function LiveView(opts: {
     cancelAnimationFrame(raf)
     stopSensors()
     stopPitch()
+    stopCamera()
     beacon?.stop()
     // The arrival card goes through /api/speak with a device-voice fallback 2 s later;
     // without this that late fallback queues the whole card ahead of the approach.

@@ -8,6 +8,7 @@
 // If the gesture has lapsed by step 3 on some iOS version, session.resumeAudioOnTap()
 // resumes the context on the next tap (the onboarding "Test it" tap covers this).
 
+import { acquireCamera } from '../core/camera'
 import { initSpeech, preload } from '../core/speech'
 import { requestHeadingPermission } from '../core/heading'
 import { unlockAudio } from '../audio'
@@ -40,10 +41,10 @@ export async function unlockAll(opts: { camera: boolean }): Promise<UnlockResult
   session.headingGranted = compass
 
   let camera = false
-  if (opts.camera && navigator.mediaDevices?.getUserMedia) {
+  if (opts.camera && typeof navigator.mediaDevices?.getUserMedia === 'function') {
     try {
-      session.stream?.getTracks().forEach((tr) => tr.stop())
-      session.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+      // Reuses a still-live stream; otherwise asks once, rear camera, 1280x720 hint.
+      await acquireCamera()
       camera = true
     } catch {
       session.stream = null

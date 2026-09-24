@@ -103,8 +103,12 @@ check("lived 503 names MAPS_API_KEY", r.status_code == 503 and "MAPS_API_KEY" in
 check("health maps false without key", client.get("/api/health").json()["maps"] is False)
 os.environ["MAPS_API_KEY"] = saved
 
-# 8. /api/route (server/route.py, not routed through upstream) is still seen by health.
+# 8. /api/route (server/route.py) goes through upstream: one 500 is retried away,
+#    three in a row reach the client and flip health.
 reset([500])
+r = client.post("/api/route", json={"fromLat": 52.52, "fromLon": 13.4, "toLat": 52.53, "toLon": 13.41})
+check("route retries a single 500", len(_calls) == 2, _calls)
+reset([500, 500, 500])
 r = client.post("/api/route", json={"fromLat": 52.52, "fromLon": 13.4, "toLat": 52.53, "toLon": 13.41})
 h = client.get("/api/health").json()
 check("route 5xx flips health maps to false", r.status_code >= 500 and h["maps"] is False, (r.status_code, h["deps"]["routes"]))

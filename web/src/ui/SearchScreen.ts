@@ -41,6 +41,7 @@ const S = {
     nearby: 'Barrierefreie Orte in der Nähe',
     suggestions: 'Vorschläge',
     noResults: 'Kein passender Ort oder Eingang.',
+    count: (n: number) => (n === 1 ? '1 Vorschlag' : `${n} Vorschläge`),
     searchFor: (q: string) => `Nach „${q}“ suchen`,
     nearbyItems: [
       { title: 'Stufenlose Eingänge', sub: 'Ebenerdig oder mit Rampe', icon: 'accessible' },
@@ -63,6 +64,7 @@ const S = {
     nearby: 'Accessible places nearby',
     suggestions: 'Suggestions',
     noResults: 'No matching place or entrance.',
+    count: (n: number) => (n === 1 ? '1 suggestion' : `${n} suggestions`),
     searchFor: (q: string) => `Search for “${q}”`,
     nearbyItems: [
       { title: 'Step-free entrances', sub: 'Level or with a ramp', icon: 'accessible' },
@@ -136,9 +138,6 @@ export function openSearchScreen(root: HTMLElement, opts: SearchScreenOpts): () 
     autocapitalize: 'off',
     spellcheck: 'false',
     enterkeyhint: 'search',
-    role: 'combobox',
-    'aria-autocomplete': 'list',
-    'aria-expanded': 'false',
     'aria-controls': 'ss-suggestions',
   }) as HTMLInputElement
   const backBtn = h('button', { class: 'ss-icon-btn', type: 'button', 'aria-label': L.back }, icon('arrow_back'))
@@ -172,7 +171,9 @@ export function openSearchScreen(root: HTMLElement, opts: SearchScreenOpts): () 
   )
 
   const home = h('div', { class: 'ss-home' }, chips, recentSection, nearbySection)
-  const suggestionsList = h('ul', { id: 'ss-suggestions', class: 'ss-list ss-suggest', role: 'listbox', 'aria-label': L.suggestions, hidden: true })
+  // A plain list of buttons: role=option around a button is invalid (nested-interactive),
+  // and VoiceOver read the rows inconsistently. The live region announces the count.
+  const suggestionsList = h('ul', { id: 'ss-suggestions', class: 'ss-list ss-suggest', role: 'list', 'aria-label': L.suggestions, hidden: true })
   const live = h('div', { class: 'sr-only', role: 'status', 'aria-live': 'polite' })
 
   const screen = h(
@@ -218,7 +219,6 @@ export function openSearchScreen(root: HTMLElement, opts: SearchScreenOpts): () 
     if (!q) {
       suggestionsList.hidden = true
       home.hidden = false
-      input.setAttribute('aria-expanded', 'false')
       live.textContent = ''
       return
     }
@@ -230,7 +230,7 @@ export function openSearchScreen(root: HTMLElement, opts: SearchScreenOpts): () 
     }
     const searchRow = h(
       'li',
-      { role: 'option' },
+      { role: 'listitem' },
       h(
         'div',
         { class: 'ss-row' },
@@ -241,7 +241,7 @@ export function openSearchScreen(root: HTMLElement, opts: SearchScreenOpts): () 
       ...hits.map((r) =>
         h(
           'li',
-          { role: 'option' },
+          { role: 'listitem' },
           h(
             'div',
             { class: 'ss-row' },
@@ -266,8 +266,7 @@ export function openSearchScreen(root: HTMLElement, opts: SearchScreenOpts): () 
     )
     suggestionsList.hidden = false
     home.hidden = true
-    input.setAttribute('aria-expanded', 'true')
-    live.textContent = hits.length ? '' : L.noResults
+    live.textContent = hits.length ? L.count(hits.length) : L.noResults
   }
 
   function submit(q: string) {
@@ -287,6 +286,22 @@ export function openSearchScreen(root: HTMLElement, opts: SearchScreenOpts): () 
     if (ev.key === 'Escape') {
       ev.preventDefault()
       close()
+      return
+    }
+    // aria-modal is a promise: Tab and Shift+Tab wrap inside the screen.
+    if (ev.key !== 'Tab') return
+    const focusables = [...screen.querySelectorAll<HTMLElement>('button, input, [tabindex]:not([tabindex="-1"])')].filter(
+      (el) => !el.hasAttribute('disabled') && el.offsetParent !== null,
+    )
+    if (!focusables.length) return
+    const first = focusables[0]
+    const last = focusables[focusables.length - 1]
+    if (ev.shiftKey && document.activeElement === first) {
+      ev.preventDefault()
+      last.focus()
+    } else if (!ev.shiftKey && document.activeElement === last) {
+      ev.preventDefault()
+      first.focus()
     }
   }
   input.addEventListener('input', renderSuggestions)
@@ -305,6 +320,10 @@ export function openSearchScreen(root: HTMLElement, opts: SearchScreenOpts): () 
 
   const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
   const previousOverflow = root.style.overflow
+  // Everything behind the screen is inert, so neither Tab nor a VoiceOver swipe can
+  // reach the map, its Google links or the sheet while the dialog is open.
+  const madeInert = [...root.children].filter((el): el is HTMLElement => el instanceof HTMLElement && !el.inert)
+  madeInert.forEach((el) => (el.inert = true))
   root.append(screen)
   root.style.overflow = 'hidden'
   renderRecent()
@@ -317,6 +336,7 @@ export function openSearchScreen(root: HTMLElement, opts: SearchScreenOpts): () 
     closed = true
     screen.removeEventListener('keydown', onKey)
     screen.remove()
+    madeInert.forEach((el) => (el.inert = false))
     root.style.overflow = previousOverflow
     previousFocus?.focus({ preventScroll: true })
     // Every way out (back, Escape, submit, pick) reports the close, otherwise the

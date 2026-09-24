@@ -66,3 +66,4 @@
    never vanish: the next action would slide left into the slot the thumb is aiming at. */
 .gm-routeactions .gm-pill[disabled] { background: #2a2b2e; color: #7b7f83; cursor: default; }
 .gm-routeactions .gm-pill[disabled] .ms { color: #7b7f83; }
+.gm-sheet-body { scroll-padding-bottom: 96px; } /* a11y #20: a focused row never sits under the nav bar */

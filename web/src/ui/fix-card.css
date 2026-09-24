@@ -17,7 +17,7 @@
 .gm-pill-primary { background: #62c4cb; color: #00363a; }
 
 /* photo: main tile 290x361 at y 215, radius 16, tile gap 8 (measured) */
-.gm-photo { height: 360px; border-radius: 16px; margin: 0 0 8px; }
+.gm-photo { height: 360px; border-radius: 16px; margin: 0 0 8px; position: relative; }
 
 /* tabs: labels y 607-624, 16px, gaps ~38; underline y 640-643 = 3px, spans label width, #62c4cb (measured) */
 .gm-tabs { gap: 38px; margin-top: 18px; border-bottom: 0; }

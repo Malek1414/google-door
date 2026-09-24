@@ -7,12 +7,16 @@ import { MAX_PHOTO_BYTES, saveSurveyEntrance, surveyTier, type SurveyEntrance } 
 import { lang } from '../strings'
 import type { FeatureCtx } from './ctx'
 import { h } from './dom'
+import { destination } from '../core/geo'
 import './entrance-editor.css'
 
 const de = {
   title: 'Eingang eintragen',
   dragHint: 'Genau auf die Tür ziehen',
   pinMoved: 'Stecknadel verschoben.',
+  useMyLocation: 'Meinen Standort verwenden',
+  nudgeGroup: 'Stecknadel um 2 Meter verschieben',
+  nudge: { n: 'Norden', s: 'Süden', e: 'Osten', w: 'Westen' },
   lat: 'Breitengrad',
   lon: 'Längengrad',
   noMap: 'Keine Karte verfügbar. Position als Zahlen eingeben.',
@@ -48,6 +52,9 @@ const en: typeof de = {
   title: 'Add entrance',
   dragHint: 'Drag exactly onto the door',
   pinMoved: 'Pin moved.',
+  useMyLocation: 'Use my location',
+  nudgeGroup: 'Move the pin by 2 metres',
+  nudge: { n: 'North', s: 'South', e: 'East', w: 'West' },
   lat: 'Latitude',
   lon: 'Longitude',
   noMap: 'No map available. Enter the position as numbers.',
@@ -182,6 +189,29 @@ export function openEntranceEditor(ctx: FeatureCtx, el: HTMLElement, opts: Entra
     ctx.map.panTo({ lat: pos.lat, lng: pos.lon })
   }
 
+  // Dragging is not the only way (WCAG 2.1.1, 2.5.7): keyboard, Switch Control and
+  // VoiceOver users place the pin from their position and nudge it in 2 m steps.
+  const movePin = (to: { lat: number; lon: number }) => {
+    pos = to
+    marker?.setPosition({ lat: to.lat, lng: to.lon })
+    ctx.map?.panTo({ lat: to.lat, lng: to.lon })
+    ctx.announce(L.pinMoved)
+  }
+  const pinTools = ctx.map
+    ? h(
+        'div',
+        { class: 'ee-pin-tools' },
+        h('button', { class: 'gm-pill ee-btn', type: 'button', onclick: () => movePin(ctx.origin()) }, L.useMyLocation),
+        h(
+          'div',
+          { class: 'ee-nudge', role: 'group', 'aria-label': L.nudgeGroup },
+          ...([['n', 0], ['s', 180], ['e', 90], ['w', 270]] as const).map(([k, deg]) =>
+            h('button', { class: 'gm-pill ee-btn ee-nudge-btn', type: 'button', onclick: () => movePin(destination(pos, deg, 2)) }, L.nudge[k]),
+          ),
+        ),
+      )
+    : null
+
   // ---- form helpers ----
   const field = (label: string, input: HTMLElement, fid: string) =>
     h('div', { class: 'ee-field' }, h('label', { class: 'ee-label', for: fid }, label), input)
@@ -280,6 +310,7 @@ export function openEntranceEditor(ctx: FeatureCtx, el: HTMLElement, opts: Entra
     { class: 'ee', novalidate: true },
     h('div', { class: 'gm-sheet-head' }, h('h2', { id: 'sheet-title', class: 'gm-sheet-title', tabindex: '-1' }, L.title)),
     hint,
+    pinTools,
     coordsBlock,
     field(L.name, nameIn, `${id}-name`),
     seg,
@@ -355,6 +386,7 @@ export function openEntranceEditor(ctx: FeatureCtx, el: HTMLElement, opts: Entra
 
   el.replaceChildren(form)
   ctx.setSheet('half')
+  form.querySelector<HTMLElement>('#sheet-title')?.focus({ preventScroll: true })
 
   function cleanup(): void {
     if (closed) return

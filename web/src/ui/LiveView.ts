@@ -305,7 +305,7 @@ export function LiveView(opts: {
     ? h('button', { class: 'apr-trigger ar-near', type: 'button', hidden: true }, ms('door_front'), APPROACH_TRIGGER)
     : null
   const stopBtn = h('button', { class: 'ar-round', type: 'button', 'aria-label': t.stop }, ms('close'))
-  const fbBtn = h('button', { class: 'ar-round', type: 'button', 'aria-label': 'Feedback' }, ms('feedback'))
+  const fbBtn = h('button', { class: 'ar-round', type: 'button', 'aria-label': t.feedback }, ms('feedback'))
   const endRow = h('div', { class: 'ar-endrow' })
   const turnIcon = h('span', { class: 'sr-only' }, '')
   // Said on screen when guidance has no route: the arrow then aims straight at the

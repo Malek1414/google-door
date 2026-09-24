@@ -66,3 +66,6 @@
 }
 /* Large-visuals profile: the banner is the thing a partially-sighted user reads first. */
 .ar.dim .ar-man-t, html[data-contrast='high'] .ar-man-t { font-size: 28px; }
+
+/* a11y #36: a focus ring that survives any camera image */
+.ar-round:focus-visible, .ar-look:focus-visible { outline: 3px solid #fff; outline-offset: 2px; box-shadow: 0 0 0 6px #000; }

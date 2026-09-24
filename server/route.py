@@ -8,17 +8,18 @@ pavement reported as ~50 m of nothing, with a left turn omitted entirely.
 This proxies the Routes API so the Maps key stays on the server, and returns only what
 the guidance loop needs: the decoded path, the steps, and their maneuvers.
 """
-import os
-import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
+from server import upstream
 
 router = APIRouter()
 # The Routes API only takes classic API keys (AIza...). An AQ. key (the Gemini kind)
 # gets a 401 "API keys are not supported by this API", which is what silently turned
 # every route into a grey straight line. ROUTES_API_KEY lets the server use a Maps key
 # with the Routes API enabled even when MAPS_API_KEY holds something else.
-MAPS_KEY = os.environ.get("ROUTES_API_KEY") or os.environ.get("MAPS_API_KEY", "")
+# The key is read per request through server/upstream.py (dependency "routes":
+# ROUTES_API_KEY, then MAPS_API_KEY), which also retries 429/5xx with backoff.
 ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
 FIELDS = (
     "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline,"
@@ -64,7 +65,9 @@ class RouteReq(BaseModel):
 
 @router.post("/api/route")
 async def route(req: RouteReq):
-    if not MAPS_KEY:
+    key = upstream.key("routes")
+    if not key:
+        upstream.record_error("routes", "ROUTES_API_KEY / MAPS_API_KEY not configured")
         raise HTTPException(503, {"code": "not_configured", "message": "ROUTES_API_KEY / MAPS_API_KEY not configured"})
     body = {
         "origin": {"location": {"latLng": {"latitude": req.fromLat, "longitude": req.fromLon}}},
@@ -75,10 +78,10 @@ async def route(req: RouteReq):
         "units": "METRIC",
     }
     try:
-        async with httpx.AsyncClient(timeout=20) as c:
-            r = await c.post(ROUTES_URL, json=body,
-                             headers={"X-Goog-Api-Key": MAPS_KEY, "X-Goog-FieldMask": FIELDS})
-    except httpx.HTTPError:
+        r = await upstream.request("routes", "POST", ROUTES_URL, json=body,
+                                   headers={"X-Goog-Api-Key": key, "X-Goog-FieldMask": FIELDS})
+    except HTTPException:
+        # upstream raises 504 only after every try failed at the network level.
         raise HTTPException(504, {"code": "network", "message": "Routes API unreachable"})
     if r.status_code != 200:
         # Say WHY, so the client can tell "key cannot call Routes" from "no path".

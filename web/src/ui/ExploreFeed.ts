@@ -96,8 +96,15 @@ function placeCard(p: PlaceHit, distM: number, trending: boolean, onPick: () => 
   )
 }
 
+/** Step-free for sure and no revolving door, the bar for "Barrierefreie Eingänge". */
+export function isAccessibleDoor(e: Entrance): boolean {
+  return e.stepFree === true && e.door !== 'revolving' && !(e.warnings as string[]).includes('revolving') && !(e.warnings as string[]).includes('steps')
+}
+
 function doorCard(e: Entrance, distM: number, onPick: () => void): HTMLElement {
-  const name = e.name || e.description || 'Eingang'
+  // Never the description: it repeats the state ("Stufenlos, Richtung Norden."), and
+  // VoiceOver then read it twice. Unnamed doors say which kind they are.
+  const name = e.name || (e.kind === 'main' ? 'Haupteingang' : 'Nebeneingang')
   const state = e.stepFree === true ? 'Stufenlos' : e.stepFree === false ? 'Mit Stufen' : 'Stufen unbekannt'
   const dist = fmtDist(distM)
   const tile = s('svg', { viewBox: '0 0 32 32', width: 28, height: 28, 'aria-hidden': 'true' }, ...glyphPaths('#000'))
@@ -157,12 +164,13 @@ export function exploreFeed(
   const placesHead = h('div', { class: 'gx-head' }, h('h2', { class: 'gx-h gx-h--lead', id: `gx-near-${uid}` }, 'In dieser Gegend'), h('div', { class: 'gm-weather' }))
   const placesSec = h('section', { class: 'gx-section', 'aria-labelledby': `gx-near-${uid}` }, placesHead, placeList, allBtn)
 
-  // Doors: tier 1 only, step-free first, then by distance.
+  // The heading promises accessible doors, and a wheelchair user trusts it: tier 1,
+  // confirmed step-free, no revolving door, nearest first.
   const doors = ctx
     .entrances()
-    .filter((e) => e.tier === 1 && Number.isFinite(e.lat) && Number.isFinite(e.lon))
+    .filter((e) => e.tier === 1 && Number.isFinite(e.lat) && Number.isFinite(e.lon) && isAccessibleDoor(e))
     .map((e) => ({ e, d: haversineM(origin, e) }))
-    .sort((a, b) => Number(b.e.stepFree === true) - Number(a.e.stepFree === true) || a.d - b.d)
+    .sort((a, b) => a.d - b.d)
     .slice(0, MAX_DOORS)
   const doorList = h('ul', { class: 'gx-carousel' })
   for (const { e, d } of doors) doorList.append(doorCard(e, d, () => opts.onDoor(e)))
@@ -171,10 +179,11 @@ export function exploreFeed(
     : section(
         'Barrierefreie Eingänge in der Nähe',
         `gx-doors-${uid}`,
-        h('p', { class: 'gx-empty' }, 'Hier ist noch kein Eingang vermessen. Verschiebe die Karte oder melde einen Eingang.'),
+        h('p', { class: 'gx-empty' }, 'Hier ist noch kein stufenloser Eingang bekannt. Verschiebe die Karte oder melde einen Eingang.'),
       )
 
-  const tipList = h('ul', { class: 'gx-carousel' })
+  // Focusable so keyboard users can scroll it with the arrow keys (it holds no buttons).
+  const tipList = h('ul', { class: 'gx-carousel', tabindex: '0', 'aria-label': 'Tipps für Barrierefreiheit' })
   for (const t of TIPS) tipList.append(tipCard(t))
   const tipSec = section('Tipps für Barrierefreiheit', `gx-tips-${uid}`, tipList)
 
@@ -188,7 +197,10 @@ export function exploreFeed(
     ctx.setSheet('full')
     const extra = allHits.slice(MAX_PLACES)
     if (!extra.length) return
+    const before = placeList.children.length
     for (const p of extra) placeList.append(placeCard(p, haversineM(origin, p), false, () => opts.onPlace(p)))
+    // The button hides itself; hand focus to the first new place, not to <body>.
+    placeList.children[before]?.querySelector<HTMLElement>('button')?.focus({ preventScroll: true })
     allBtn.hidden = true
     ctx.announce(`${allHits.length} Orte in dieser Gegend`)
   })

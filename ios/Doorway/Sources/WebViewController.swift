@@ -59,7 +59,7 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
         cfg.allowsInlineMediaPlayback = true
         cfg.mediaTypesRequiringUserActionForPlayback = []   // the beacon unlocks on the Start tap
         cfg.defaultWebpagePreferences.allowsContentJavaScript = true
-        cfg.ignoresViewportScaleLimits = false               // keep user-scalable=no binding
+        cfg.ignoresViewportScaleLimits = true                // pinch zoom always allowed (WCAG 1.4.4)
         GeoBridge.install(on: cfg.userContentController, handler: self)
 
         webView = WKWebView(frame: .zero, configuration: cfg)
@@ -68,7 +68,7 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
         #if DEBUG
         if #available(iOS 16.4, *) { webView.isInspectable = true }  // Safari > Develop
         #endif
-        // A native app does not rubber-band or zoom. The page lays itself out under the
+        // No rubber band. Pinch zoom stays (low vision). The page lays itself out under the
         // status bar and home indicator with env(safe-area-inset-*), so no native insets.
         let sv = webView.scrollView
         sv.contentInsetAdjustmentBehavior = .never
@@ -224,7 +224,6 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
         status.text = nil
         retry.isHidden = true
         webView.isHidden = false
-        webView.scrollView.pinchGestureRecognizer?.isEnabled = false
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {

@@ -20,6 +20,10 @@ export const en = {
   tryAgain: 'Try again',
   simBanner: 'Simulation. Replaying a recorded walk, no sensors used.',
   simCameraNote: 'Camera replaced by a still image in simulation.',
+  sensorStatus: 'Sensor status',
+  feedback: 'Feedback',
+  doorNotFound: (id: string) => `Door ${id} is not in the data.`,
+  simNoArrow: (id: string) => `Door ${id} cannot be guided to with an arrow for your settings.`,
 
   // Onboard
   onboardStepFree: 'Do you need step-free routes?',
@@ -227,6 +231,10 @@ export const de: Strings = {
   tryAgain: 'Nochmal versuchen',
   simBanner: 'Simulation. Ein aufgezeichneter Weg wird abgespielt, ohne Sensoren.',
   simCameraNote: 'Kamera in der Simulation durch ein Standbild ersetzt.',
+  sensorStatus: 'Status der Sensoren',
+  feedback: 'Rückmeldung',
+  doorNotFound: (id: string) => `Die Tür ${id} ist nicht in den Daten.`,
+  simNoArrow: (id: string) => `Zur Tür ${id} gibt es mit deinen Einstellungen keinen Pfeil.`,
 
   onboardStepFree: 'Brauchst du stufenlose Wege?',
   yes: 'Ja',

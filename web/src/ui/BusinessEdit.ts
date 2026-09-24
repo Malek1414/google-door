@@ -272,7 +272,7 @@ export function openBusinessEdit(el: HTMLElement, ctx: FeatureCtx, businessId: s
   const root = h(
     'form',
     { class: 'be', 'aria-label': 'Profil bearbeiten', onsubmit: (e: Event) => e.preventDefault() },
-    h('h2', { class: 'gm-sheet-title be-title' }, 'Profil bearbeiten'),
+    h('h2', { id: 'sheet-title', class: 'gm-sheet-title be-title', tabindex: '-1' }, 'Profil bearbeiten'),
     h(
       'div',
       { class: 'be-card' },
@@ -312,5 +312,6 @@ export function openBusinessEdit(el: HTMLElement, ctx: FeatureCtx, businessId: s
   updateScore()
   el.replaceChildren(root)
   ctx.setSheet('full')
+  root.querySelector<HTMLElement>('#sheet-title')?.focus({ preventScroll: true })
   return cleanup
 }

@@ -167,9 +167,6 @@ blockquote footer { color: var(--muted); font-size: 1rem; }
 .gm-search-btn { width: 44px; height: 44px; flex: none; border: 0; background: none; color: var(--fg); display: grid; place-items: center; cursor: pointer; }
 .gm-search-btn .ms { font-size: 26px; }
 .gm-avatar { width: 34px; height: 34px; flex: none; margin-left: 6px; border-radius: 50%; border: 0; background: #7e57c2; color: #fff; font: 500 17px/34px 'Google Sans Flex', Roboto, sans-serif; text-align: center; cursor: pointer; }
-.gm-results { list-style: none; margin: 6px 0 0; padding: 6px 0; background: var(--search); border-radius: 20px; box-shadow: 0 4px 12px rgb(0 0 0 / 0.5); max-height: 50vh; overflow: auto; }
-.gm-result { width: 100%; display: flex; align-items: center; gap: 16px; padding: 10px 16px; min-height: 56px; border: 0; background: none; text-align: left; color: inherit; cursor: pointer; }
-.gm-result > .ms { color: var(--fg2); }
 
 /* chips: 36 high, radius 18, icon + label, 14 under the search bar, scroll off the right edge */
 .gm-chips { display: flex; gap: 8px; margin: 14px -14px 0 0; padding-right: 14px; overflow-x: auto; scrollbar-width: none; }
@@ -311,8 +308,10 @@ html.ios-gap .gm-nav { padding-bottom: 0; }
 /* Until the sheet is fully open its content does not scroll: vertical swipes move the sheet
    (MapView touch handlers), horizontal ones still scroll carousels and chips. */
 .gm:not([data-sheet='full']) .gm-sheet-body { overflow-y: hidden; }
-.gm-sheet { touch-action: pan-x; }
-.gm[data-sheet='full'] .gm-sheet-body { touch-action: pan-y; }
+.gm-sheet { touch-action: pan-x pinch-zoom; }
+.gm[data-sheet='full'] .gm-sheet-body { touch-action: pan-y pinch-zoom; }
+/* Pinch zoom stays on (WCAG 1.4.4); only double-tap zoom is suppressed. */
+html { touch-action: manipulation; }
 .gm-handle { height: 28px; }
 
 /* ══════════════════════════════════════════════════════════════════════

@@ -186,8 +186,18 @@ export function MapView(opts: {
   // ---- top: search bar, chips, layers ----
   const status = h('p', { class: 'gm-status', role: 'status' }, '')
   const mapEl = h('div', { class: 'gm-map', role: 'region', 'aria-label': t.mapTitle })
-  const searchInput = h('input', { class: 'gm-search-input', type: 'search', placeholder: t.searchPlaceholder, 'aria-label': t.searchLabel, autocomplete: 'off', enterkeyhint: 'search' }) as HTMLInputElement
-  const results = h('ul', { class: 'gm-results', role: 'listbox', 'aria-label': t.searchLabel, hidden: true })
+  // The pill is a button, not an input: it only opens the full-screen search. As an
+  // input it opened the overlay on focus, so keyboard and Switch Control users tabbing
+  // past it were trapped in the search (WCAG 2.1.1, 3.2.1).
+  const searchInput = h('button', { class: 'gm-search-input is-empty', type: 'button', 'aria-haspopup': 'dialog' }, t.searchPlaceholder) as HTMLButtonElement
+  let searchQuery = ''
+  const setSearchQuery = (q: string) => {
+    searchQuery = q
+    searchInput.textContent = q || t.searchPlaceholder
+    searchInput.classList.toggle('is-empty', !q)
+    searchInput.setAttribute('aria-label', q ? `${t.searchPlaceholder}: ${q}` : t.searchPlaceholder)
+  }
+  setSearchQuery('')
   const micBtn = h('button', { class: 'gm-search-btn', type: 'button', 'aria-label': t.voiceSearch }, icon('mic'))
   const lensBtn = h('button', { class: 'gm-search-btn', type: 'button', 'aria-label': t.look }, icon('photo_camera'))
   const avatar = h('button', { class: 'gm-avatar', type: 'button', 'aria-label': t.profileButton, onclick: opts.onSettings }, 'S')
@@ -244,6 +254,10 @@ export function MapView(opts: {
   /** Bumped by every draw and clear, so a route that lands after a close is dropped. */
   let routeSeq = 0
   let routeTarget: Entrance | null = null
+  /** Reopens the card a route was drawn from, when the user removes the route. */
+  let routeReturn: (() => void) | null = null
+  /** The place card currently (or last) open, so a place route can return to it. */
+  let lastPlace: PlaceHit | null = null
 
   function showRoutePreview(summary: string, label: string | null, out: RouteOutcome, retry: () => void, crowM: number) {
     routePreview = true
@@ -360,7 +374,7 @@ export function MapView(opts: {
     { class: 'gm', 'aria-labelledby': 'map-title' },
     h('h1', { id: 'map-title', class: 'sr-only' }, t.mapTitle),
     mapEl,
-    h('div', { class: 'gm-top' }, search, results, chips, morePill, status),
+    h('div', { class: 'gm-top' }, search, chips, morePill, status),
     layersBtn,
     rightCol,
     sheet,
@@ -371,6 +385,17 @@ export function MapView(opts: {
   // scrollIntoView() still scroll overflow:hidden boxes, which leaves the tab bar
   // mid-screen; snap them back whenever that happens.
   for (const frame of [root, sheet]) frame.addEventListener('scroll', () => { if (frame.scrollTop || frame.scrollLeft) frame.scrollTo(0, 0) }, { passive: true })
+
+  // Focus never lands under the nav bar or below the sheet edge (WCAG 2.4.11): a Tab
+  // stop outside the visible part opens the sheet fully and brings the row into view.
+  sheetBody.addEventListener('focusin', (ev) => {
+    const el = ev.target as HTMLElement
+    const r = el.getBoundingClientRect()
+    const bottom = nav.getBoundingClientRect().top || window.innerHeight
+    if (r.top >= sheet.getBoundingClientRect().top && r.bottom <= bottom) return
+    if (sheet.dataset.state !== 'full') setSheet('full')
+    requestAnimationFrame(() => el.scrollIntoView({ block: 'nearest' }))
+  })
 
   // ---- sheet snap states: drag or tap the handle ----
   const setSheet = (st: SheetState) => {
@@ -451,6 +476,14 @@ export function MapView(opts: {
     'touchmove',
     (ev) => {
       if (dragY0 === null) return
+      // Two fingers are a pinch: page zoom for low-vision users, never a sheet drag.
+      if (ev.touches.length > 1) {
+        dragY0 = null
+        dragging = false
+        sheet.style.transition = ''
+        setSheet(sheet.dataset.state as SheetState)
+        return
+      }
       const tt = ev.touches[0]
       const dy = tt.clientY - dragY0
       const dx = tt.clientX - dragX0
@@ -562,7 +595,7 @@ export function MapView(opts: {
       if (want && !opened) {
         opened = true
         openEntrance(want)
-      } else if (!selected && !placeOpen && !routePreview) renderSheet()
+      } else backgroundRender()
     } catch {
       status.textContent = t.noDoors
     }
@@ -592,6 +625,18 @@ export function MapView(opts: {
       console.error('[doorway] panel failed', err)
       sheetBody.replaceChildren(h('p', { class: 'gm-p', role: 'alert' }, t.panelError))
     }
+  }
+
+  /**
+   * New data (a map load, a location fix) redraws the Erkunden sheet only. Für dich,
+   * Beitragen and Unternehmen own their screens: remounting them from a GPS tick threw
+   * the user out of an open editor ("Eingang hinzufügen" jumped back to the business
+   * home) and moved VoiceOver focus. They re-render themselves after their own saves.
+   */
+  function backgroundRender() {
+    if (selected || placeOpen || routePreview) return
+    if (tab !== 'explore') return
+    renderSheet()
   }
 
   function renderSheet() {
@@ -651,6 +696,7 @@ export function MapView(opts: {
     const fill = () => {
       if (!weather) return
       chip.replaceChildren(icon(weather.icon), h('span', {}, `${Math.round(weather.temp)}°`))
+      chip.setAttribute('role', 'img')
       chip.setAttribute('aria-label', `${Math.round(weather.temp)} Grad`)
       chip.hidden = false
     }
@@ -766,7 +812,7 @@ export function MapView(opts: {
     panelCleanup?.()
     panelCleanup = null
     selected = null
-    clearRoute()
+    clearRoute(false)
     renderMarkers()
     renderSheet()
     // Back to a result list: show the list, not a peek that hides every row.
@@ -803,7 +849,13 @@ export function MapView(opts: {
     }]
   }
 
-  function clearRoute() {
+  /**
+   * Remove the route from the map. With `restore` (the user's "Route entfernen"), the
+   * sheet goes back to what the route was drawn from: the door card or the place card,
+   * not a stale "2 Min. · 160 m". Internal clears (a new draw, closing the card,
+   * teardown) pass false and leave the sheet to their caller.
+   */
+  function clearRoute(restore = true) {
     routeSeq++
     routeLine?.setMap(null)
     routeCasing?.setMap(null)
@@ -815,10 +867,17 @@ export function MapView(opts: {
     routeCasing = null
     routeEnd = null
     routeBadge = null
-    if (routePreview) {
-      routePreview = false
-      renderSheet()
-      setSheet('peek')
+    const back = routeReturn
+    const wasPreview = routePreview
+    routeReturn = null
+    routePreview = false
+    if (!restore) return
+    if (wasPreview) {
+      if (back) back()
+      else {
+        renderSheet()
+        setSheet('peek')
+      }
     }
   }
 
@@ -875,13 +934,16 @@ export function MapView(opts: {
     // navigated away from.
     routeTarget = target
     const from = origin()
-    clearRoute()
+    clearRoute(false)
     const seq = ++routeSeq
+    const place = placeOpen ? lastPlace : null
+    const back = target ? () => openEntrance(target) : place ? () => openPlace(place) : null
 
     const out = await computeRoute(from, to)
     // Closed, or another route asked for, while this one was in flight.
     if (seq !== routeSeq || !map) return out.ok ? out.route : null
-    clearRoute()
+    clearRoute(false)
+    routeReturn = back
     const retry = () => void drawRoute(to, label, target)
     endCap(to)
 
@@ -959,7 +1021,12 @@ export function MapView(opts: {
 
   function streetView(e: Entrance): HTMLElement | null {
     if (!map) return null
+    // The outer box is one image for assistive tech. The panorama goes in an inert
+    // inner box: Google's own links and shortcut buttons inside role=img were invalid
+    // (nested-interactive) and added seven junk Tab stops before the tabs.
     const box = h('div', { class: 'gm-photo', role: 'img', 'aria-label': t.streetViewAlt })
+    const pano = h('div', { class: 'gm-photo-pano', inert: '', 'aria-hidden': 'true', style: 'position:absolute;inset:0' })
+    box.append(pano)
     new google.maps.StreetViewService().getPanorama({ location: { lat: e.lat, lng: e.lon }, radius: 40 }, (data, st) => {
       if (st !== google.maps.StreetViewStatus.OK || !data?.location?.latLng) {
         box.remove()
@@ -967,7 +1034,7 @@ export function MapView(opts: {
       }
       const from = data.location.latLng
       const heading = google.maps.geometry?.spherical ? google.maps.geometry.spherical.computeHeading(from, { lat: e.lat, lng: e.lon }) : bearingFromTo(from.lat(), from.lng(), e.lat, e.lon)
-      new google.maps.StreetViewPanorama(box, { pano: data.location.pano, pov: { heading, pitch: 5 }, disableDefaultUI: true, clickToGo: false, linksControl: false, motionTracking: false })
+      new google.maps.StreetViewPanorama(pano, { pano: data.location.pano, pov: { heading, pitch: 5 }, disableDefaultUI: true, clickToGo: false, linksControl: false, motionTracking: false })
     })
     return box
   }
@@ -1035,19 +1102,39 @@ export function MapView(opts: {
     const reviews = h('div', { class: 'gm-tabpanel', hidden: true }, livedSection(b) ?? h('p', { class: 'gm-p' }, t.livedNone))
     const photos = h('div', { class: 'gm-tabpanel', hidden: true })
     const panels = [overview, reviews, photos]
+    // ARIA tab pattern, as in PlaceCard: roving tabindex, arrows/Home/End, linked panels.
+    panels.forEach((p, i) => {
+      p.setAttribute('role', 'tabpanel')
+      p.id = `gm-panel-${i}`
+      p.setAttribute('aria-labelledby', `gm-tab-${i}`)
+    })
+    const tabBtns: HTMLButtonElement[] = []
+    const selectTab = (i: number, focus = false) => {
+      tabBtns.forEach((x, j) => {
+        x.setAttribute('aria-selected', String(j === i))
+        x.tabIndex = j === i ? 0 : -1
+      })
+      panels.forEach((p, j) => (p.hidden = j !== i))
+      if (i === 2 && !photos.childElementCount) {
+        const sv = streetView(e)
+        photos.append(sv ?? h('p', { class: 'gm-p' }, t.noPhotos))
+      }
+      if (focus) tabBtns[i].focus()
+    }
     const tabs = h(
       'div',
       { class: 'gm-tabs', role: 'tablist' },
       ...[t.tabOverview, t.tabReviews, t.tabPhotos].map((label, i) => {
-        const b2 = h('button', { class: 'gm-tabbtn', type: 'button', role: 'tab', 'aria-selected': String(i === 0) }, label)
-        b2.addEventListener('click', () => {
-          tabs.querySelectorAll('.gm-tabbtn').forEach((x, j) => x.setAttribute('aria-selected', String(j === i)))
-          panels.forEach((p, j) => (p.hidden = j !== i))
-          if (i === 2 && !photos.childElementCount) {
-            const sv = streetView(e)
-            photos.append(sv ?? h('p', { class: 'gm-p' }, t.noPhotos))
-          }
+        const b2 = h('button', { class: 'gm-tabbtn', type: 'button', role: 'tab', id: `gm-tab-${i}`, 'aria-controls': `gm-panel-${i}`, 'aria-selected': String(i === 0), tabindex: i === 0 ? '0' : '-1' }, label) as HTMLButtonElement
+        b2.addEventListener('click', () => selectTab(i))
+        b2.addEventListener('keydown', (ev) => {
+          const n = tabBtns.length
+          const to = ev.key === 'ArrowRight' ? (i + 1) % n : ev.key === 'ArrowLeft' ? (i + n - 1) % n : ev.key === 'Home' ? 0 : ev.key === 'End' ? n - 1 : -1
+          if (to < 0) return
+          ev.preventDefault()
+          selectTab(to, true)
         })
+        tabBtns.push(b2)
         return b2
       }),
     )
@@ -1186,6 +1273,7 @@ export function MapView(opts: {
   function openPlace(p: PlaceHit) {
     selected = null
     placeOpen = true
+    lastPlace = p
     panelCleanup?.()
     chips.hidden = true
     morePill.hidden = false
@@ -1234,65 +1322,27 @@ export function MapView(opts: {
       map.setZoom(18)
     } else void load(bboxAround(lat, lon, 500))
   }
-  function renderResults() {
-    const q = searchInput.value.trim().toLowerCase()
-    if (!q) {
-      results.hidden = true
-      return
-    }
-    const placeHits = t.places.filter((p) => p.name.toLowerCase().includes(q)).map((p) => ({ title: p.name, sub: p.sub, go: () => flyTo(p.lat, p.lon), ic: 'location_on' }))
-    const doorHits = entrances
-      .filter((e) => e.name && e.name.toLowerCase().includes(q) && markerKind(e) !== 'no-marker')
-      .map((e) => ({ title: e.name!, sub: stepFreeLabel(e.stepFree), go: () => openEntrance(e), ic: 'door_front' }))
-    const hits = [...placeHits, ...doorHits].slice(0, SEARCH_MAX)
-    results.replaceChildren(
-      ...(hits.length
-        ? hits.map((r) =>
-            h(
-              'li',
-              { role: 'option' },
-              h(
-                'button',
-                {
-                  class: 'gm-result',
-                  type: 'button',
-                  onclick: () => {
-                    searchInput.value = r.title
-                    results.hidden = true
-                    searchInput.blur()
-                    r.go()
-                  },
-                },
-                icon(r.ic),
-                h('span', { class: 'gm-row-text' }, h('span', { class: 'gm-row-title' }, r.title), h('span', { class: 'gm-row-meta' }, r.sub)),
-              ),
-            ),
-          )
-        : [h('li', { class: 'gm-empty' }, t.searchNoResults)]),
-    )
-    results.hidden = false
+  const runQuery = (q: string) => {
+    setSearchQuery(q)
+    if (!map) return
+    status.textContent = t.loading
+    searchText(map, q)
+      .then((hits) => {
+        status.textContent = hits.length ? '' : t.searchNoResults
+        showPlaces(hits, q)
+      })
+      .catch((err) => (status.textContent = err instanceof PlacesUnavailable ? err.message : t.placesError))
   }
-  // Tapping the bar opens the full-screen search like Maps; the inline list stays as fallback.
+  // Tapping the bar opens the full-screen search like Maps. Click also fires for Enter
+  // and Space, and focus alone never opens it; closing hands focus back to the pill.
   let searchOpen = false
-  searchInput.addEventListener('focus', () => {
+  searchInput.addEventListener('click', () => {
     if (searchOpen) return
     searchOpen = true
-    searchInput.blur()
-    const runQuery = (q: string) => {
-      searchInput.value = q
-      if (!map) return
-      status.textContent = t.loading
-      searchText(map, q)
-        .then((hits) => {
-          status.textContent = hits.length ? '' : t.searchNoResults
-          showPlaces(hits, q)
-        })
-        .catch((err) => (status.textContent = err instanceof PlacesUnavailable ? err.message : t.placesError))
-    }
     let close: () => void = () => {}
     try {
       close = openSearchScreen(root, {
-        initial: searchInput.value,
+        initial: searchQuery,
         onQuery: (q) => {
           close()
           runQuery(q)
@@ -1303,6 +1353,9 @@ export function MapView(opts: {
         },
         onClose: () => {
           searchOpen = false
+          // Safari does not focus a tapped button, so the screen may have nothing to
+          // hand focus back to. The pill is where the user came from.
+          if (!document.activeElement || document.activeElement === document.body) searchInput.focus({ preventScroll: true })
         },
         suggestions: (q) => {
           const ql = q.trim().toLowerCase()
@@ -1317,30 +1370,8 @@ export function MapView(opts: {
     } catch (err) {
       console.error('[doorway] search screen failed', err)
       searchOpen = false
-      searchInput.focus()
     }
   })
-  searchInput.addEventListener('input', renderResults)
-  searchInput.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Enter') {
-      const first = results.querySelector<HTMLButtonElement>('button')
-      if (first) first.click()
-      else if (map && searchInput.value.trim()) {
-        const q = searchInput.value.trim()
-        results.hidden = true
-        searchInput.blur()
-        status.textContent = t.loading
-        searchText(map, q)
-          .then((hits) => {
-            status.textContent = hits.length ? '' : t.searchNoResults
-            showPlaces(hits, q)
-          })
-          .catch((err) => (status.textContent = err instanceof PlacesUnavailable ? err.message : t.placesError))
-      }
-    }
-    if (ev.key === 'Escape') results.hidden = true
-  })
-
   // Voice search through the browser's speech recognition (Safari and Chrome ship it prefixed).
   type Rec = { lang: string; interimResults: boolean; start(): void; onresult: ((ev: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null }
   const RecCtor = (window as unknown as { webkitSpeechRecognition?: new () => Rec; SpeechRecognition?: new () => Rec }).SpeechRecognition ?? (window as unknown as { webkitSpeechRecognition?: new () => Rec }).webkitSpeechRecognition
@@ -1352,8 +1383,8 @@ export function MapView(opts: {
       rec.lang = document.documentElement.lang === 'en' ? 'en-US' : 'de-DE'
       rec.interimResults = false
       rec.onresult = (ev) => {
-        searchInput.value = ev.results[0]?.[0]?.transcript ?? ''
-        renderResults()
+        const q = (ev.results[0]?.[0]?.transcript ?? '').trim()
+        if (q) runQuery(q)
       }
       rec.start()
       announce(t.listening)
@@ -1407,7 +1438,7 @@ export function MapView(opts: {
           if (!opts.openDoor) map?.setCenter({ lat: me.lat, lng: me.lon })
           if (!map) void load(bboxAround(me.lat, me.lon, 500))
         }
-        if (!selected && !placeOpen && !routePreview) renderSheet()
+        backgroundRender()
       },
       () => {},
       { enableHighAccuracy: true, maximumAge: 5000 },
@@ -1438,7 +1469,6 @@ export function MapView(opts: {
             if (e) map?.setCenter({ lat: e.lat, lng: e.lon })
           })
         map.addListener('click', (ev: google.maps.MapMouseEvent | google.maps.IconMouseEvent) => {
-          results.hidden = true
           const placeId = (ev as google.maps.IconMouseEvent).placeId
           if (placeId) {
             // A Google POI was tapped. Suppress the default InfoWindow and show our card.
@@ -1481,7 +1511,7 @@ export function MapView(opts: {
     if (geoWatch !== null) navigator.geolocation.clearWatch(geoWatch)
     markers.forEach((m) => m.setMap(null))
     meMarker?.setMap(null)
-    clearRoute()
+    clearRoute(false)
   }
   return teardown
 }

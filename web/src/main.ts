@@ -100,20 +100,23 @@ function showApproach(door: Entrance, p: Profile, mode: ApproachMode) {
 /** ?approach=demo (guidance, scripted engine) or ?approach=check (wheelchair verdict), straight in. */
 async function startApproachDemo(p: Profile, mode: ApproachMode) {
   const door = await findEntrance(params.door)
-  if (!door) return fatal(`Door ${params.door} not found in data.`)
+  if (!door) return fatal(t.doorNotFound(params.door))
   showApproach(door, p, mode)
 }
 
 async function startSim(p: Profile) {
   const [door, track] = await Promise.all([findEntrance(params.door), loadTrack(params.track)])
-  if (!door) return fatal(`Simulation door ${params.door} not found in data.`)
+  if (!door) return fatal(t.doorNotFound(params.door))
   const target = arrowTargetFor(door, p)
   // The safety gate applies in simulation too: no arrow for a door that may not carry one.
-  if (!target) return fatal(`Simulation door ${params.door} cannot carry an arrow for this profile (tier ${door.tier}, stepFree ${String(door.stepFree)}).`)
+  if (!target) {
+    console.warn('[doorway] sim door without arrow', { door: door.id, tier: door.tier, stepFree: door.stepFree })
+    return fatal(t.simNoArrow(params.door))
+  }
   const run = () =>
     LiveView({
       target,
-      sensors: replaySensors(track, { speed: params.speed, imageUrl: `${import.meta.env.BASE_URL}sim/placeholder-facade.svg`, label: `${t.simBanner} ${params.track}` }),
+      sensors: replaySensors(track, { speed: params.speed, imageUrl: `${import.meta.env.BASE_URL}sim/placeholder-facade.svg`, label: t.simBanner }),
       config: output(),
       onExit: () => showMap(p),
       onReplay: run,

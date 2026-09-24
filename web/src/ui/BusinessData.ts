@@ -186,7 +186,7 @@ export function openBusinessData(el: HTMLElement, ctx: FeatureCtx, businessId: s
     h('section', { class: 'bd-sec', 'aria-labelledby': `${id}-${key}` },
       h('div', { class: 'bd-sec-head' },
         h('span', { class: 'bd-sec-icon', 'aria-hidden': 'true' }, icon(ic)),
-        h('h4', { class: 'bd-h', id: `${id}-${key}` }, title),
+        h('h3', { class: 'bd-h', id: `${id}-${key}` }, title),
         count ? h('span', { class: 'bd-count' }, count) : null,
       ),
       ...body,
@@ -254,7 +254,7 @@ export function openBusinessData(el: HTMLElement, ctx: FeatureCtx, businessId: s
           ? h('img', { class: 'bd-thumb', src: e.photo, alt: L.photoAlt(name), width: 56, height: 56, loading: 'lazy' })
           : h('span', { class: 'bd-thumb bd-thumb-empty', 'aria-hidden': 'true' }, icon('door_front')),
         h('div', { class: 'bd-card-text' },
-          h('h5', { class: 'bd-card-title' }, name),
+          h('h4', { class: 'bd-card-title' }, name),
           h('p', { class: 'bd-src' }, L.byYou),
         ),
       ),
@@ -278,7 +278,7 @@ export function openBusinessData(el: HTMLElement, ctx: FeatureCtx, businessId: s
     const items = [
       ...d.community.map((c) => h('li', { class: 'bd-card' },
         h('div', { class: 'bd-card-text' },
-          h('h5', { class: 'bd-card-title' }, c.entry.name ?? L.unnamed),
+          h('h4', { class: 'bd-card-title' }, c.entry.name ?? L.unnamed),
           h('p', { class: 'bd-src' }, `${L.fromCommunity}, ${L.unconfirmed}`),
         ),
         h('dl', { class: 'bd-dl' },
@@ -290,7 +290,7 @@ export function openBusinessData(el: HTMLElement, ctx: FeatureCtx, businessId: s
       )),
       ...d.nearby.map((n) => h('li', { class: 'bd-card' },
         h('div', { class: 'bd-card-text' },
-          h('h5', { class: 'bd-card-title' }, n.entrance.name ?? L.unnamed),
+          h('h4', { class: 'bd-card-title' }, n.entrance.name ?? L.unnamed),
           h('p', { class: 'bd-src' }, n.entrance.source === 'places' ? L.fromPlaces : L.fromOsm),
         ),
         h('dl', { class: 'bd-dl' },
@@ -319,7 +319,8 @@ export function openBusinessData(el: HTMLElement, ctx: FeatureCtx, businessId: s
     const b = loadBusiness()
     if (!b || b.id !== businessId) return leave()
     const d = collectBusinessData(b, ctx.entrances())
-    const headId = `${id}-h`
+    // The sheet's region is labelled by #sheet-title; this screen replaces its h2.
+    const headId = 'sheet-title'
 
     const actions = confirming
       ? h('div', { class: 'bd-confirm', role: 'group', 'aria-labelledby': `${id}-ct` },
@@ -342,7 +343,7 @@ export function openBusinessData(el: HTMLElement, ctx: FeatureCtx, businessId: s
     const root = h('section', { class: 'bd', 'aria-labelledby': headId },
       h('div', { class: 'bd-top' },
         h('button', { class: 'gm-circle bd-back', type: 'button', 'aria-label': L.back, onclick: leave }, icon('arrow_back')),
-        h('h3', { class: 'bd-title', id: headId, tabindex: '-1' }, L.title),
+        h('h2', { class: 'bd-title', id: headId, tabindex: '-1' }, L.title),
       ),
       h('p', { class: 'bd-intro' }, L.intro),
       h('div', { class: 'bd-where' }, icon('smartphone'), h('div', {}, h('p', { class: 'bd-where-t' }, L.where), h('p', { class: 'bd-where-s' }, L.whereSub))),
@@ -356,7 +357,7 @@ export function openBusinessData(el: HTMLElement, ctx: FeatureCtx, businessId: s
       status,
     )
     el.replaceChildren(root)
-    document.getElementById(focusId ?? headId)?.focus()
+    document.getElementById(focusId ?? headId)?.focus({ preventScroll: true })
   }
 
   function remove(d: CollectedData): void {

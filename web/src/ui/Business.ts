@@ -296,6 +296,10 @@ export const businessPanel: Panel = (el, ctx) => {
   }
 
   // ---------- steps 2 to 5: dashboard as a full-height page ----------
+  /** After a sub-screen or the editor closes, focus the page heading, not <body>. */
+  function focusHead(): void {
+    el.querySelector<HTMLElement>('#sheet-title')?.focus({ preventScroll: true })
+  }
   function renderDashboard(): void {
     const stored = loadBusiness()
     if (!stored) return renderCreate()
@@ -361,10 +365,12 @@ export const businessPanel: Panel = (el, ctx) => {
           ctx.refresh()
           ctx.announce(L.entranceSaved)
           renderDashboard()
+          focusHead()
         },
         onCancel: () => {
           closeEditor()
           renderDashboard()
+          focusHead()
         },
       })
     }
@@ -374,6 +380,7 @@ export const businessPanel: Panel = (el, ctx) => {
       closeEditor()
       ctx.refresh()
       renderDashboard()
+      focusHead()
     }
     const taskAction = (taskId: string): { label: string; aria: string; icon: string; run: () => void } | null => {
       if (taskId === ROUTE_TASK_ID) return { label: L.film, aria: L.filmLabel, icon: 'videocam', run: () => ctx.openRecorder() }
@@ -400,7 +407,7 @@ export const businessPanel: Panel = (el, ctx) => {
           h('h4', { class: 'bz-rec-title' }, t.label),
           h('p', { class: 'bz-rec-line' }, done ? L.doneLine : t.line),
           act
-            ? h('button', { class: 'bz-rec-pill', type: 'button', 'aria-label': act.aria, onclick: act.run }, icon(act.icon), act.label)
+            ? h('button', { class: 'bz-rec-pill', type: 'button', 'aria-label': `${act.label}: ${act.aria}`, onclick: act.run }, icon(act.icon), act.label)
             : null,
         ),
         box,
@@ -458,6 +465,7 @@ export const businessPanel: Panel = (el, ctx) => {
       closeEditor()
       ctx.refresh()
       renderDashboard()
+      focusHead()
     }
     try {
       return businessHomeHeader(ctx, b, {

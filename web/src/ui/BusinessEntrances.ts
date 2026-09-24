@@ -131,12 +131,12 @@ export function openEntrancesManager(el: HTMLElement, ctx: FeatureCtx, businessI
         if (initial && saved.id !== initial.id) deleteSurveyEntrance(initial.id)
         linkToBusiness(saved.id, initial?.id)
         ctx.refresh()
-        render()
+        render(undefined, true)
         say(L.saved)
       },
       onCancel: () => {
         editorCleanup = null
-        render()
+        render(undefined, true)
       },
     })
   }
@@ -225,7 +225,7 @@ export function openEntrancesManager(el: HTMLElement, ctx: FeatureCtx, businessI
         h(
           'div',
           { class: 'bem-text' },
-          h('h4', { class: 'bem-title', id: titleId }, e.name ?? L.unnamed, isMain ? h('span', { class: 'bem-main' }, L.main) : null),
+          h('h3', { class: 'bem-title', id: titleId }, e.name ?? L.unnamed, isMain ? h('span', { class: 'bem-main' }, L.main) : null),
           h('p', { class: 'bem-meta' }, h('span', { class: `bem-verdict ${vClass}` }, verdict), h('span', {}, door)),
         ),
       ),
@@ -233,10 +233,10 @@ export function openEntrancesManager(el: HTMLElement, ctx: FeatureCtx, businessI
     )
   }
 
-  function render(focusId?: string): void {
+  function render(focusId?: string, focusHead = false): void {
     if (closed) return
     const list = entrancesOf(businessId)
-    const headId = `${id}-h`
+    const headId = 'sheet-title'
     const root = h(
       'section',
       { class: 'bem', 'aria-labelledby': headId },
@@ -244,7 +244,7 @@ export function openEntrancesManager(el: HTMLElement, ctx: FeatureCtx, businessI
         'div',
         { class: 'bem-top' },
         h('button', { class: 'gm-circle bem-back', type: 'button', 'aria-label': L.back, onclick: () => { cleanup(); onDone() } }, icon('arrow_back')),
-        h('h3', { class: 'bem-h', id: headId }, L.title),
+        h('h2', { class: 'bem-h', id: headId, tabindex: '-1' }, L.title),
         h('span', { class: 'bem-count' }, L.count(list.length)),
       ),
       list.length ? h('ul', { class: 'bem-list' }, ...list.map(card)) : h('p', { class: 'gm-p bem-empty' }, L.empty),
@@ -252,7 +252,10 @@ export function openEntrancesManager(el: HTMLElement, ctx: FeatureCtx, businessI
       status,
     )
     el.replaceChildren(root)
-    if (focusId) document.getElementById(focusId)?.focus()
+    // Focus follows the screen: a given row, else the heading when the screen (re)opens,
+    // so VoiceOver does not keep reading the one that was replaced.
+    const target = focusId ? document.getElementById(focusId) : focusHead ? root.querySelector<HTMLElement>('#sheet-title') : null
+    target?.focus({ preventScroll: true })
   }
 
   function cleanup(): void {
@@ -261,7 +264,7 @@ export function openEntrancesManager(el: HTMLElement, ctx: FeatureCtx, businessI
     closeEditor()
   }
 
-  render()
+  render(undefined, true)
   ctx.setSheet('half')
   return cleanup
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { doorName } from '../src/ui/doorName'
+import { doorName, pathDoorName } from '../src/ui/doorName'
+import { t } from '../src/strings'
 import type { Building, Entrance } from '../src/core/types'
 
 const door = (over: Partial<Entrance>): Entrance => ({
@@ -20,5 +21,15 @@ describe('unnamed doors get a name that tells them apart (a11y #8)', () => {
   it('uses the building and its side when known', () => {
     const b: Building = { id: 'b1', name: 'Hauptbahnhof', placeId: null, addr: null, centroid: [52.5, 13.4], accessSummary: { tier: 0, stepFree: null, confidence: 'mapped' } as Building['accessSummary'], entranceIds: [], stats: { total: 1, stepFree: 0, notStepFree: 0, unknown: 1 } }
     expect(doorName(door({ buildingId: 'b1', lat: 52.4995 }), me, [b])).toBe('Entrance, south side, Hauptbahnhof')
+  })
+})
+
+describe('the chosen door has one stable name on the way there (rehearsal)', () => {
+  it('keeps a real name', () => expect(pathDoorName(door({ name: ' Nordeingang ' }))).toBe('Nordeingang'))
+  it('an unnamed door is called by its kind, never "unnamed"', () => {
+    expect(pathDoorName(door({ kind: 'secondary' }))).toBe(t.doorKind.secondary)
+    expect(pathDoorName(door({ kind: 'main', name: '  ' }))).toBe(t.doorKind.main)
+    expect(pathDoorName(door({}))).toBe(t.doorKind.any)
+    expect(pathDoorName(door({}))).not.toBe(t.unnamedEntrance)
   })
 })

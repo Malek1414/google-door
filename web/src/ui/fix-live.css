@@ -101,3 +101,17 @@ body:has(section.apr) .health-banner { display: none; }
 .ar button.ar-noroute:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 .ar .ar-noroute.is-folded { right: auto; width: 44px; height: 44px; padding: 0; font-size: 0; border-radius: 22px; display: grid; place-items: center; }
 .ar .ar-noroute.is-folded::before { content: 'info'; font-family: 'Material Symbols Outlined'; font-size: 26px; line-height: 1; color: #fdd8b5; }
+
+/* The door's warning ("Achtung: Drehtür …"). In flow it sat under the absolute camera
+   and the manoeuvre banner, so it was drawn but invisible. Pin it above the camera, under
+   the manoeuvre banner, and below the "no route" line when that one is showing. */
+.ar > .warning {
+  position: absolute; left: 12px; right: 12px; z-index: 6; margin: 0;
+  top: calc(env(safe-area-inset-top) + 236px);
+  padding: 10px 14px; border-radius: 16px; outline: none; border-width: 3px;
+  font-size: 16px; line-height: 1.3;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.45);
+}
+.ar > .ar-noroute[hidden] ~ .warning { top: calc(max(14px, env(safe-area-inset-top)) + 176px); }
+.ar.dim > .warning, html[data-contrast='high'] .ar > .warning { font-size: 20px; }
+.ar > .warning p { margin: 0; }

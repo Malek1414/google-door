@@ -126,6 +126,11 @@ describe('guide screen: through, no direction, safety line', () => {
     expect(guideLayout(view({ distanceM: 5, instruction: 'Leicht links 5 Meter' }), 'de').instruction).toBe('Leicht links')
     expect(guideLayout(view({ distanceM: 1, instruction: 'Die Tür ist direkt vor dir.' }), 'de').instruction).toBe('Die Tür ist direkt vor dir.')
     expect(guideLayout(view({ distanceM: null, instruction: 'Geradeaus' }), 'de').instruction).toBe('Geradeaus')
+    // The spoken metres lag the live distance: a stale "5 Meter" under a big "3 Meter" is dropped too.
+    expect(guideLayout(view({ distanceM: 3, instruction: 'Leicht links 5 Meter' }), 'de').instruction).toBe('Leicht links')
+    expect(guideLayout(view({ distanceM: 3, instruction: '5 Meter' }), 'de').instruction).toBe('')
+    expect(guideLayout(view({ distanceM: 3, instruction: 'Geradeaus Ein Meter.' }), 'de').instruction).toBe('Geradeaus')
+    expect(guideLayout(view({ distanceM: 3, instruction: 'Slightly left 8 metres' }), 'en').instruction).toBe('Slightly left')
   })
   it('no direction after the start: no arrow, the engine line is the text', () => {
     const v = view({ relBearingDeg: null, source: null, distanceM: null, instruction: noDirectionLine('de') })

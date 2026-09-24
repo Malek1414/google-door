@@ -25,3 +25,12 @@ export function doorName(e: Entrance, origin: LatLon, buildings: Building[] = []
   }
   return t.doorToward(kind, t.compass[sector(bearingDeg(origin, e))])
 }
+
+/**
+ * The name used on the way to one chosen door: card, Live View, arrival, approach. Stable
+ * (it never changes as the user walks, unlike doorName's "Richtung …"), so every screen and
+ * every spoken line call the door the same thing: its name, else its kind ("Nebeneingang").
+ */
+export function pathDoorName(e: Pick<Entrance, 'name' | 'kind'>): string {
+  return e.name?.trim() || doorKindName(e)
+}

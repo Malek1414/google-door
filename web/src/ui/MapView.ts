@@ -34,6 +34,7 @@ import { openSearchScreen } from './SearchScreen'
 import { exploreFeed } from './ExploreFeed'
 import { t } from '../strings'
 import { h, mount, s } from './dom'
+import { pathDoorName } from './doorName'
 
 const DEFAULT_CENTER: LatLon = { lat: 52.5251, lon: 13.3694 } // Berlin Hauptbahnhof
 const BASE_PIN = 32
@@ -662,7 +663,7 @@ export function MapView(opts: {
         'button',
         { class: `gm-row door-${markerKind(e)}`, type: 'button', onclick: () => openEntrance(e) },
         h('span', { class: 'gm-row-shape', 'aria-hidden': 'true' }),
-        h('span', { class: 'gm-row-text' }, h('span', { class: 'gm-row-title' }, e.name ?? t.unnamedEntrance), h('span', { class: 'gm-row-meta' }, meta)),
+        h('span', { class: 'gm-row-text' }, h('span', { class: 'gm-row-title' }, pathDoorName(e)), h('span', { class: 'gm-row-meta' }, meta)),
       ),
     )
   }
@@ -780,7 +781,7 @@ export function MapView(opts: {
       const m = new google.maps.Marker({
         map,
         position: { lat: e.lat, lng: e.lon },
-        title: `${e.name ?? t.unnamedEntrance}, ${stepFreeLabel(e.stepFree)}`,
+        title: `${pathDoorName(e)}, ${stepFreeLabel(e.stepFree)}`,
         // 40x42 artwork: anchor at the pin TIP, not its centre, or every door sits
         // half a pin north of where it actually is.
         icon: {
@@ -834,7 +835,7 @@ export function MapView(opts: {
   async function share(e: Entrance) {
     const url = `${location.origin}${location.pathname}?door=${encodeURIComponent(e.id)}`
     try {
-      if (navigator.share) await navigator.share({ title: e.name ?? t.unnamedEntrance, url })
+      if (navigator.share) await navigator.share({ title: pathDoorName(e), url })
       else {
         await navigator.clipboard.writeText(url)
         announce(t.copied)
@@ -1087,7 +1088,7 @@ export function MapView(opts: {
 
   /** Door cards still call this with an Entrance. */
   function drawRouteToEntrance(e: Entrance) {
-    void drawRoute({ lat: e.lat, lon: e.lon }, e.name ?? t.unnamedEntrance, e)
+    void drawRoute({ lat: e.lat, lon: e.lon }, pathDoorName(e), e)
   }
 
 

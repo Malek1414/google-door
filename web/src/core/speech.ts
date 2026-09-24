@@ -87,6 +87,17 @@ export function stopSpeech(): void {
 /** /api/speak gets this long before the device voice takes over (the server retries 429 for a minute). */
 export const API_SPEAK_TIMEOUT_MS = 2000
 
+/**
+ * After /api/speak failed (429/5xx, timeout, offline) the device voice speaks straight away
+ * for this long: with the TTS quota out, every line would otherwise wait the full timeout.
+ */
+export const API_SPEAK_BACKOFF_MS = 5 * 60_000
+let apiDownUntil = 0
+/** Tests: forget a remembered /api/speak failure. */
+export function resetSpeakBackoff(): void {
+  apiDownUntil = 0
+}
+
 /** Distances are spoken from a fixed ladder of clips; pick the nearest one we have. */
 const DISTANCE_STEPS = [5, 10, 15, 20, 30, 40, 50, 75, 100]
 export function distanceKey(m: number): ClipKey | null {
@@ -115,9 +126,10 @@ export async function say(key: ClipKey | null, text: string, apiBase = '', opts:
       /* fall through */
     }
   }
-  const abort = typeof AbortController === 'undefined' ? null : new AbortController()
+  const apiDown = Date.now() < apiDownUntil
+  const abort = apiDown || typeof AbortController === 'undefined' ? null : new AbortController()
   const timer = abort ? setTimeout(() => abort.abort(), opts.apiTimeoutMs ?? API_SPEAK_TIMEOUT_MS) : null
-  try {
+  if (!apiDown) try {
     const r = await fetch(`${apiBase}/api/speak`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -131,8 +143,10 @@ export async function say(key: ClipKey | null, text: string, apiBase = '', opts:
       play(buf)
       return 'api'
     }
+    if (!r.ok) apiDownUntil = Date.now() + API_SPEAK_BACKOFF_MS
   } catch {
     /* timeout, offline, quota: fall through */
+    apiDownUntil = Date.now() + API_SPEAK_BACKOFF_MS
   } finally {
     if (timer !== null) clearTimeout(timer)
   }

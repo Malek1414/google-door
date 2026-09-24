@@ -11,3 +11,5 @@ web/config.js
 web/drag.png
 ios/Doorway.xcodeproj/
 ios/build/
+# e2e screenshots are regenerated on every run
+web/e2e/out/approach-*.png

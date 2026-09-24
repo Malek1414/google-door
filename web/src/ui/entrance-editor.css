@@ -1,7 +1,8 @@
 /* Entrance editor, Google Maps edit-form look inside the dark sheet (.gm tokens). */
 .ee { display: flex; flex-direction: column; gap: 14px; padding-bottom: 16px; }
 .ee-hint { margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--tonal, #063c40); color: var(--tonal-ink, #cdeef0); font-weight: 500; }
-.ee-hint-live { background: #FFD60A; color: #000; }
+/* "Live" hint: a caution, so the warning colour carries the icon, not the whole chip. */
+.ee-hint-live { background: #3a3326; color: #fdd663; }
 .ee-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .ee-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .ee-label { font-size: 14px; font-weight: 500; color: var(--fg2, #c9c5ca); }

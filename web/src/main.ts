@@ -8,6 +8,9 @@ import { loadTrack, Recorder, replaySensors } from './sim/replay'
 import { t } from './strings'
 import { h, mount } from './ui/dom'
 import { LiveView, realSensors, applyContrast } from './ui/LiveView'
+import { Approach } from './ui/Approach'
+import type { ApproachMode } from './ui/approachPort'
+import type { Entrance } from './core/types'
 import { MapView } from './ui/MapView'
 import { Onboard } from './ui/Onboard'
 import { Start } from './ui/Start'
@@ -78,7 +81,25 @@ function showMap(p: Profile) {
 }
 
 function showLive(target: ArrowTarget, p: Profile) {
-  LiveView({ target, sensors: realSensors(), config: outputFor(p), onExit: () => showMap(p) })
+  LiveView({
+    target,
+    sensors: realSensors(),
+    config: outputFor(p),
+    onExit: () => showMap(p),
+    profile: p,
+    onApproach: (mode) => showApproach(target.entrance, p, mode),
+  })
+}
+
+function showApproach(door: Entrance, p: Profile, mode: ApproachMode) {
+  Approach({ door, mode, config: outputFor(p), onExit: () => showMap(p) })
+}
+
+/** ?approach=demo (guidance, scripted engine) or ?approach=check (wheelchair verdict), straight in. */
+async function startApproachDemo(p: Profile, mode: ApproachMode) {
+  const door = await findEntrance(params.door)
+  if (!door) return fatal(`Door ${params.door} not found in data.`)
+  showApproach(door, p, mode)
 }
 
 async function startSim(p: Profile) {
@@ -94,11 +115,17 @@ async function startSim(p: Profile) {
       config: output(),
       onExit: () => showMap(p),
       onReplay: run,
+      profile: p,
+      onApproach: (mode) => showApproach(target.entrance, p, mode),
     })
   run()
 }
 
-if (params.record) {
+const approachParam = new URLSearchParams(location.search).get('approach')
+if (approachParam === 'demo' || approachParam === 'check') {
+  const p = session.profile ?? DEFAULT_PROFILE
+  void startApproachDemo(p, approachParam === 'check' ? 'check' : 'guide').catch((e) => fatal(String(e)))
+} else if (params.record) {
   Start({ sim: false, onDone: () => Recorder() })
 } else if (params.sim) {
   Start({ sim: true, onDone: () => withProfile((p) => void startSim(p).catch((e) => fatal(String(e)))) })

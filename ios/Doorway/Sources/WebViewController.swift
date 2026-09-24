@@ -19,12 +19,14 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
     ///
     /// A public tunnel leads because it is the only address that survives leaving the
     /// flat: the phone's Tailscale has been offline for months and a LAN address only
-    /// works on one network. Override at launch with -DoorwayURL <url>.
+    /// works on one network. The hostname is fixed now — serveo grants a named host
+    /// under serveousercontent.com without registration — so it survives reconnects.
+    /// Override at launch with -DoorwayURL <url>.
     /// The Mac on the local network. Also the host asked for the current tunnel address.
     private static let lanBase = "http://192.168.12.158:8090"
 
     private static let candidates: [String] = [
-        "https://2a3e4c389410a5b2-83-135-183-58.serveousercontent.com",
+        "https://doorway.serveousercontent.com",
         lanBase + "/",
     ]
 

@@ -196,7 +196,10 @@ export function nextManeuver(remainingM: number, route: Route, tailM = 0): NextM
     const d = steps[i].distanceM ?? 0
     // i === 0 takes whatever is left: path and step lengths never sum exactly.
     if (left <= d || i === 0) {
-      const next = steps[i + 1] ?? null
+      // The Routes API often ends with a step that has no text and no manoeuvre: that is
+      // arriving, not a turn ("In 50 m Ziel erreichen" with 240 m left).
+      const after = steps[i + 1] ?? null
+      const next = after && (after.text || after.maneuver) ? after : null
       return { step: next, toManeuverM: next ? left : Math.max(0, remainingM), walking: i }
     }
     left -= d

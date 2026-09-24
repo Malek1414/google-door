@@ -29,3 +29,18 @@ Exit code = number of failed steps.
 - `APPROACH_DEMO=1` opens `?approach=demo` / `?approach=check` directly (scripted demo engine, for selectors only). Checks that need door-fix calls or the real no-direction timing print `SKIP` with the reason and do not count as failures.
 
 Screenshots in `e2e/out/approach-*.png`. Exit code = number of failed checks.
+
+# e2e route regression (Malek's e21a687)
+
+`node e2e/route.mjs [baseUrl]` (default `https://localhost:5173/`). Same Chrome and `playwright-core` as the smoke test. Phone viewport 402x874, touch, de-DE, geolocation Berlin Hbf. Each scenario gets a fresh browser context.
+
+- `mock`: `/api/route` answers a recorded Routes response (re-anchored onto the tapped door). Door card → Route: a blue multi-point line on the map (every `google.maps.Polyline` is recorded page-side), "N Min. · X m" in the sheet, Start in slot 1, the steps list. Then a location tick plus a map pan that reloads `/api/entrances`: the preview must survive. Then "Andere Türen" → Kaffee chip → a Google POI → Route: the request goes to the POI, the preview survives a tick + reload again, and Start (slot 1) never opens guidance to the door routed to before.
+- `slot`: wheelchair profile, a door the card says cannot be guided to: Start stays in slot 1, disabled (`aria-disabled="true"`), tapping it does nothing.
+- `retry`: POI route fails once (quota) with the browser Routes library blocked: German reason plus "Erneut versuchen"; the retry draws the route, and the preview survives tick + reload with neither `selected` nor `placeOpen` set.
+- `real`: no mocks, against the running backend (server proxy or the Maps JS fallback): a real line, duration and distance; "Route entfernen" clears line and sheet.
+- `503` / `503js`: `/api/route` 503 `not_configured`, with and without the browser Routes library: never "Ungefähr in diese Richtung"; blocked → visible German reason, no line; allowed → a real route or a reason.
+- `429`: `?sim=1` → arrival → "Zum Eingang führen"; `/api/door-fix` answers 429 twice, then 200: door-fix keeps being asked and the arrow appears.
+
+Checks that depend on UI still being built print `PENDING` with the reason when the feature is absent from the DOM; present but wrong is a `FAIL`. `ROUTE_ONLY=mock,slot` runs a subset. `ROUTE_ASSETS_FROM=https://localhost:5199` serves every non-API file from an older build under the same origin (the Maps key is referrer-locked), to prove the checks catch the old bugs. Screenshots in `e2e/out/route-*.png`. Exit code = number of FAILs.
+
+Unit side: `test/route-regression.test.ts` (client: German reasons, Maps JS fallback, no invented lines, cache keyed on the target, walking the recorded route) and `test/route-server.test.ts` (Python via vitest: polyline decode, `/api/route` 503 without a key, 401 as `auth`, `/api/door-fix` riding out 429/503; skipped when fastapi/httpx/pydantic are missing, `DOORWAY_PYTHON` picks the interpreter).

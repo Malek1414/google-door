@@ -24,6 +24,7 @@ import { h, mount, s } from './dom'
 import './arrival.css'
 import { APPROACH_TRIGGER, approachModeFor, type ApproachMode } from './approachPort'
 import './approach.css'
+import { pathDoorName } from './doorName'
 
 export interface Fix {
   lat: number
@@ -257,7 +258,7 @@ export function LiveView(opts: {
   const { target, config: cfg } = opts
   const e = target.entrance
   applyContrast(cfg.contrast)
-  const name = e.name ?? t.unnamedEntrance
+  const name = pathDoorName(e)
 
   // ---- DOM ----
   let mediaEl: HTMLVideoElement | HTMLImageElement | null = null

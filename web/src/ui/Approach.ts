@@ -15,7 +15,7 @@ import { metresLine, safetyLine } from '../core/instruct'
 import type { OutputConfig } from '../core/profile'
 import type { Entrance } from '../core/types'
 import { announce, keepScreenOn, session } from '../session'
-import { lang, t } from '../strings'
+import { lang } from '../strings'
 import { engine, type ApproachMode, type ApproachView } from './approachPort'
 import { playInstruction, playLine, preloadClips, reportMissingClips, stopLines } from './clips'
 import { checkDoor, runDoorCheckOnce, verdictNote, verdictRows } from './doorCheck'
@@ -23,6 +23,7 @@ import { h, mount, s } from './dom'
 import { grabFrame } from './LiveView'
 import { SteadyAngle } from './arrowSteady'
 import './approach.css'
+import { pathDoorName } from './doorName'
 
 // Screen chrome only. Everything spoken during guidance comes from the engine
 // (core/instruct.ts); the verdict rows come from doorCheck.verdictRows.
@@ -198,7 +199,7 @@ function shell(title: string, onExit: () => void) {
 }
 
 function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () => void }): () => void {
-  const name = opts.door.name ?? t.unnamedEntrance
+  const name = pathDoorName(opts.door)
   const { root, cam } = shell(`${AP.title}: ${name}`, () => exit())
   root.classList.add('apr-guide')
 
@@ -357,7 +358,7 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
 export const AIM_DELAY_MS = 1500
 
 function DoorCheckScreen(opts: { door: Entrance; config: OutputConfig; onExit: () => void }): () => void {
-  const name = opts.door.name ?? t.unnamedEntrance
+  const name = pathDoorName(opts.door)
   const { root, cam } = shell(`${AP.checkTitle}: ${name}`, () => exit())
   root.classList.add('apr-check')
   const status = h('p', { class: 'apr-status', role: 'status' }, AP.aim)

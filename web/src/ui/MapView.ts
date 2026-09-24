@@ -1051,7 +1051,7 @@ export function MapView(opts: {
     if (e.stepFree === true) tips.push(t.tipStepFree)
     if (e.stepFree === false) tips.push(t.tipNotStepFree)
     if (e.door) tips.push(`${t.door[e.door] ?? e.door}${e.automatic ? `, ${t.automatic}` : ''}.`)
-    for (const w of e.warnings) tips.push(t.warning[w] ?? w)
+    // Warnings are not tips: they sit right under the actions (warningsBlock), once.
     if (e.approachBearing !== null) tips.push(t.faceToEnter(t.compass[Math.round(e.approachBearing / 45) % 8]))
     if (e.description) tips.unshift(e.description)
     return h(
@@ -1094,7 +1094,6 @@ export function MapView(opts: {
       { class: 'gm-tabpanel' },
       tipsCard(e),
       g.kind === 'arrow' ? null : h('p', { class: 'reason' }, reasonText[g.reason]),
-      warningsBlock(e),
       h(
         'ul',
         { class: 'gm-facts' },
@@ -1146,7 +1145,10 @@ export function MapView(opts: {
       }),
     )
 
-    showCard(e, cardHead(e.name ?? t.unnamedEntrance, e), h('p', { class: 'gm-sheet-sub' }, [stepFreeLabel(e.stepFree), t.metresShort(haversineM(origin(), e)), b?.name ?? b?.addr ?? null].filter(Boolean).join(' · ')), pills, streetView(e), tabs, ...panels)
+    // A revolving door or steps decide whether this door works at all for a wheelchair:
+    // named in the subtitle and shown right under the actions, above the fold.
+    const warnShort = e.warnings.map((w) => (t.warning[w] ?? w).split('.')[0])
+    showCard(e, cardHead(e.name ?? t.unnamedEntrance, e), h('p', { class: 'gm-sheet-sub' }, [stepFreeLabel(e.stepFree), ...warnShort, t.metresShort(haversineM(origin(), e)), b?.name ?? b?.addr ?? null].filter(Boolean).join(' · ')), pills, warningsBlock(e), streetView(e), tabs, ...panels)
   }
 
   function openBuilding(b: Building) {

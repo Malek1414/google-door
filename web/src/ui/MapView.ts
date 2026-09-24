@@ -1114,14 +1114,21 @@ export function MapView(opts: {
     map?.panTo({ lat: e.lat, lng: e.lon })
 
     const start = () => beginGuidance(e)
-    viewBtn.hidden = g.kind !== 'arrow'
+    // The card's own View pill is the one way in; a second floating View button beside
+    // it read as two different features. viewBtn stays as the Lens shortcut's target.
+    viewBtn.hidden = true
     viewBtn.onclick = () => void start()
 
+    // Like Maps' Directions/Start: one filled Google-blue action leads the row. For a
+    // door that can carry guidance it is View, and one tap opens the guidance itself.
+    const canGuide = g.kind === 'arrow'
     const pills = h(
       'div',
       { class: 'gm-actions' },
-      h('button', { class: 'gm-pill gm-pill-primary', type: 'button', onclick: () => drawRouteToEntrance(e) }, icon('assistant_direction', true), t.route),
-      g.kind === 'arrow' ? h('button', { class: 'gm-pill', type: 'button', onclick: () => void start() }, icon('navigation', true), t.guideMe) : null,
+      canGuide
+        ? h('button', { class: 'gm-pill gm-pill-view', type: 'button', 'aria-label': 'Live View zum Eingang starten', style: 'background:#1a73e8;color:#fff;min-height:48px', onclick: () => void start() }, icon('view_in_ar', true), t.view)
+        : null,
+      h('button', { class: canGuide ? 'gm-pill' : 'gm-pill gm-pill-primary', type: 'button', onclick: () => drawRouteToEntrance(e) }, icon('assistant_direction', true), t.route),
       h('button', { class: 'gm-pill', type: 'button', onclick: () => void share(e) }, icon('ios_share'), t.share),
     )
 

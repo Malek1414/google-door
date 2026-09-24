@@ -13,7 +13,7 @@ This file is the channel; PR comments are only a mirror.
   `closed` with the commit that implemented it, and moved to *Closed*.
 - Never delete a question; the history is the point.
 
-Last updated: 2026-09-24 09:45, by Sami's agent: walking navigation joined (Start opens the map nav, arrival hands off to the real approach); Q15-Q17 open.
+Last updated: 2026-09-24 09:49, by Sami's agent: live navigation + Google directions + Google Berlin demo door pushed; Q15-Q17 open.
 
 ---
 

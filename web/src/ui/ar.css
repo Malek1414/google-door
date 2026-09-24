@@ -6,32 +6,43 @@
 .ar-cam { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .ar-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 
-/* ── top controls: two 56px circles, right aligned, below the notch ── */
-.ar-top { position: absolute; top: max(14px, env(safe-area-inset-top)); right: 16px; z-index: 5;
-  display: flex; gap: 14px; }
-.ar-round { width: 56px; height: 56px; border-radius: 50%; border: 0; display: grid; place-items: center;
-  background: rgb(32 33 36 / 0.82); color: #fff; cursor: pointer;
-  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+/* ── top bar: close left, sound right, 48 px circles, below the notch ── */
+.ar-top { position: absolute; top: max(14px, env(safe-area-inset-top)); left: 16px; right: 16px; z-index: 5;
+  display: flex; justify-content: space-between; align-items: center; pointer-events: none; }
+.ar-top > * { pointer-events: auto; }
+.ar-round { width: 48px; height: 48px; border-radius: 50%; border: 0; display: grid; place-items: center;
+  background: #202124; color: #fff; cursor: pointer; box-shadow: 0 2px 6px rgb(0 0 0 / 0.4); }
 .ar-round .ms { font-size: 26px; }
-.ar-round:active { background: rgb(60 64 67 / 0.9); }
+.ar-round:active { background: #3c4043; }
+.ar .ar-top .mute-btn { position: static; min-width: 0; min-height: 0; width: 48px; height: 48px; padding: 0;
+  border-radius: 50%; justify-content: center; }
+.ar .ar-top .mute-btn[aria-pressed='true'] { background: #fff; color: #202124; }
 
-/* ── scanning: instruction at the top, animated glyph, pill at the bottom ── */
-.ar-scan-text { position: absolute; top: 96px; left: 28px; right: 28px; z-index: 4;
-  text-align: center; font-size: 15px; line-height: 1.35; font-weight: 500;
-  text-shadow: 0 1px 6px rgb(0 0 0 / 0.75); }
-.ar-scan-art { position: absolute; top: 30%; left: 50%; transform: translateX(-50%); z-index: 4;
-  width: 180px; opacity: 0.96; }
-.ar-pill { position: absolute; left: 50%; transform: translateX(-50%); z-index: 5;
-  top: 46%; padding: 7px 18px; border-radius: 999px; font-size: 14px; font-weight: 600;
-  background: rgb(32 33 36 / 0.88); color: #fff; white-space: nowrap;
-  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
-.ar-pill-ready { background: #a7e2e6; color: #00363a; }
-.ar-follow { position: absolute; left: 24px; bottom: 148px; z-index: 5;
-  font-size: 19px; font-weight: 600; text-shadow: 0 1px 8px rgb(0 0 0 / 0.8); }
+/* ── the one instruction line: solid plate, fixed place, room for two lines so a longer
+   route step never pushes anything (24 px, white on #202124 is 16:1) ── */
+.ar-instr { position: absolute; left: 16px; right: 16px; z-index: 5; margin: 0;
+  top: calc(max(14px, env(safe-area-inset-top)) + 60px);
+  box-sizing: border-box; min-height: 88px; padding: 14px 18px; border-radius: 20px;
+  display: flex; align-items: center; gap: 14px;
+  background: #202124; color: #fff; box-shadow: 0 4px 16px rgb(0 0 0 / 0.45);
+  font: 600 24px/1.25 'Google Sans Flex', Roboto, -apple-system, sans-serif; }
+.ar-instr-ic { font-size: 34px; color: #8ab4f8; flex: none; } /* 8.3:1 on #202124 */
+.ar-instr-t { min-width: 0; overflow-wrap: anywhere; }
+.ar.dim .ar-instr, html[data-contrast='high'] .ar-instr { font-size: 28px; }
 
-/* the scanning glyph sweeps, like Google's lottie */
-@keyframes ar-sweep { 0%,100% { transform: translateX(-50%) rotate(-7deg) } 50% { transform: translateX(-50%) rotate(7deg) } }
-.ar-scan-art { animation: ar-sweep 2.6s ease-in-out infinite; }
+/* ── status strip: directly under the instruction line, stacked, never over the arrow ── */
+.ar-status { position: absolute; left: 16px; right: 16px; z-index: 5;
+  top: calc(max(14px, env(safe-area-inset-top)) + 156px);
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px; pointer-events: none; }
+.ar-status > * { pointer-events: auto; }
+.ar .ar-status > .ar-noroute, .ar .ar-status > .warning, .ar .ar-status > .ar-safe, .ar .ar-status > .ar-look-out {
+  position: static; box-sizing: border-box; width: 100%; margin: 0; padding: 8px 12px; border-radius: 12px;
+  font: 500 16px/1.3 'Google Sans Flex', Roboto, -apple-system, sans-serif; box-shadow: 0 2px 8px rgb(0 0 0 / 0.4); }
+.ar .ar-status > [hidden] { display: none; }
+.ar .ar-status > .ar-safe, .ar .ar-status > .ar-look-out { background: #202124; color: #fff; }
+.ar .ar-status > .ar-look-out:empty { display: none; }
+.ar .ar-status > .warning p { margin: 0; }
+.ar .ar-status > .ar-noroute.is-folded { width: 44px; height: 44px; padding: 0; font-size: 0; }
 
 /* ── chevrons ── */
 .ar-stack, .ar-pin { filter: drop-shadow(0 4px 10px rgb(0 0 0 / 0.35)); }
@@ -40,26 +51,36 @@
 .ar-chev[data-i='1'] { animation-delay: 0.18s }
 .ar-chev[data-i='2'] { animation-delay: 0.36s }
 
-/* ── destination strip: pin left, distance under it, name to the right ── */
+/* ── the one door card: distance left, full name (wraps, no ellipsis), eye button right ── */
 .ar-dest { position: absolute; left: 12px; right: 12px; bottom: max(14px, env(safe-area-inset-bottom));
-  z-index: 5; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 18px;
-  padding: 14px 20px; border-radius: 22px; background: rgb(32 33 36 / 0.78);
-  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
+  z-index: 5; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px 16px;
+  padding: 14px 14px 14px 18px; border-radius: 22px; background: #202124; color: #fff;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.45); }
 .ar-dest-pin { display: grid; justify-items: center; gap: 2px; }
-.ar-dest-pin .ms { font-size: 30px; }
-.ar-dest-m { font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.ar-dest-name { font-size: 21px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ar-dest-pin .ms { font-size: 28px; color: #f28b82; } /* 6.6:1 on #202124 */
+.ar-dest-m { font-size: 16px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ar-dest-body { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.ar-dest-name { font-size: 20px; line-height: 1.25; font-weight: 600; overflow-wrap: anywhere; }
+.ar .ar-dest .ar-meta { position: static; font-size: 15px; color: #dadce0; text-shadow: none; background: none; padding: 0; }
+.ar .ar-dest .ar-meta:empty { display: none; }
+.ar .ar-dest .ar-look { position: static; width: 48px; height: 48px; padding: 0; border-radius: 50%;
+  border: 1px solid #5f6368; background: #303134; color: #a8c7fa; display: grid; place-items: center; cursor: pointer; }
+.ar .ar-dest .ar-look .ms { font-size: 26px; }
+.ar .ar-dest .ar-look[aria-busy='true'] { opacity: 0.6; }
+/* The early trigger (real walks only): a quiet text button in the card, not a teal block. */
+.ar .ar-dest .ar-near { grid-column: 1 / -1; position: static; width: auto; min-height: 44px; margin: 0;
+  padding: 0 12px; justify-self: start; border: 0; border-radius: 22px; background: transparent;
+  color: #a8c7fa; font: 600 17px/1 'Google Sans Flex', Roboto, sans-serif; box-shadow: none; }
+.ar .ar-dest .ar-near[hidden] { display: none; }
+.ar-endrow { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ar-endrow:empty { display: none; }
+.ar-endrow .hint { margin: 0; }
 
-/* ── "Be safe": everything dims, warning centred ── */
-.ar-safe { position: absolute; inset: 0; z-index: 6; display: grid; place-content: center;
-  justify-items: center; gap: 8px; background: rgb(0 0 0 / 0.62);
-  animation: ar-fade 300ms ease-out; }
-@keyframes ar-fade { from { opacity: 0 } }
-.ar-safe .ms { font-size: 40px; }
-.ar-safe-t { font-size: 20px; font-weight: 600; }
-.ar-safe-s { font-size: 14px; color: #dadce0; text-align: center; max-width: 16rem; }
-.ar[data-safe='1'] .ar-stack, .ar[data-safe='1'] .ar-pin { opacity: 0.25; }
-.ar[data-safe='1'] .ar-dest { opacity: 0.35; }
+/* ── the centre: arrow OR pin, never both; 200 ms cross-fade ── */
+.ar-mark { transition: opacity 200ms ease; }
+.ar[data-mark='none'] .ar-mark, .ar[data-mark='arrow'] .ar-mark-pin, .ar[data-mark='pin'] .ar-mark-arrow { opacity: 0; }
+/* The arrival sheet takes over: arrow, pin, line and strip leave. */
+.ar.is-arrived .ar-mark, .ar.is-arrived .ar-instr, .ar.is-arrived .ar-status { visibility: hidden; }
 
 /* ── arrival card ── */
 .ar-card { position: absolute; left: 14px; right: 14px; bottom: calc(86px + env(safe-area-inset-bottom));
@@ -81,27 +102,8 @@
   align-items: center; justify-content: center; gap: 10px; cursor: pointer; }
 .ar-done:active { background: #0f4e53; }
 
-/* ── accuracy + look button, kept from our build ── */
-.ar-meta { position: absolute; left: 20px; bottom: calc(96px + env(safe-area-inset-bottom)); z-index: 5;
-  font-size: 12px; color: #dadce0; text-shadow: 0 1px 4px rgb(0 0 0 / 0.8); }
-.ar-look { position: absolute; right: 14px; bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 5;
-  height: 44px; padding: 0 18px; border-radius: 22px; border: 1px solid #5f6368;
-  background: rgb(32 33 36 / 0.82); color: #a8c7fa; font: 600 15px/1 inherit;
-  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
-  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
-.ar-look-out { position: absolute; left: 14px; right: 14px; bottom: calc(150px + env(safe-area-inset-bottom));
-  z-index: 5; padding: 12px 16px; border-radius: 14px; background: rgb(32 33 36 / 0.88); font-size: 15px;
-  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
-.ar-look-out:empty { display: none; }
-
-/* ── "Zum Eingang führen" in the panel, from 25 m in (same pill as the arrival card) ── */
-.ar .ar-near { position: absolute; left: 14px; right: 14px; width: auto; z-index: 5;
-  bottom: calc(96px + env(safe-area-inset-bottom)); min-height: 64px; font-size: 20px; }
-.ar[data-near='1'] .ar-look { bottom: calc(172px + env(safe-area-inset-bottom)); }
-.ar[data-near='1'] .ar-look-out { bottom: calc(226px + env(safe-area-inset-bottom)); }
-.ar[data-near='1'] .ar-meta { display: none; }
-
 @media (prefers-reduced-motion: reduce) {
-  .ar-chev, .ar-scan-art { animation: none !important; }
-  .ar-card, .ar-safe { animation-duration: 0.01ms !important; }
+  .ar-chev { animation: none !important; }
+  .ar-card { animation-duration: 0.01ms !important; }
+  .ar-mark { transition: none; }
 }

@@ -39,32 +39,6 @@
 .nav-exit:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 
 
-/* Manoeuvre banner: the card Maps puts at the top of a navigation screen.
-   Sits under the round buttons, above everything the camera shows. */
-.ar-man {
-  /* --top belongs to .gm; the AR screen is its own root, so measure from the same
-     safe-area expression .ar-top uses and clear the two round buttons under it. */
-  position: absolute; left: 12px; right: 12px; z-index: 6;
-  top: calc(max(14px, env(safe-area-inset-top)) + 68px);
-  display: flex; align-items: center; gap: 14px;
-  padding: 14px 18px; border-radius: 22px;
-  background: rgb(26 28 31 / 0.94);
-  box-shadow: 0 4px 16px rgb(0 0 0 / 0.45);
-  backdrop-filter: blur(12px);
-}
-.ar-man-ic { font-size: 40px; color: #8ab4f8; flex: none; }
-.ar-man-body { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
-.ar-man-d { font-size: 15px; font-weight: 500; color: #9aa0a6; }
-/* Two lines, then clip. A walking instruction is a street name and a direction and
-   truncating it to "Auf Heidestrasse nach Sueden Ric..." loses the half that matters. */
-.ar-man-t {
-  font-size: 24px; font-weight: 500; color: #fff;
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
-  overflow: hidden;
-}
-/* Large-visuals profile: the banner is the thing a partially-sighted user reads first. */
-.ar.dim .ar-man-t, html[data-contrast='high'] .ar-man-t { font-size: 28px; }
-
 /* a11y #36: a focus ring that survives any camera image */
 .ar-round:focus-visible, .ar-look:focus-visible { outline: 3px solid #fff; outline-offset: 2px; box-shadow: 0 0 0 6px #000; }
 
@@ -86,30 +60,10 @@ body:has(section.apr) .health-banner { display: none; }
 .mute-btn .ms { font-size: 26px; }
 .mute-btn[aria-pressed='true'] { background: #fff; color: #202124; }
 .mute-btn:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
-.ar .mute-btn { left: 16px; }
 .apr .mute-btn { right: 16px; }
-
-/* Route note: one compact strip right under the top buttons, clear of the arrow. */
-.ar .ar-noroute { top: calc(max(14px, env(safe-area-inset-top)) + 66px); padding: 8px 12px; font-size: 16px; line-height: 1.3; }
-/* GPS accuracy (shown only when worse than 10 m): white on a dark chip, >= 7:1, 16 px. */
-.ar .ar-meta:not(:empty) { font-size: 16px; color: #fff; background: rgb(32 33 36 / 0.9); padding: 4px 10px; border-radius: 12px; width: fit-content; }
 
 /* The route note folds into a 44 px info button after 8 s; tap to read it again. */
 .ar button.ar-noroute { text-align: left; border: 0; min-height: 44px; cursor: pointer; }
 .ar button.ar-noroute:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 .ar .ar-noroute.is-folded { right: auto; width: 44px; height: 44px; padding: 0; font-size: 0; border-radius: 22px; display: grid; place-items: center; }
 .ar .ar-noroute.is-folded::before { content: 'info'; font-family: 'Material Symbols Outlined'; font-size: 26px; line-height: 1; color: #fdd8b5; }
-
-/* The door's warning ("Achtung: Drehtür …"). In flow it sat under the absolute camera
-   and the manoeuvre banner, so it was drawn but invisible. Pin it above the camera, under
-   the manoeuvre banner, and below the "no route" line when that one is showing. */
-.ar > .warning {
-  position: absolute; left: 12px; right: 12px; z-index: 6; margin: 0;
-  top: calc(env(safe-area-inset-top) + 236px);
-  padding: 10px 14px; border-radius: 16px; outline: none; border-width: 3px;
-  font-size: 16px; line-height: 1.3;
-  box-shadow: 0 4px 16px rgb(0 0 0 / 0.45);
-}
-.ar > .ar-noroute[hidden] ~ .warning { top: calc(max(14px, env(safe-area-inset-top)) + 176px); }
-.ar.dim > .warning, html[data-contrast='high'] .ar > .warning { font-size: 20px; }
-.ar > .warning p { margin: 0; }

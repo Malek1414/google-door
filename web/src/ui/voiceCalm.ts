@@ -114,10 +114,14 @@ import { lang } from '../strings'
 import { h } from './dom'
 
 /** "Ton aus" toggle, aria-pressed = muted. Big (56 px) for one thumb. `onChange` stops what is sounding. */
-export function muteButton(onChange: (muted: boolean) => void, cls = ''): HTMLButtonElement {
+export function muteButton(onChange: (muted: boolean) => void, cls = '', iconOnly = false): HTMLButtonElement {
   const label = lang === 'de' ? 'Ton aus' : 'Sound off'
   const ic = h('span', { class: 'ms', 'aria-hidden': 'true' }, isMuted() ? 'volume_off' : 'volume_up')
-  const b = h('button', { class: `mute-btn ${cls}`.trim(), type: 'button', 'aria-pressed': String(isMuted()) }, ic, h('span', { class: 'mute-t' }, label)) as HTMLButtonElement
+  // Icon only (Live View top bar): the name moves to aria-label and stays fixed; the
+  // state is aria-pressed, so VoiceOver says "Ton aus, Taste, ausgewählt" when muted.
+  const b = (iconOnly
+    ? h('button', { class: `mute-btn ${cls}`.trim(), type: 'button', 'aria-pressed': String(isMuted()), 'aria-label': label }, ic)
+    : h('button', { class: `mute-btn ${cls}`.trim(), type: 'button', 'aria-pressed': String(isMuted()) }, ic, h('span', { class: 'mute-t' }, label))) as HTMLButtonElement
   b.addEventListener('click', () => {
     const on = !isMuted()
     setMuted(on)

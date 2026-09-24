@@ -63,6 +63,14 @@ export const LEAVE_M = 8
 export const ARRIVAL_CARD_DELAY_MS = 1500
 /** The red Maps pin takes over from the chevrons this close in, as Google's does. */
 export const APPROACH_PIN_M = 25
+/** The red pin takes the arrow's place only this close in (and on arrival). Never both. */
+export const PIN_SWAP_M = 3
+
+/** Pure. Arrow or pin in the centre? With 1 m hysteresis so a jittering fix does not flip it. */
+export function centreMark(distM: number, pinShown: boolean): 'arrow' | 'pin' {
+  if (!Number.isFinite(distM)) return pinShown ? 'pin' : 'arrow'
+  return distM <= (pinShown ? PIN_SWAP_M + 1 : PIN_SWAP_M) ? 'pin' : 'arrow'
+}
 
 /**
  * Pure. Is "Zum Eingang führen" offered in the Live View panel? From APPROACH_PIN_M in,
@@ -308,65 +316,51 @@ export function LiveView(opts: {
     mediaEl = h('img', { class: 'cam', src: opts.sensors.media.url, alt: '', 'aria-hidden': 'true' }) as HTMLImageElement
   }
 
-  // ── Live View, measured from a Google Maps Live View recording ─────────────
-  // Phases: scanning -> ready -> guiding -> approach -> arrived.
-  // Chevrons are extruded solids (see ui/ar.ts); the red pin replaces them close in.
+  // ── Live View, Google Maps calm: one arrow (or the pin), one sentence, one card ──
+  // Everything mounts at once in its final place; only its text changes afterwards.
+  // Fixed layout, top to bottom (also the VoiceOver order): close, sound, the instruction
+  // line, the one-line status strip, the door card. The centre holds the arrow OR the pin.
   const stack = chevronStack()
   const stackG = s('g', { class: 'ar-stack-wrap' }, stack)
-  const pinG = s('g', { class: 'ar-pin-wrap', visibility: 'hidden' }, destinationPin())
+  const pinG = s('g', { class: 'ar-pin-wrap' }, destinationPin())
+  pinG.setAttribute('transform', stackTransform(0, 393, 760).replace(/ rotate\([^)]*\)/, ''))
   const coneG = s('g', { class: 'cone' })
-  const svg = s('svg', { class: 'ar-svg', viewBox: '0 0 393 760', preserveAspectRatio: 'xMidYMid slice', 'aria-hidden': 'true' }, coneG, stackG, pinG)
+  // The outer groups carry the cross-fade (CSS opacity); stackG keeps its own opacity for poor GPS.
+  const svg = s('svg', { class: 'ar-svg', viewBox: '0 0 393 760', preserveAspectRatio: 'xMidYMid slice', 'aria-hidden': 'true' },
+    coneG, s('g', { class: 'ar-mark ar-mark-arrow' }, stackG), s('g', { class: 'ar-mark ar-mark-pin' }, pinG))
 
   const ms = (n: string) => h('span', { class: 'ms', 'aria-hidden': 'true' }, n)
 
-  // scanning
-  const scanText = h('p', { class: 'ar-scan-text' }, t.arScan ?? 'Richte die Kamera auf Gebäude, Geschäfte und Schilder um dich herum.')
-  const scanArt = s('svg', { class: 'ar-scan-art', viewBox: '0 0 120 120', 'aria-hidden': 'true' },
-    s('rect', { x: '44', y: '18', width: '32', height: '58', rx: '6', fill: 'none', stroke: '#a8c7fa', 'stroke-width': '4' }),
-    s('rect', { x: '50', y: '26', width: '20', height: '38', rx: '2', fill: '#a8c7fa', opacity: '0.35' }),
-    s('path', { d: 'M28 92 q32 -16 64 0', fill: 'none', stroke: '#a8c7fa', 'stroke-width': '4', 'stroke-linecap': 'round' }),
-  ) as unknown as HTMLElement
-  const pill = h('div', { class: 'ar-pill' }, t.arScanning ?? 'Scanning …')
-  const follow = h('p', { class: 'ar-follow', hidden: true }, t.arFollow ?? 'Folge dem Pfeil')
+  // The one instruction line ("Geradeaus · 8 m"), at the top under the bar. dirEl is its
+  // text and what VoiceOver reads there; changes are spoken through announce(), not here.
+  const instrGlyph = h('span', { class: 'ms ar-instr-ic', 'aria-hidden': 'true' }, 'explore')
+  const dirEl = h('span', { class: 'ar-instr-t' }, t.waitingGps)
+  const instrEl = h('p', { class: 'ar-instr' }, instrGlyph, dirEl)
+  const setLine = (text: string, glyph: string) => {
+    if (dirEl.textContent !== text) dirEl.textContent = text
+    if (instrGlyph.textContent !== glyph) instrGlyph.textContent = glyph
+  }
 
-  // destination strip
+  // The door card: full name (wraps), distance, and the camera question as an eye button.
   const distEl = h('span', { class: 'ar-dest-m' }, '')
-  const dirEl = h('span', { class: 'sr-only' }, t.waitingGps)
+  const accEl = h('span', { class: 'ar-meta' }, '')
+  const lookBtn = h('button', { class: 'ar-look', type: 'button', 'aria-label': t.look }, ms('visibility'))
+  // Only when no arrival sheet can offer it (a real walk whose GPS may never reach the
+  // 3 m arrival): a quiet text button inside the card. The demo and ?sim replays always
+  // reach the sheet, and "Ja, zeig mir den Eingang" there is the single way in.
+  const approachMode = opts.onApproach ? approachModeFor(opts.profile) : null
+  const nearBtn = approachMode && !opts.sensors.replay
+    ? h('button', { class: 'apr-trigger ar-near', type: 'button', hidden: true }, APPROACH_TRIGGER)
+    : null
+  const endRow = h('div', { class: 'ar-endrow' })
   const destStrip = h('div', { class: 'ar-dest' },
     h('div', { class: 'ar-dest-pin' }, ms('location_on'), distEl),
-    h('span', { class: 'ar-dest-name' }, name),
+    h('div', { class: 'ar-dest-body' }, h('span', { class: 'ar-dest-name' }, name), accEl),
+    lookBtn,
+    nearBtn,
+    endRow,
   )
 
-  // safety interstitial
-  const safeEl = h('div', { class: 'ar-safe', hidden: true, role: 'note' },
-    ms('warning'),
-    h('p', { class: 'ar-safe-t' }, t.arSafe ?? 'Pass auf dich auf'),
-    h('p', { class: 'ar-safe-s' }, t.arSafeSub ?? 'Achte beim Gehen auf deine Umgebung.'),
-  )
-
-  // Manoeuvre banner. Maps puts the next turn at the top of the screen and this app
-  // built it sr-only, so the one element everybody recognises from navigation was
-  // never drawn. aria-hidden: dirEl below is still the element screen readers read,
-  // so adding pixels here changes nothing that is spoken.
-  const manGlyph = h('span', { class: 'ms ar-man-ic', 'aria-hidden': 'true' }, 'straight')
-  const manDist = h('span', { class: 'ar-man-d' }, '')
-  const manText = h('span', { class: 'ar-man-t' }, '')
-  const manBanner = h(
-    'div',
-    { class: 'ar-man', hidden: true, 'aria-hidden': 'true' },
-    manGlyph,
-    h('span', { class: 'ar-man-body' }, manDist, manText),
-  )
-
-  const accEl = h('p', { class: 'ar-meta' }, '')
-  const lookOut = h('p', { class: 'ar-look-out', 'aria-live': 'polite' }, '')
-  const lookBtn = h('button', { class: 'ar-look', type: 'button' }, ms('visibility'), t.look)
-  // The last 10 metres, offered as soon as the door is close, not only after GPS says
-  // "arrived". An ordinary button: VoiceOver's own double-tap activates it.
-  const approachMode = opts.onApproach ? approachModeFor(opts.profile) : null
-  const nearBtn = approachMode
-    ? h('button', { class: 'apr-trigger ar-near', type: 'button', hidden: true }, ms('door_front'), APPROACH_TRIGGER)
-    : null
   const stopBtn = h('button', { class: 'ar-round', type: 'button', 'aria-label': t.stop }, ms('close'))
   const muteBtn = muteButton((m) => {
     if (!m) return
@@ -377,14 +371,11 @@ export function LiveView(opts: {
     } catch {
       /* ignored */
     }
-  })
-  const fbBtn = h('button', { class: 'ar-round', type: 'button', 'aria-label': t.feedback }, ms('feedback'))
-  const endRow = h('div', { class: 'ar-endrow' })
-  const turnIcon = h('span', { class: 'sr-only' }, '')
-  // Said on screen when guidance has no route: the arrow then aims straight at the
-  // door, and pretending that is a route is how people get sent into a wall.
-  // The route note: a one-line strip under the top buttons. It folds into a 44 px info
-  // button after NOTE_FOLD_MS so it never sits over the arrow; a tap unfolds it again.
+  }, 'ar-round ar-mute', true)
+
+  // The status strip: one line under the instruction, never over the arrow. Route note,
+  // GPS lost, the periodic safety reminder and the camera answer all take turns here.
+  // The route note folds into a 44 px info button after NOTE_FOLD_MS; a tap unfolds it.
   const noRouteEl = h('button', { class: 'ar-noroute', type: 'button', hidden: true }, '') as HTMLButtonElement
   const NOTE_FOLD_MS = 8000
   let noteTimer = 0
@@ -406,27 +397,25 @@ export function LiveView(opts: {
     unfoldNote(!gpsLost)
     announce(noRouteEl.textContent ?? '')
   })
-
+  const safeEl = h('p', { class: 'ar-safe', hidden: true, role: 'note' }, t.arSafeSub ?? 'Achte beim Gehen auf deine Umgebung.')
+  const lookOut = h('p', { class: 'ar-look-out', 'aria-live': 'polite' }, '')
   const warnEl =
     e.warnings.length > 0
       ? h('div', { class: 'warning', role: 'note' }, ...e.warnings.map((w) => h('p', {}, h('strong', {}, `${t.warningPrefix}: `), t.warning[w] ?? w)))
       : null
+  const statusEl = h('div', { class: 'ar-status' }, noRouteEl, warnEl, safeEl, lookOut)
 
   const root = h(
     'section',
-    { class: `ar${cfg.dimScreen ? ' dim' : ''}`, 'aria-labelledby': 'live-title' },
+    { class: `ar${cfg.dimScreen ? ' dim' : ''}`, 'aria-labelledby': 'live-title', 'data-mark': 'none' },
     h('h1', { id: 'live-title', class: 'sr-only' }, `${t.liveTitle}: ${name}`),
     mediaEl,
     svg,
-    muteBtn,
-    h('div', { class: 'ar-top' }, fbBtn, stopBtn),
-    manBanner,
-    noRouteEl,
-    scanText, scanArt, pill, follow,
-    opts.sensors.banner ? h('p', { class: 'banner' }, opts.sensors.banner) : null,
-    warnEl,
-    accEl, lookOut, lookBtn, nearBtn, endRow,
-    destStrip, safeEl, dirEl,
+    h('div', { class: 'ar-top' }, stopBtn, muteBtn),
+    instrEl,
+    statusEl,
+    opts.sensors.banner ? h('p', { class: 'banner sr-only' }, opts.sensors.banner) : null,
+    destStrip,
   )
 
   mount(root)
@@ -446,6 +435,7 @@ export function LiveView(opts: {
   let calloutIdx = 0
   let lookBusy = false
   let nearShown = false
+  let pinShown = false
   // Know which approach clips exist before the tap, so a missing one is spoken at once.
   if (approachMode === 'guide') preloadClips(lang)
   let saidNear = false
@@ -466,6 +456,10 @@ export function LiveView(opts: {
   // chevrons keep today's fixed screen placement.
   let pitch: number | null = null
   let lastSafe = 0
+  /** What the centre shows. One at a time; CSS cross-fades 200 ms (none with reduced motion). */
+  const setMark = (m: 'arrow' | 'pin' | 'none') => {
+    if (root.dataset.mark !== m) root.dataset.mark = m
+  }
 
   // Walking route to the door. Until it arrives (or if none exists) guidance falls
   // back to a straight-line bearing, which points through buildings — so the UI says
@@ -524,38 +518,25 @@ export function LiveView(opts: {
     countdown = 0
   }
 
-  /** scanning -> ready -> guiding, then approach once the pin takes over. */
+  /** scanning -> guiding, approach from APPROACH_PIN_M in. Only data-phase changes: no
+   *  element appears or moves with it (the old "Bereit" badge and hint text are gone). */
   function setPhase(next: ArPhase) {
     if (next === arPhase) return
-    arPhase = next
-    root.dataset.phase = next
-    const scanning = next === 'scanning'
-    const ready = next === 'ready'
-    scanText.hidden = !scanning
-    // scanArt is an SVGElement: .hidden is not reflected there, so set the attribute.
-    if (scanning) scanArt.removeAttribute('hidden')
-    else scanArt.setAttribute('hidden', '')
-    pill.hidden = !(scanning || ready)
-    pill.textContent = ready ? (t.arReady ?? 'Bereit') : (t.arScanning ?? 'Wird gescannt …')
-    pill.classList.toggle('ar-pill-ready', ready)
-    follow.hidden = !ready
-    destStrip.hidden = scanning
-    if (ready) {
-      // "Ready" holds briefly, then the chevrons take the screen, as in the recording.
-      timers.push(window.setTimeout(() => setPhase('guiding'), 1400))
-    }
+    arPhase = next === 'ready' ? 'guiding' : next
+    root.dataset.phase = arPhase
   }
 
-  /** Google re-surfaces a safety reminder every so often; it dims everything behind it. */
+  /** Google re-surfaces a safety reminder every so often: here in the status strip, for a
+   *  few seconds, and not while another note (route, GPS) holds the strip. The first one
+   *  waits a full period, since the opening line already says it. */
   function maybeSafety(now: number) {
-    if (arPhase !== 'guiding' || safeEl.hidden === false) return
+    if (arPhase !== 'guiding' || safeEl.hidden === false || !noRouteEl.hidden) return
+    if (!lastSafe) lastSafe = now
     if (now - lastSafe < SAFE_EVERY_MS) return
     lastSafe = now
     safeEl.hidden = false
-    root.dataset.safe = '1'
     timers.push(window.setTimeout(() => {
       safeEl.hidden = true
-      delete root.dataset.safe
     }, SAFE_SHOW_MS))
   }
 
@@ -564,8 +545,6 @@ export function LiveView(opts: {
     if (!nearBtn || show === nearShown) return
     nearShown = show
     nearBtn.hidden = !show
-    if (show) root.dataset.near = '1'
-    else delete root.dataset.near
     if (show && !saidNear) {
       saidNear = true
       announce(t.nearTrigger(APPROACH_TRIGGER))
@@ -592,12 +571,9 @@ export function LiveView(opts: {
     if (cfg.haptics || cfg.beacon) vibrate(HAPTIC_ARRIVED) // one long cue; iOS gets the sound
     beacon?.stop()
     beaconOn = false
-    dirEl.textContent = t.arrived
-    turnIcon.textContent = 'where_to_vote'
-    manBanner.hidden = true
-    stackG.setAttribute('visibility', 'hidden')
+    setLine(t.arrived, 'where_to_vote')
     coneG.replaceChildren()
-    pinG.setAttribute('visibility', 'hidden')
+    setMark('pin') // until the sheet rises and takes the centre away
     root.dataset.phase = 'arrived'
     // The sheet says it, once, 1.5 s later ("Du bist angekommen" plus the question).
     announce(t.arrived)
@@ -692,7 +668,6 @@ export function LiveView(opts: {
     root.classList.remove('is-arrived')
     root.dataset.phase = arPhase // 'arrived' would otherwise stick and hide the guidance
     safeEl.hidden = true
-    delete root.dataset.safe
     // Focus was on the card that just went away; put it somewhere a finger can find.
     lookBtn.focus({ preventScroll: true })
     lastWord = ''
@@ -734,7 +709,7 @@ export function LiveView(opts: {
         const nowMs = performance.now()
         if (!offRouteSince) offRouteSince = nowMs
         if (nowMs - offRouteSince > OFF_ROUTE_GRACE_MS && nowMs - lastRouteAt > REROUTE_EVERY_MS) {
-          dirEl.textContent = D.rerouting
+          setLine(D.rerouting, 'directions')
           askRoute(pos)
         }
       }
@@ -760,8 +735,10 @@ export function LiveView(opts: {
     maybeSafety(now)
 
     distEl.textContent = t.metres(dist)
+    const mShort = (m: number) => t.metresShort(m)
     // Good GPS needs no note; poor GPS is worth reading (fix-live.css: 16 px, 7:1).
-    accEl.textContent = fix.accuracy !== null && fix.accuracy > 10 ? t.accuracy(fix.accuracy) : ''
+    accEl.textContent = fix.accuracy !== null && fix.accuracy > 10 ? `± ${mShort(fix.accuracy)}` : ''
+    accEl.setAttribute('aria-label', accEl.textContent ? t.accuracy(fix.accuracy!) : '')
 
     if (arrived) {
       // Walked away again before leaving: cancel arrival and guide on.
@@ -774,25 +751,17 @@ export function LiveView(opts: {
       return
     }
 
-    const showBanner = (glyph: string) => {
-      // GPS gone: the next turn is stale, and the banner would cover the status saying so.
-      if (gpsLost) {
-        manBanner.hidden = true
-        return
-      }
-      if (ahead && aheadText && arPhase !== 'approach' && arPhase !== 'scanning') {
-        manGlyph.textContent = ahead.step ? glyph : 'location_on'
-        manDist.textContent = t.inMetres(ahead.toManeuverM)
-        manText.textContent = aheadText
-        manBanner.hidden = false
-      } else {
-        manBanner.hidden = true
-      }
+    // The instruction line: the next route step while following one, else the direction
+    // word, then the distance ("Geradeaus · 8 m"). GPS lost: the status strip says so and
+    // the line keeps the last direction instead of claiming a stale next turn.
+    const lineFor = (glyph: string, word: string) => {
+      if (gpsLost) return
+      if (ahead && aheadText) setLine(`${aheadText} · ${mShort(ahead.toManeuverM)}`, ahead.step ? glyph : 'location_on')
+      else setLine(`${word} · ${mShort(dist)}`, glyph)
     }
 
     if (!hasHeading) {
       // No compass: the route still says what to do and how far away it is.
-      dirEl.textContent = aheadText ? `${t.inMetres(ahead!.toManeuverM)}. ${aheadText}` : t.noCompass
       if (!aheadText && !saidNoCompass) {
         // Without a compass and without a route there is nothing to point with: say
         // so once instead of leaving the user in silence.
@@ -802,14 +771,17 @@ export function LiveView(opts: {
       }
       const glyph = maneuverGlyph(ahead?.step?.maneuver ?? null) ?? 'straight'
       if (arPhase === 'scanning' && aheadText) setPhase('ready')
-      showBanner(glyph)
+      if (aheadText) lineFor(glyph, aheadText)
+      else if (!gpsLost) setLine(t.noCompass, 'explore_off')
       if (aheadText && aheadText !== lastWord && gate.allow(aheadText, now)) {
         lastWord = aheadText
         const line = `${t.inMetres(ahead!.toManeuverM)}. ${aheadText}`
         if (voiceOn()) speak(line)
         else announce(line)
       }
-      stackG.setAttribute('visibility', 'hidden')
+      // Nothing to point with: no arrow. The pin still marks the last metres.
+      pinShown = centreMark(dist, pinShown) === 'pin'
+      setMark(pinShown ? 'pin' : 'none')
       coneG.replaceChildren()
       beacon?.update(beaconFor(dist, 0))
     } else {
@@ -818,13 +790,11 @@ export function LiveView(opts: {
         : cone
           ? `${t.roughly}. ${calmWord.propose(rel, now)}`
           : calmWord.propose(rel, now)
-      dirEl.textContent = aheadText ? `${t.inMetres(ahead!.toManeuverM)}. ${aheadText}` : word
       const glyph = maneuverGlyph(ahead?.step?.maneuver ?? null) ?? turnGlyph(rel)
-      turnIcon.textContent = glyph
-      // The banner only claims a manoeuvre while we are actually following a route.
+      // The line only claims a manoeuvre while we are actually following a route.
       // Off route it would be inventing turns, and inventing turns is the one thing
       // a blind user cannot check.
-      showBanner(glyph)
+      lineFor(glyph, word)
       // Chevrons foreshorten as they swing away, the way an extruded plate would.
       // Attribute rather than CSS transform: the group lives in the SVG user space.
       stackG.setAttribute('transform', stackTransform(rel, 393, 760, pitch))
@@ -833,20 +803,15 @@ export function LiveView(opts: {
         // guidance on screen and softens the wording, and an empty screen tells a
         // partially-sighted user nothing at all.
         coneG.replaceChildren()
-        stackG.setAttribute('visibility', 'visible')
         stackG.setAttribute('opacity', '0.88')
       } else {
         coneG.replaceChildren()
         stackG.setAttribute('opacity', '1')
-        stackG.setAttribute('visibility', 'visible')
       }
-      // The pin marks "the door is ahead" when roughly aimed at it. Centred above the
-      // arrow, never sliding sideways: direction comes from the arrow's rotation only.
-      // It grows slowly as the door gets closer.
-      if (Math.abs(rel) <= 35 && arPhase === 'approach') {
-        pinG.setAttribute('visibility', 'visible')
-        pinG.setAttribute('transform', `translate(196.5 ${(760 * 0.2).toFixed(0)}) scale(${(0.7 + 0.3 * Math.max(0, APPROACH_PIN_M - dist) / APPROACH_PIN_M).toFixed(2)})`)
-      } else pinG.setAttribute('visibility', 'hidden')
+      // The pin replaces the arrow in the last metres, in the arrow's own place and size.
+      // Never both: the centre shows one thing.
+      pinShown = centreMark(dist, pinShown) === 'pin'
+      setMark(pinShown ? 'pin' : 'arrow')
 
       if (beacon && !gpsLost && !isMuted()) {
         if (!beaconOn) {

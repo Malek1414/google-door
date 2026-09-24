@@ -71,7 +71,7 @@ describe('no server key: a German reason, never a crow-flight line (bug 1)', () 
     expect(out.ok).toBe(false)
     if (out.ok) return
     expect(out.reason).toBe('auth')
-    expect(out.message).toBe('Die Routenberechnung ist gerade nicht freigeschaltet.')
+    expect(out.message).toBe('Route gerade nicht verfügbar. Der Pfeil zeigt direkt zum Eingang.')
     expect(out.message).not.toMatch(/Ungefähr|Roughly/)
   })
 

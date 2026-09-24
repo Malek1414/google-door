@@ -26,7 +26,7 @@ export type RouteOutcome =
 export const D = {
   de: {
     none: 'Für diesen Weg gibt es keine Fußgängerroute.',
-    auth: 'Die Routenberechnung ist gerade nicht freigeschaltet.',
+    auth: 'Route gerade nicht verfügbar. Der Pfeil zeigt direkt zum Eingang.',
     network: 'Keine Verbindung zur Routenberechnung.',
     quota: 'Zu viele Routenanfragen. Bitte gleich noch einmal versuchen.',
     unknown: 'Die Route konnte nicht berechnet werden.',
@@ -50,7 +50,7 @@ export const D = {
   },
   en: {
     none: 'There is no walking route for this trip.',
-    auth: 'Route calculation is not enabled right now.',
+    auth: 'Directions are unavailable right now. The arrow points straight at the entrance.',
     network: 'Cannot reach route calculation.',
     quota: 'Too many route requests. Please try again shortly.',
     unknown: 'The route could not be calculated.',
@@ -178,6 +178,11 @@ export function cachedRoute(from: LatLon, to: LatLon): { route: Route; from: Lat
   if (haversineM(last.to, to) > 3) return null
   if (haversineM(last.from, from) > 40) return null
   return { route: last.route, from: last.from }
+}
+
+/** The route last drawn to this destination, wherever it was asked from: what Start follows. */
+export function routeTo(to: LatLon): Route | null {
+  return last && haversineM(last.to, to) <= 3 ? last.route : null
 }
 
 /** The grey line under the route time, as Maps shows it: mode, then where to. */

@@ -14,15 +14,17 @@ describe('bannerText', () => {
     expect(bannerText(ok(), 'de')).toBeNull()
   })
   it('names the missing feature, in German by default wording', () => {
-    expect(bannerText(ok({ maps: false }), 'de')).toBe('Routen gerade nicht verfügbar')
     expect(bannerText(ok({ gemini: false }), 'de')).toBe('Bildbeschreibung gerade nicht verfügbar')
-    expect(bannerText(ok({ maps: false, gemini: false }), 'de')).toBe('Routen und Bildbeschreibung gerade nicht verfügbar')
+    expect(bannerText(ok({ maps: false, gemini: false }), 'de')).toBe('Bildbeschreibung gerade nicht verfügbar')
+  })
+  it('a failing server Routes key never shows the snackbar (the browser fallback routes)', () => {
+    expect(bannerText(ok({ maps: false }), 'de')).toBeNull()
   })
   it('an unreachable server wins over everything else', () => {
     expect(bannerText(unreachable(), 'de')).toBe('Keine Verbindung zum Server')
   })
   it('has English lines too', () => {
-    expect(bannerText(ok({ maps: false }), 'en')).toMatch(/Directions/)
+    expect(bannerText(ok({ gemini: false }), 'en')).toMatch(/Image description/)
   })
 })
 

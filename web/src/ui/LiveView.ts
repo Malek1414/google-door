@@ -199,6 +199,74 @@ const ARR = {
   },
 }[lang === 'de' ? 'de' : 'en']
 
+/**
+ * The arrival sheet on its own, over whatever screen is up (the map navigation calls it
+ * from onArrive). Same words and rules as the Live View's sheet: the question and "Ja"
+ * only at a tier-1 door, the door data is only read. `onYes` runs synchronously inside
+ * the tap, so speech and audio are unlocked there. Returns close.
+ */
+export function arrivalSheet(opts: {
+  door: Entrance
+  name: string
+  profile: Profile | null | undefined
+  speak: boolean
+  onYes: (mode: ApproachMode) => void
+  onNo: () => void
+  /** Where the sheet goes; default #app. */
+  parent?: HTMLElement
+}): () => void {
+  const e = opts.door
+  const mode = arrivalPrompt(e, opts.profile, true).mode
+  const doorType = e.door ? t.door[e.door] ?? null : null
+  const face = e.approachBearing !== null ? ARR.face(compassWord(e.approachBearing)) : null
+  const warns = e.warnings.map((w) => t.warning[w] ?? w)
+  const question = mode ? ARR.ask : ARR.noGuide
+  const yesBtn = mode ? h('button', { class: 'arrival-yes', type: 'button' }, ARR.yes) : null
+  const noBtn = h('button', { class: mode ? 'arrival-no' : 'gm-pill gm-pill-primary', type: 'button' }, mode ? ARR.no : ARR.toMap)
+  const meta = [doorType, face].filter(Boolean).join(' · ')
+  const el = h(
+    'div',
+    { class: 'arrival-scrim', style: 'position:fixed;z-index:10002' },
+    h(
+      'div',
+      { class: 'arrival', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'arrival-title', 'aria-describedby': 'arrival-ask' },
+      h('span', { class: 'arrival-handle', 'aria-hidden': 'true' }),
+      h('h2', { id: 'arrival-title', class: 'arrival-title' }, ARR.sheetTitle),
+      h('p', { class: 'arrival-name' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'where_to_vote'), opts.name),
+      meta ? h('p', { class: 'arrival-door' }, meta) : null,
+      ...warns.map((w) => h('p', { class: 'arrival-warn', role: 'note' }, h('strong', {}, `${t.warningPrefix}: `), w)),
+      h('p', { id: 'arrival-ask', class: 'arrival-ask' }, question),
+      yesBtn,
+      noBtn,
+    ),
+  )
+  ;(opts.parent ?? document.getElementById('app') ?? document.body).append(el)
+  ;(yesBtn ?? noBtn).focus({ preventScroll: true })
+  const lines = [`${ARR.sheetTitle}. ${opts.name}.`, doorType ? `${doorType}.` : '', ...warns.map((w) => `${t.warningPrefix}. ${w}`), face ?? '', question].filter(Boolean)
+  if (opts.speak && !isMuted()) speak(lines.join(' '), { interrupt: true })
+  announce(lines.join(' '))
+  let closed = false
+  const close = () => {
+    if (closed) return
+    closed = true
+    el.remove()
+  }
+  yesBtn?.addEventListener('click', () => {
+    if (closed || !mode) return
+    close()
+    stopSpeech()
+    // Still synchronous inside the tap: iOS only unlocks speech and audio here.
+    primeSpeech()
+    opts.onYes(mode)
+  })
+  noBtn.addEventListener('click', () => {
+    if (closed) return
+    close()
+    opts.onNo()
+  })
+  return close
+}
+
 export function realSensors(): Sensors {
   return {
     media: session.stream ? { kind: 'stream', stream: session.stream } : { kind: 'none' },

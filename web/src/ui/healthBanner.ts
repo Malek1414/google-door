@@ -84,8 +84,9 @@ export function unreachable(now = Date.now()): Health {
 export function bannerText(hl: Health, l: Lang = lang): string | null {
   const s = TEXT[l]
   if (!hl.reachable) return s.offline
-  if (!hl.maps && !hl.gemini) return s.both
-  if (!hl.maps) return s.route
+  // Routes never reach the snackbar: the server's Routes key failing ("routes: ok:false")
+  // says nothing about the app, whose browser Routes fallback still draws the walk. When
+  // both paths fail, the route panel says so calmly (Directions.ts D.auth).
   if (!hl.gemini) return s.look
   return null
 }

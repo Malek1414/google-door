@@ -3,11 +3,15 @@ import { outputFor, type Profile } from './core/profile'
 import { arrowTargetFor, type ArrowTarget } from './core/target'
 import { readParams } from './config'
 import { findEntrance } from './data'
-import { loadProfile, output, session } from './session'
+import { announce, loadProfile, output, session, speak } from './session'
 import { demoWalkTrack, loadTrack, Recorder, replaySensors, type TrackPoint } from './sim/replay'
 import { t } from './strings'
 import { h, mount } from './ui/dom'
-import { LiveView, realSensors, applyContrast } from './ui/LiveView'
+import { LiveView, realSensors, applyContrast, arrivalSheet } from './ui/LiveView'
+import { computeRoute, routeTo } from './ui/Directions'
+import { isMuted } from './ui/voiceCalm'
+import { pathDoorName } from './ui/doorName'
+import type { Route } from './core/route'
 import { Approach } from './ui/Approach'
 import type { ApproachMode } from './ui/approachPort'
 import { startDemoApproach } from './ui/approachDemo'
@@ -89,8 +93,110 @@ function showMap(p: Profile) {
   })
 }
 
+// The map navigation screen (ui/NavMode.ts). Looked up with a glob so the app still
+// builds and falls back to the camera Live View while that screen does not exist.
+type NavFixLike = { lat: number; lng: number }
+type OpenNav = (opts: {
+  route: Route
+  destination: { lat: number; lng: number; name: string }
+  onArrive: () => void
+  onExit: () => void
+  onLiveView?: () => void
+  onOffRoute?: (fix: NavFixLike) => void
+  onStepChange?: (text: string) => void
+  parent?: HTMLElement
+}) => () => void
+const navModule = import.meta.glob<{ openNav: OpenNav }>('./ui/NavMode.ts')['./ui/NavMode.ts']
+
+/** Re-route at most this often while off the route. */
+const NAV_REROUTE_EVERY_MS = 20000
+
+/**
+ * Start: the map navigation along the route the preview drew, driven by the device's real
+ * position. Off the route it asks for a new one from where the user is. At the door the
+ * arrival sheet asks, and "Ja" opens the approach with the real engine. No route (routing
+ * failed) or no nav screen: the camera Live View, as before.
+ */
 function showLive(target: ArrowTarget, p: Profile, name?: string) {
   if (params.demo) return showDemoLive(target, p, name, demoWalkTrack(target.entrance))
+  const first = routeTo(target)
+  if (!first || !navModule) return showCameraLive(target, p, name)
+  const destName = name ?? pathDoorName(target.entrance)
+  const cfg = outputFor(p)
+  void navModule()
+    .then(({ openNav }) => {
+      // A host in #app replaces the map, so the screen reader does not reach it underneath.
+      const host = h('section', { class: 'nav-host', 'aria-label': destName })
+      mount(host)
+      let closed = false
+      let closeNav: () => void = () => {}
+      let closeSheet: (() => void) | null = null
+      let lastReroute = 0
+      const leave = () => {
+        if (closed) return
+        closed = true
+        closeSheet?.()
+        closeNav()
+      }
+      const open = (route: Route) => {
+        closeNav = openNav({
+          route,
+          destination: { lat: target.lat, lng: target.lon, name: destName },
+          parent: host,
+          onArrive: () => {
+            if (closed || closeSheet) return
+            closeSheet = arrivalSheet({
+              door: target.entrance,
+              name: destName,
+              profile: p,
+              speak: cfg.speak,
+              parent: host,
+              onYes: (mode) => {
+                leave()
+                showApproach(target.entrance, p, mode)
+              },
+              onNo: () => {
+                leave()
+                showMap(p)
+              },
+            })
+          },
+          onExit: () => {
+            leave()
+            showMap(p)
+          },
+          onLiveView: () => {
+            leave()
+            showCameraLive(target, p, name)
+          },
+          // Event-only voice: a new step is said once, nothing repeats it.
+          onStepChange: (text) => {
+            if (closed) return
+            if (cfg.speak && !isMuted()) speak(text)
+            announce(text)
+          },
+          onOffRoute: (fix) => {
+            const now = Date.now()
+            if (closed || now - lastReroute < NAV_REROUTE_EVERY_MS) return
+            lastReroute = now
+            void computeRoute({ lat: fix.lat, lon: fix.lng }, target).then((out) => {
+              if (closed || !out.ok) return
+              closeNav()
+              open(out.route)
+            })
+          },
+        })
+      }
+      open(first)
+    })
+    .catch((err) => {
+      console.warn('[doorway] nav screen failed, camera Live View instead', err)
+      showCameraLive(target, p, name)
+    })
+}
+
+/** The camera Live View with the real sensors (GPS, compass, camera). */
+function showCameraLive(target: ArrowTarget, p: Profile, name?: string) {
   LiveView({
     target,
     ...(name ? { name } : {}),

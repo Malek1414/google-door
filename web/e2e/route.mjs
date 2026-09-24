@@ -52,7 +52,7 @@ const HBF = { latitude: 52.5249, longitude: 13.3688 }
 const CROW = /Ungefähr in diese Richtung|Roughly this way/
 const ROUTE_BLUE = '#1a73e8'
 // Directions.ts D.de: every reason the sheet may give instead of a route.
-const GERMAN_REASON = /nicht freigeschaltet|Keine Verbindung zur Routenberechnung|Zu viele Routenanfragen|konnte nicht berechnet werden|keine Fußgängerroute/
+const GERMAN_REASON = /Route gerade nicht verfügbar|nicht freigeschaltet|Keine Verbindung zur Routenberechnung|Zu viele Routenanfragen|konnte nicht berechnet werden|keine Fußgängerroute/
 
 // Recorded from the Routes API (walking, de-DE) around Berlin Hbf, in the shape the
 // /api/route proxy returns it (server/route.py: path decoded, steps flattened).

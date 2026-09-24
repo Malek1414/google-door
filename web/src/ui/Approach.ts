@@ -16,11 +16,13 @@ import type { OutputConfig } from '../core/profile'
 import type { Entrance } from '../core/types'
 import { announce, keepScreenOn, session } from '../session'
 import { lang } from '../strings'
-import { engine, type ApproachMode, type ApproachView, type StartApproach } from './approachPort'
+import { engine, engineName, type ApproachMode, type ApproachView, type StartApproach } from './approachPort'
 import { playInstruction, playLine, preloadClips, reportMissingClips, stopLines } from './clips'
 import { checkDoor, runDoorCheckOnce, verdictNote, verdictRows } from './doorCheck'
 import { h, mount, s } from './dom'
-import { grabFrame } from './LiveView'
+import { directionWord, grabFrame } from './LiveView'
+import { watchFixes, type Fix as PosFix } from '../core/position'
+import { bearingDeg, haversineM, relativeBearing } from '../core/geo'
 import { SteadyAngle } from './arrowSteady'
 import { isTransient, splitInstruction } from './clips'
 import { isMuted, LineGate, muteButton } from './voiceCalm'
@@ -41,6 +43,7 @@ export const AP = {
     checkTitle: 'Die Tür',
     offline: 'Die Prüfung ist gerade nicht erreichbar.',
     noCamera: 'Kein Kamerabild.',
+    gps: (m: number, dir: string | null) => `Laut GPS etwa ${m} Meter${dir ? `, ${dir}` : ''}.`,
   },
   en: {
     title: 'To the entrance',
@@ -53,6 +56,7 @@ export const AP = {
     checkTitle: 'The door',
     offline: 'The check is not available right now.',
     noCamera: 'No camera picture.',
+    gps: (m: number, dir: string | null) => `By GPS about ${m} metres${dir ? `, ${dir}` : ''}.`,
   },
 }[lang === 'de' ? 'de' : 'en']
 
@@ -180,6 +184,23 @@ function bigArrow(): SVGSVGElement {
   )
 }
 
+/** GPS worse than this gives no hint: a 30 m circle says nothing about the last metres. */
+export const GPS_HINT_MAX_ACCURACY_M = 25
+
+/**
+ * Pure. The GPS line under the engine's words while the engine has no direction (no
+ * camera, no vision, no surveyed bearing): distance, and a direction word only with a
+ * compass. Text only, never an arrow: GPS next to a wall is too coarse to draw one.
+ */
+export function gpsHint(fix: Pick<PosFix, 'lat' | 'lng' | 'accuracy'> | null, door: { lat: number; lon: number }, headingDeg: number | null): string | null {
+  if (!fix || !(fix.accuracy <= GPS_HINT_MAX_ACCURACY_M)) return null
+  const here = { lat: fix.lat, lon: fix.lng }
+  const m = haversineM(here, door)
+  if (!Number.isFinite(m)) return null
+  const dir = headingDeg === null ? null : directionWord(relativeBearing(bearingDeg(here, door), headingDeg)).toLowerCase()
+  return AP.gps(Math.max(1, Math.round(m)), dir)
+}
+
 export interface ApproachOpts {
   door: Entrance
   mode: ApproachMode
@@ -232,8 +253,9 @@ function GuideScreen(opts: ApproachOpts): () => void {
   const srcEl = h('p', { class: 'apr-src', hidden: true }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'map'), AP.fromMap)
   const outsideBtn = h('button', { class: 'apr-big apr-outside', type: 'button', hidden: true }, AP.stillOutside)
   const safetyEl = h('p', { class: 'apr-safety', hidden: true }, safetyLine(lang))
+  const gpsEl = h('p', { class: 'apr-src apr-gps', hidden: true }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'my_location'), h('span', {}, ''))
   const dirEl = h('div', { class: 'apr-dir' }, arrow, angleEl)
-  root.append(h('div', { class: 'apr-panel' }, dirEl, distEl, instrEl, srcEl, outsideBtn, safetyEl))
+  root.append(h('div', { class: 'apr-panel' }, dirEl, distEl, instrEl, srcEl, gpsEl, outsideBtn, safetyEl))
   mount(root)
 
   const narrator = new Narrator(lang, new LineGate())
@@ -278,6 +300,7 @@ function GuideScreen(opts: ApproachOpts): () => void {
     }
     distEl.textContent = lay.distance
     instrEl.textContent = lay.instruction
+    showGps()
     srcEl.hidden = !lay.fromMap
     outsideBtn.hidden = !lay.outsideButton
     safetyEl.hidden = !lay.safety
@@ -310,12 +333,34 @@ function GuideScreen(opts: ApproachOpts): () => void {
     }
   }
 
+  // No direction from the engine: say what the GPS knows, as text, so the screen is never
+  // just "no direction". The engine itself stays GPS-free.
+  let gpsFix: PosFix | null = null
+  let compass: number | null = null
+  function showGps() {
+    const hint = current && current.relBearingDeg === null && current.phase !== 'through' ? gpsHint(gpsFix, opts.door, compass) : null
+    gpsEl.hidden = !hint
+    const span = gpsEl.lastElementChild as HTMLElement
+    if (hint && span.textContent !== hint) span.textContent = hint
+  }
+  const stopFixes = watchFixes((f) => {
+    gpsFix = f
+    showGps()
+  })
+
   const stopHeading: (() => void)[] = []
-  const run = (opts.start ?? engine())({
+  const chosen = opts.start ?? engine()
+  // Which engine drives this screen: 'real' (Malek's core) or 'demo' (scripted). Tests read it.
+  root.dataset.engine = engineName(chosen)
+  const run = chosen({
     door: opts.door,
     frame: () => grabFrame(cam),
     onHeading: (cb) => {
-      const stop = startHeading((hd) => hd.source !== 'none' && cb({ deg: hd.deg, accuracy: hd.accuracy }), { gpsCourse: false })
+      const stop = startHeading((hd) => {
+        if (hd.source === 'none') return
+        compass = hd.deg
+        cb({ deg: hd.deg, accuracy: hd.accuracy })
+      }, { gpsCourse: false })
       stopHeading.push(stop)
       return stop
     },
@@ -367,6 +412,7 @@ function GuideScreen(opts: ApproachOpts): () => void {
     clearTimeout(throughTimer)
     unsubscribe()
     run.stop()
+    stopFixes()
     stopHeading.forEach((f) => f())
     beacon?.stop()
     stopLines(lang)

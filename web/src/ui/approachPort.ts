@@ -112,3 +112,8 @@ export function approachModeFor(p: Profile | null | undefined): ApproachMode | n
   if (p.channels.length === 0 || p.channels.includes('speech')) return 'guide'
   return null
 }
+
+/** 'demo' for the scripted adapter, 'real' for everything else. */
+export function engineName(start: StartApproach): 'real' | 'demo' {
+  return start === startDemoApproach ? 'demo' : 'real'
+}

@@ -61,3 +61,4 @@
 
 .gm-steps { margin: 18px 0 0; padding: 0 0 0 22px; color: var(--fg); }
 .gm-steps li { margin: 0 0 14px; line-height: 1.35; }
+.gm-sheet-body { scroll-padding-bottom: 96px; } /* a11y #20: a focused row never sits under the nav bar */

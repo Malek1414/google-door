@@ -386,6 +386,17 @@ export function MapView(opts: {
   // mid-screen; snap them back whenever that happens.
   for (const frame of [root, sheet]) frame.addEventListener('scroll', () => { if (frame.scrollTop || frame.scrollLeft) frame.scrollTo(0, 0) }, { passive: true })
 
+  // Focus never lands under the nav bar or below the sheet edge (WCAG 2.4.11): a Tab
+  // stop outside the visible part opens the sheet fully and brings the row into view.
+  sheetBody.addEventListener('focusin', (ev) => {
+    const el = ev.target as HTMLElement
+    const r = el.getBoundingClientRect()
+    const bottom = nav.getBoundingClientRect().top || window.innerHeight
+    if (r.top >= sheet.getBoundingClientRect().top && r.bottom <= bottom) return
+    if (sheet.dataset.state !== 'full') setSheet('full')
+    requestAnimationFrame(() => el.scrollIntoView({ block: 'nearest' }))
+  })
+
   // ---- sheet snap states: drag or tap the handle ----
   const setSheet = (st: SheetState) => {
     sheet.dataset.state = st
@@ -1009,7 +1020,12 @@ export function MapView(opts: {
 
   function streetView(e: Entrance): HTMLElement | null {
     if (!map) return null
+    // The outer box is one image for assistive tech. The panorama goes in an inert
+    // inner box: Google's own links and shortcut buttons inside role=img were invalid
+    // (nested-interactive) and added seven junk Tab stops before the tabs.
     const box = h('div', { class: 'gm-photo', role: 'img', 'aria-label': t.streetViewAlt })
+    const pano = h('div', { class: 'gm-photo-pano', inert: '', 'aria-hidden': 'true', style: 'position:absolute;inset:0' })
+    box.append(pano)
     new google.maps.StreetViewService().getPanorama({ location: { lat: e.lat, lng: e.lon }, radius: 40 }, (data, st) => {
       if (st !== google.maps.StreetViewStatus.OK || !data?.location?.latLng) {
         box.remove()
@@ -1017,7 +1033,7 @@ export function MapView(opts: {
       }
       const from = data.location.latLng
       const heading = google.maps.geometry?.spherical ? google.maps.geometry.spherical.computeHeading(from, { lat: e.lat, lng: e.lon }) : bearingFromTo(from.lat(), from.lng(), e.lat, e.lon)
-      new google.maps.StreetViewPanorama(box, { pano: data.location.pano, pov: { heading, pitch: 5 }, disableDefaultUI: true, clickToGo: false, linksControl: false, motionTracking: false })
+      new google.maps.StreetViewPanorama(pano, { pano: data.location.pano, pov: { heading, pitch: 5 }, disableDefaultUI: true, clickToGo: false, linksControl: false, motionTracking: false })
     })
     return box
   }
@@ -1085,19 +1101,39 @@ export function MapView(opts: {
     const reviews = h('div', { class: 'gm-tabpanel', hidden: true }, livedSection(b) ?? h('p', { class: 'gm-p' }, t.livedNone))
     const photos = h('div', { class: 'gm-tabpanel', hidden: true })
     const panels = [overview, reviews, photos]
+    // ARIA tab pattern, as in PlaceCard: roving tabindex, arrows/Home/End, linked panels.
+    panels.forEach((p, i) => {
+      p.setAttribute('role', 'tabpanel')
+      p.id = `gm-panel-${i}`
+      p.setAttribute('aria-labelledby', `gm-tab-${i}`)
+    })
+    const tabBtns: HTMLButtonElement[] = []
+    const selectTab = (i: number, focus = false) => {
+      tabBtns.forEach((x, j) => {
+        x.setAttribute('aria-selected', String(j === i))
+        x.tabIndex = j === i ? 0 : -1
+      })
+      panels.forEach((p, j) => (p.hidden = j !== i))
+      if (i === 2 && !photos.childElementCount) {
+        const sv = streetView(e)
+        photos.append(sv ?? h('p', { class: 'gm-p' }, t.noPhotos))
+      }
+      if (focus) tabBtns[i].focus()
+    }
     const tabs = h(
       'div',
       { class: 'gm-tabs', role: 'tablist' },
       ...[t.tabOverview, t.tabReviews, t.tabPhotos].map((label, i) => {
-        const b2 = h('button', { class: 'gm-tabbtn', type: 'button', role: 'tab', 'aria-selected': String(i === 0) }, label)
-        b2.addEventListener('click', () => {
-          tabs.querySelectorAll('.gm-tabbtn').forEach((x, j) => x.setAttribute('aria-selected', String(j === i)))
-          panels.forEach((p, j) => (p.hidden = j !== i))
-          if (i === 2 && !photos.childElementCount) {
-            const sv = streetView(e)
-            photos.append(sv ?? h('p', { class: 'gm-p' }, t.noPhotos))
-          }
+        const b2 = h('button', { class: 'gm-tabbtn', type: 'button', role: 'tab', id: `gm-tab-${i}`, 'aria-controls': `gm-panel-${i}`, 'aria-selected': String(i === 0), tabindex: i === 0 ? '0' : '-1' }, label) as HTMLButtonElement
+        b2.addEventListener('click', () => selectTab(i))
+        b2.addEventListener('keydown', (ev) => {
+          const n = tabBtns.length
+          const to = ev.key === 'ArrowRight' ? (i + 1) % n : ev.key === 'ArrowLeft' ? (i + n - 1) % n : ev.key === 'Home' ? 0 : ev.key === 'End' ? n - 1 : -1
+          if (to < 0) return
+          ev.preventDefault()
+          selectTab(to, true)
         })
+        tabBtns.push(b2)
         return b2
       }),
     )

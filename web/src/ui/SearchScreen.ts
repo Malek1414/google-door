@@ -287,7 +287,6 @@ export function openSearchScreen(root: HTMLElement, opts: SearchScreenOpts): () 
     if (ev.key === 'Escape') {
       ev.preventDefault()
       close()
-      opts.onClose()
     }
   }
   input.addEventListener('input', renderSuggestions)
@@ -301,10 +300,7 @@ export function openSearchScreen(root: HTMLElement, opts: SearchScreenOpts): () 
     renderSuggestions()
     input.focus()
   })
-  backBtn.addEventListener('click', () => {
-    close()
-    opts.onClose()
-  })
+  backBtn.addEventListener('click', () => close())
   screen.addEventListener('keydown', onKey)
 
   const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
@@ -323,6 +319,9 @@ export function openSearchScreen(root: HTMLElement, opts: SearchScreenOpts): () 
     screen.remove()
     root.style.overflow = previousOverflow
     previousFocus?.focus({ preventScroll: true })
+    // Every way out (back, Escape, submit, pick) reports the close, otherwise the
+    // caller keeps thinking the screen is open and the search bar goes dead.
+    opts.onClose()
   }
   return close
 }

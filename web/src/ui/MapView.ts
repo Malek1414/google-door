@@ -367,6 +367,10 @@ export function MapView(opts: {
     nav,
   )
   mount(root)
+  // The root and the sheet are fixed frames, never scroll containers. focus() and
+  // scrollIntoView() still scroll overflow:hidden boxes, which leaves the tab bar
+  // mid-screen; snap them back whenever that happens.
+  for (const frame of [root, sheet]) frame.addEventListener('scroll', () => { if (frame.scrollTop || frame.scrollLeft) frame.scrollTo(0, 0) }, { passive: true })
 
   // ---- sheet snap states: drag or tap the handle ----
   const setSheet = (st: SheetState) => {
@@ -409,6 +413,13 @@ export function MapView(opts: {
   let dragging = false
   let decided = false
   const stateIdx = () => order.indexOf(sheet.dataset.state as SheetState)
+  /** Handle tap: one step up, from full back to the bottom; the route summary counts as the bottom. */
+  const nextState = (): SheetState => {
+    const st = sheet.dataset.state as SheetState
+    if (st === 'route') return 'half'
+    if (st === 'full') return routePreview ? 'route' : 'peek'
+    return order[stateIdx() + 1]
+  }
   const snap = (dy: number, dt: number) => {
     const v = dy / Math.max(dt, 1) // px per ms, negative = up
     // 'route' is not in `order`; index -1 used to make an upward swipe land on peek.
@@ -421,7 +432,8 @@ export function MapView(opts: {
     let step = 0
     if (v < -0.5 || dy < -60) step = dy < -420 && i === 0 ? 2 : 1
     else if (v > 0.5 || dy > 60) step = dy > 420 && i === 2 ? -2 : -1
-    setSheet(order[Math.max(0, Math.min(order.length - 1, i + step))])
+    const next = order[Math.max(0, Math.min(order.length - 1, i + step))]
+    setSheet(next === 'peek' && routePreview ? 'route' : next)
   }
   sheet.addEventListener(
     'touchstart',
@@ -469,7 +481,7 @@ export function MapView(opts: {
     sheet.style.transition = ''
     if (dragging) snap(dy, performance.now() - dragT0)
     // A plain tap on the handle cycles peek, half, full.
-    else if (!decided && handle.contains(ev.target as Node)) setSheet(stateIdx() === order.length - 1 ? 'peek' : order[stateIdx() + 1])
+    else if (!decided && handle.contains(ev.target as Node)) setSheet(nextState())
     dragging = false
   }
   sheet.addEventListener('touchend', endDrag)
@@ -490,8 +502,8 @@ export function MapView(opts: {
     const dy = clientY === null ? 0 : clientY - mouseY0
     mouseY0 = null
     if (Math.abs(dy) < 6) {
-      if (clientY !== null) setSheet(stateIdx() === order.length - 1 ? 'peek' : order[stateIdx() + 1])
-      else setSheet(order[stateIdx()])
+      if (clientY !== null) setSheet(nextState())
+      else setSheet(sheet.dataset.state as SheetState)
     } else snap(dy, performance.now() - dragT0)
   }
   handle.addEventListener('pointermove', (ev) => {
@@ -504,15 +516,14 @@ export function MapView(opts: {
   handle.addEventListener('lostpointercapture', (ev) => endMouse(ev.clientY))
   // Safety net: any scroll or wheel on the sheet without an active gesture clears a stale offset.
   const clearStale = () => {
-    if (mouseY0 === null && dragY0 === null && sheet.style.getPropertyValue('--drag')) setSheet(order[stateIdx()])
+    if (mouseY0 === null && dragY0 === null && sheet.style.getPropertyValue('--drag')) setSheet(sheet.dataset.state as SheetState)
   }
   sheetBody.addEventListener('scroll', clearStale, { passive: true })
   sheet.addEventListener('wheel', clearStale, { passive: true })
   handle.addEventListener('keydown', (ev) => {
     if (ev.key !== 'Enter' && ev.key !== ' ') return
     ev.preventDefault()
-    const i = order.indexOf(sheet.dataset.state as SheetState)
-    setSheet(i === order.length - 1 ? 'peek' : order[i + 1])
+    setSheet(nextState())
   })
 
   const origin = () => me ?? (map?.getCenter() ? { lat: map.getCenter()!.lat(), lon: map.getCenter()!.lng() } : DEFAULT_CENTER)
@@ -747,7 +758,9 @@ export function MapView(opts: {
     sheetBody.replaceChildren(...children.filter((c): c is Node => c !== null))
     setSheet('half')
     sheetBody.scrollTop = 0
-    sheetBody.querySelector<HTMLElement>('h2')?.focus()
+    // preventScroll: the sheet is still sliding up, and a plain focus() scrolls the
+    // fixed root so the tab bar ends up in the middle of the screen.
+    sheetBody.querySelector<HTMLElement>('h2')?.focus({ preventScroll: true })
   }
   function closeCard() {
     panelCleanup?.()

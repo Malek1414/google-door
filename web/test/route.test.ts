@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { progressAlong, cumulative, currentStep, LOOKAHEAD_M, OFF_ROUTE_M, type Route } from '../src/core/route'
+import { progressAlong, cumulative, currentStep, stepAhead, LOOKAHEAD_M, OFF_ROUTE_M, type Route } from '../src/core/route'
 
 // ~1 m per step due north, 60 points
 const path: [number, number][] = Array.from({ length: 60 }, (_, i) => [52.5250 + i * 0.000009, 13.3694])
@@ -59,5 +59,24 @@ describe('route following', () => {
     ] }
     expect(currentStep(80, route)?.maneuver).toBe('DEPART')
     expect(currentStep(20, route)?.maneuver).toBe('TURN_LEFT')
+  })
+
+  it('counts down the metres left of the step being walked, not of the whole route', () => {
+    const route: Route = { found: true, distanceM: 88, path: [], steps: [
+      { distanceM: 53, maneuver: 'DEPART', text: 'Auf Heidestraße', endLat: null, endLon: null },
+      { distanceM: 36, maneuver: 'TURN_LEFT', text: 'Links abbiegen', endLat: null, endLon: null },
+    ] }
+    // 80 m left overall: 36 of those belong to the final step, so the left turn is 44 m off.
+    const far = stepAhead(80, route)!
+    expect(far.step.maneuver).toBe('DEPART')
+    expect(far.toManeuverM).toBe(44)
+
+    // Inside the last step the countdown is simply what is left of the walk.
+    expect(stepAhead(20, route)!.toManeuverM).toBe(20)
+    expect(stepAhead(0, route)!.toManeuverM).toBe(0)
+  })
+
+  it('has no step to show for a route without steps', () => {
+    expect(stepAhead(40, { found: true, distanceM: 40, path: [], steps: [] })).toBeNull()
   })
 })

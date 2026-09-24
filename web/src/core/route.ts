@@ -109,13 +109,27 @@ export function progressAlong(pos: LatLon, path: [number, number][]): Progress |
 }
 
 /** The step the user is currently walking, by distance consumed along the route. */
-export function currentStep(remainingM: number, route: Route): RouteStep | null {
+export interface StepAhead {
+  step: RouteStep
+  /** Metres still to walk before this step's manoeuvre. What the banner counts down. */
+  toManeuverM: number
+}
+
+/**
+ * The step being walked, and how far is left of it. Steps are measured from the end of
+ * the route backwards, because remainingM is all we know: the walk is the only clock.
+ */
+export function stepAhead(remainingM: number, route: Route): StepAhead | null {
   if (!route.steps.length) return null
   let left = remainingM
   for (let i = route.steps.length - 1; i >= 0; i--) {
     const d = route.steps[i].distanceM ?? 0
-    if (left <= d) return route.steps[i]
+    if (left <= d) return { step: route.steps[i], toManeuverM: Math.max(0, left) }
     left -= d
   }
-  return route.steps[0]
+  return { step: route.steps[0], toManeuverM: Math.max(0, route.steps[0].distanceM ?? 0) }
+}
+
+export function currentStep(remainingM: number, route: Route): RouteStep | null {
+  return stepAhead(remainingM, route)?.step ?? null
 }

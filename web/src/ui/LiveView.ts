@@ -533,6 +533,8 @@ export function LiveView(opts: {
 
   let history: TimedFix[] = []
   const timers: number[] = []
+  // Re-check once the intro may end: without a new sensor event nothing would.
+  timers.push(window.setTimeout(() => { if (!closed && arPhase === 'scanning') update() }, SCAN_MIN_MS + 50))
   let countdown = 0
   let cardEl: HTMLElement | null = null
 

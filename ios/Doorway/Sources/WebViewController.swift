@@ -20,14 +20,43 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
     /// A public tunnel leads because it is the only address that survives leaving the
     /// flat: the phone's Tailscale has been offline for months and a LAN address only
     /// works on one network. Override at launch with -DoorwayURL <url>.
+    /// The Mac on the local network. Also the host asked for the current tunnel address.
+    private static let lanBase = "http://192.168.12.158:8090"
+
     private static let candidates: [String] = [
-        "https://555331bfe4ab7384-83-135-183-58.serveousercontent.com",
-        "http://192.168.12.158:8090/",
+        "https://2a3e4c389410a5b2-83-135-183-58.serveousercontent.com",
+        lanBase + "/",
     ]
+
+    /// Learned from the Mac at launch. The tunnel hands out a new subdomain on every
+    /// reconnect, so a baked-in address is stale within the hour; the Mac always knows
+    /// the current one, and on a hackathon network the phone can reach it.
+    private var discovered: URL?
 
     private var urls: [URL] {
         if let s = UserDefaults.standard.string(forKey: "DoorwayURL"), let u = URL(string: s) { return [u] }
-        return Self.candidates.compactMap(URL.init(string:))
+        var out = Self.candidates.compactMap(URL.init(string:))
+        if let d = discovered { out.removeAll { $0 == d }; out.insert(d, at: 0) }
+        return out
+    }
+
+    /// Ask the Mac over the LAN which public address it is on right now. Short timeout:
+    /// off that network this must cost the launch nothing, it just falls through.
+    private func discoverURL(_ done: @escaping () -> Void) {
+        guard UserDefaults.standard.string(forKey: "DoorwayURL") == nil,
+              let probe = URL(string: "\(Self.lanBase)/api/live-url") else { return done() }
+        var req = URLRequest(url: probe)
+        req.timeoutInterval = 2
+        req.cachePolicy = .reloadIgnoringLocalCacheData
+        URLSession.shared.dataTask(with: req) { [weak self] data, _, _ in
+            if let data,
+               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let s = obj["url"] as? String, let u = URL(string: s) {
+                self?.discovered = u
+                NSLog("[doorway] discovered %@", s)
+            }
+            DispatchQueue.main.async(execute: done)
+        }.resume()
     }
 
     private var attempt = 0
@@ -81,6 +110,16 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
     override var prefersHomeIndicatorAutoHidden: Bool { true }
 
     private func load(from index: Int) {
+        // Before the first attempt, give the Mac two seconds to name the current tunnel.
+        if index == 0 && discovered == nil && UserDefaults.standard.string(forKey: "DoorwayURL") == nil {
+            status.text = "Suche Server …"
+            discoverURL { [weak self] in self?.loadResolved(from: 0) }
+            return
+        }
+        loadResolved(from: index)
+    }
+
+    private func loadResolved(from index: Int) {
         guard index < urls.count else {
             status.text = "Kein Server erreichbar.\nLäuft Doorway auf dem Mac?"
             retry.isHidden = false

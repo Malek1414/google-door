@@ -19,6 +19,7 @@ import {
   bandText,
   fallbackLine,
   metresLine,
+  noCompassLine,
   noDirectionLine,
   pitchFor,
   safetyLine,
@@ -42,6 +43,8 @@ export const FALLBACK_AFTER = 3
  *  direction, not a distance, and GPS is not allowed to supply one. */
 export const FALLBACK_ASSUMED_M = 10
 export const TICK_MS = 100
+/** No compass reading this long after start: say so once instead of staying silent. */
+export const NO_COMPASS_MS = 3000
 /** A new band must hold this long before it is spoken: compass jitter across a band
  *  edge otherwise speaks a line per tick. The beacon still follows every tick. */
 export const BAND_HOLD_MS = 700
@@ -154,6 +157,8 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     let pendingUnsure = false
     let pendingNoDirection = false
     let saidNoDirection = false
+    let saidNoCompass = false
+    const startedAt = deps.now()
 
     // The safety line is the first thing the session ever says, and it is said once.
     let view: ApproachView = {
@@ -234,8 +239,15 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     }
 
     const tick = () => {
-      if (stopped || rawHeading === null) return
+      if (stopped) return
       const now = deps.now()
+      if (rawHeading === null) {
+        if (!saidNoCompass && now - startedAt >= NO_COMPASS_MS) {
+          saidNoCompass = true
+          emit({ ...view, instruction: noCompassLine(L) })
+        }
+        return
+      }
       heading = smoother.push(rawHeading, now)
       // A map anchor that has aged out is simply re-minted: the surveyed bearing does
       // not go stale, and letting it lapse drops the beacon every MAX_AGE_MS.

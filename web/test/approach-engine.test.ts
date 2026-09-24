@@ -6,7 +6,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { STEP_M } from '../src/core/anchor'
 import { STILL_MS } from '../src/core/approach'
-import { bandText, fallbackLine, noDirectionLine, pitchFor, safetyLine, thresholdLine, throughLine, unsureLine } from '../src/core/instruct'
+import { bandText, fallbackLine, noCompassLine, noDirectionLine, pitchFor, safetyLine, thresholdLine, throughLine, unsureLine } from '../src/core/instruct'
 import { angleDelta } from '../src/core/stability'
 import type { Entrance } from '../src/core/types'
 import { createApproachEngine, FALLBACK_AFTER, INSIDE_MIN_CONFIDENCE, parseDoorFix, saysInside } from '../src/ui/approachEngine'
@@ -387,6 +387,17 @@ describe('band speech does not chatter on compass jitter', () => {
     const said = r.views.slice(from).map((v) => v.instruction).filter((x, i, a) => i === 0 || x !== a[i - 1])
     expect(said.filter((x) => bandLines.has(x)).length).toBeLessThanOrEqual(2)
     expect(new Set(r.views.slice(from).map((v) => v.beaconPitch)).size).toBeGreaterThan(1)
+  })
+})
+
+describe('no compass', () => {
+  it('says so once, 3 s in, instead of staying silent after the safety line', async () => {
+    const r = rig(() => ({ found: false }))
+    for (let i = 0; i < 25; i++) await r.tick()
+    expect(r.spoken()).toEqual([safetyLine('de')])
+    for (let i = 0; i < 100; i++) await r.tick()
+    expect(r.spoken()).toEqual([safetyLine('de'), noCompassLine('de')])
+    expect(r.calls).toHaveLength(0) // still no heading, so still no request
   })
 })
 

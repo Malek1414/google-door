@@ -133,6 +133,14 @@ export function noDirectionLine(lang = 'de'): string {
     : "I can't see the entrance and have no direction for it. Pan the camera slowly."
 }
 
+/** Spoken once when no compass reading has arrived a few seconds in. Without a
+ *  heading there is no direction to give at all, and silence reads as a crash. */
+export function noCompassLine(lang = 'de'): string {
+  return lang.startsWith('de')
+    ? 'Kein Kompass. Ich kann dir keine Richtung geben.'
+    : 'No compass. I cannot give you a direction.'
+}
+
 /** Spoken when the user should be inside. Vision proposes; the user can take it back. */
 export function throughLine(lang = 'de'): string {
   return lang.startsWith('de') ? 'Du müsstest jetzt drin sein.' : 'You should be inside now.'
@@ -166,7 +174,7 @@ export function metresLine(m: number, lang = 'de'): string {
 export type ApproachLine =
   | { kind: 'band'; band: Band }
   | { kind: 'metres'; m: number }
-  | { kind: 'safety' | 'fallback' | 'unsure' | 'threshold' | 'through' | 'noDirection' }
+  | { kind: 'safety' | 'fallback' | 'unsure' | 'threshold' | 'through' | 'noDirection' | 'noCompass' }
 
 export function clipKeyFor(line: ApproachLine): string | null {
   switch (line.kind) {
@@ -192,6 +200,7 @@ export function approachClipBank(lang = 'de'): { key: string; text: string }[] {
     { key: 'approach_threshold', text: thresholdLine(lang) },
     { key: 'approach_through', text: throughLine(lang) },
     { key: 'approach_noDirection', text: noDirectionLine(lang) },
+    { key: 'approach_noCompass', text: noCompassLine(lang) },
   ]
   for (let n = 1; n <= 10; n++) out.push({ key: `m_${n}`, text: metresLine(n, lang) })
   return out

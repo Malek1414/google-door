@@ -70,3 +70,12 @@ export function navSheetLines(seconds: number, remainingM: number, now: Date, de
   const m = remainingM < 1000 ? `${Math.round(remainingM / 10) * 10} m` : `${(remainingM / 1000).toFixed(1).replace('.', de ? ',' : '.')} km`
   return { big: de ? `${mins} Min.` : `${mins} min`, small: `${m} · ${arrivalClock(now, seconds)}` }
 }
+
+/**
+ * Start in the route preview. Any computed route can be navigated (nav mode needs no
+ * door); without a route only a door that may carry guidance can start (Live View
+ * then points straight at it).
+ */
+export function startEnabled(routeOk: boolean, guidableDoor: boolean): boolean {
+  return routeOk || guidableDoor
+}

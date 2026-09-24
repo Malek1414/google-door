@@ -10,7 +10,7 @@
 
 import { haversineM, type LatLon } from '../core/geo'
 import { CONNECTOR_MIN_M, connected, instructionLine, tailLength, walkMinutes, type Route } from '../core/route'
-import { arrivalClock, navState, roundNavM, secondsLeft } from '../core/nav'
+import { arrivalClock, navState, roundNavM, secondsLeft, startEnabled } from '../core/nav'
 import { NEAR_TRIGGER_M } from './LiveView'
 import { computeRoute, D, formatDistance, routeSubline, startBlockedReason, stepsList, type RouteOutcome } from './Directions'
 import type { Profile } from '../core/profile'
@@ -285,6 +285,8 @@ export function MapView(opts: {
   let routeReturn: (() => void) | null = null
   /** The place card currently (or last) open, so a place route can return to it. */
   let lastPlace: PlaceHit | null = null
+  /** Destination of the route being drawn or shown. */
+  let routeTo: LatLon | null = null
 
   // ---- navigation mode (after Start) ----
   // Measured off Maps: Start does not jump into the camera. It turns the map into a
@@ -296,7 +298,10 @@ export function MapView(opts: {
     : { live: 'Live View', end: 'End navigation', arrive: 'Arrival', dest: 'Arrive at destination', inM: (m: number) => `In ${m} m`, you: 'Your location', started: 'Navigation started', near: 'Guide me to the entrance', nearSay: 'You are almost there. Guide you to the entrance?' }
   let navOn = false
   let navRoute: Route | null = null
-  let navDoor: Entrance | null = null
+  /** Where nav mode is going. `door` is set only for a door that may carry guidance:
+   *  the Live View button and the last-10-m handover need it; places navigate without. */
+  let navDest: { lat: number; lon: number; name: string; door: Entrance | null } | null = null
+  let navBack: (() => void) | null = null
   let navFollow: [number, number][] = []
   let navTail = 0
   let navSpoken = -1
@@ -316,13 +321,15 @@ export function MapView(opts: {
   const navSub = h('span', { class: 'gm-navsheet-sub' }, '')
   const navNearBtn = h('button', { class: 'gm-pill gm-pill-primary gm-navnear', type: 'button', hidden: true }, icon('door_front', true), NV.near)
 
-  function startNav(e: Entrance, r: Route) {
+  function startNav(dest: { lat: number; lon: number; name: string; door: Entrance | null }, r: Route, back: () => void) {
     primeSpeech()
     navOn = true
     navRoute = r
-    navDoor = e
+    navDest = dest
+    navBack = back
+    const e = dest.door
     const from = origin()
-    navFollow = connected(from, r.path, { lat: e.lat, lon: e.lon })
+    navFollow = connected(from, r.path, { lat: dest.lat, lon: dest.lon })
     navTail = tailLength(r.path, navFollow)
     navSpoken = -1
     navNearSaid = false
@@ -330,7 +337,8 @@ export function MapView(opts: {
     navBanner.hidden = false
     routeTop.hidden = true
     navNearBtn.hidden = true
-    navNearBtn.onclick = () => void beginGuidance(e)
+    navNearBtn.onclick = () => e && void beginGuidance(e)
+    liveThumb.hidden = !e
     sheetBody.replaceChildren(
       h('div', { class: 'gm-navsheet' },
         h('div', { class: 'gm-navsheet-txt' }, navSummary, navSub),
@@ -348,13 +356,13 @@ export function MapView(opts: {
   }
 
   function updateNav() {
-    if (!navOn || !navRoute || !navDoor) return
+    if (!navOn || !navRoute || !navDest) return
     const pos = origin()
     const st = navState(pos, navRoute, navFollow, navTail)
     const m = roundNavM(st.toManeuverM)
     navIc.replaceChildren(icon(st.glyph, true))
     navDist.textContent = NV.inM(m)
-    navText.textContent = st.text ?? `${NV.dest}: ${pathDoorName(navDoor)}`
+    navText.textContent = st.text ?? `${NV.dest}: ${navDest.name}`
     const secs = secondsLeft(navRoute, st.remainingM)
     navSummary.textContent = `${t.walkMin(Math.max(1, Math.round(secs / 60)))} · ${formatDistance(st.remainingM)}`
     navSub.textContent = `${NV.arrive} ${arrivalClock(new Date(), secs)}`
@@ -364,7 +372,8 @@ export function MapView(opts: {
       announce(line)
       speak(line, { interrupt: true })
     }
-    const near = haversineM(pos, { lat: navDoor.lat, lon: navDoor.lon }) <= NEAR_TRIGGER_M
+    // The last-10-m handover is ours only for a door that may carry guidance.
+    const near = !!navDest.door && haversineM(pos, { lat: navDest.lat, lon: navDest.lon }) <= NEAR_TRIGGER_M
     navNearBtn.hidden = !near
     if (near && !navNearSaid) {
       navNearSaid = true
@@ -384,9 +393,9 @@ export function MapView(opts: {
 
   /** X in navigation: back to the route preview, as in Maps. */
   function endNav() {
-    const e = navDoor
+    const back = navBack
     stopNav()
-    if (e) drawRouteToEntrance(e)
+    if (back) back()
     else clearRoute()
   }
 
@@ -402,11 +411,12 @@ export function MapView(opts: {
 
     const action = (cls: string, ic: string, text: string, on: () => void) =>
       h('button', { class: `gm-pill ${cls}`, type: 'button', onclick: on }, icon(ic, true), text)
-    // Start always holds the first slot. When this door cannot carry guidance the
-    // button is disabled and says why — it does not disappear, because then the next
-    // action shifts left into the place the thumb was already going.
-    const blocked = g?.kind !== 'arrow'
-    const why = blocked ? startBlockedReason(g?.kind === 'text' ? g.reason : null) : null
+    // Start works whenever there is a route: nav mode needs no door. Only Live View and
+    // the last-10-m handover need a door that may carry guidance; for a door that cannot,
+    // the reason stays as an info line under the actions.
+    const guidable = g?.kind === 'arrow'
+    const blocked = !startEnabled(!!r, guidable)
+    const why = e && !guidable ? startBlockedReason(g?.kind === 'text' ? g.reason : null) : null
     const startBtn = h(
       'button',
       {
@@ -416,9 +426,9 @@ export function MapView(opts: {
         'aria-disabled': String(blocked),
         ...(why ? { 'aria-describedby': 'route-start-why' } : {}),
         onclick: () => {
-          if (!e) return
-          if (r) startNav(e, r)
-          else void beginGuidance(e)
+          const to = routeTo
+          if (r && to) startNav({ lat: to.lat, lon: to.lon, name: label ?? D.destination, door: guidable ? e : null }, r, retry)
+          else if (e && guidable) void beginGuidance(e)
         },
       },
       icon(blocked ? 'block' : 'navigation', true),
@@ -437,7 +447,7 @@ export function MapView(opts: {
           h('p', {}, out.ok ? '' : out.message, h('small', {}, D.crow(t.metresShort(crowM)))),
         )
 
-    liveThumb.hidden = blocked || !e
+    liveThumb.hidden = !guidable || !e
     liveThumb.onclick = () => e && void beginGuidance(e)
     const whyLine = why ? [h('p', { id: 'route-start-why', class: 'gm-route-why' }, icon('info'), why)] : []
     sheetBody.replaceChildren(
@@ -1128,6 +1138,7 @@ export function MapView(opts: {
     // previous door in routeTarget, and Start would then guide to a door the user had
     // navigated away from.
     routeTarget = target
+    routeTo = to
     const from = origin()
     clearRoute(false)
     const seq = ++routeSeq

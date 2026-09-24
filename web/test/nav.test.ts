@@ -73,3 +73,15 @@ describe('Dann chip and sheet lines', () => {
     expect(navSheetLines(20, 1234, new Date(2026, 8, 24, 9, 22, 0)).small).toBe('1,2 km · 09:22')
   })
 })
+
+import { startEnabled } from '../src/core/nav'
+describe('startEnabled', () => {
+  it('any route can start, place or non-guidable door included', () => {
+    expect(startEnabled(true, false)).toBe(true)
+    expect(startEnabled(true, true)).toBe(true)
+  })
+  it('without a route only a guidable door starts', () => {
+    expect(startEnabled(false, true)).toBe(true)
+    expect(startEnabled(false, false)).toBe(false)
+  })
+})

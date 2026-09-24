@@ -57,18 +57,22 @@ export const AP = {
  */
 export class Narrator {
   private lastInstruction = ''
+  private lastSeq: number | undefined = undefined
 
   constructor(private readonly language: string = lang) {}
 
   next(v: ApproachView): { text: string; interrupt: boolean } | null {
-    if (!v.instruction || v.instruction === this.lastInstruction) return null
+    if (!v.instruction) return null
+    if (v.instruction === this.lastInstruction && v.seq === this.lastSeq) return null
     this.lastInstruction = v.instruction
+    this.lastSeq = v.seq
     return { text: v.instruction, interrupt: v.instruction.startsWith(safetyLine(this.language)) }
   }
 
   /** After "Noch draußen": the engine's next line is spoken even if it repeats an earlier one. */
   reset(): void {
     this.lastInstruction = ''
+    this.lastSeq = undefined
   }
 }
 
@@ -166,7 +170,10 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
   const beacon = opts.config.beacon && session.audio ? new BeaconAudio(session.audio) : null
   let beaconOn = false
 
+  let current: ApproachView | null = null
+  let hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden'
   const render = (v: ApproachView) => {
+    current = v
     const lay = guideLayout(v)
     const enteringThrough = lay.outsideButton && outsideBtn.hidden
     root.dataset.phase = v.phase
@@ -188,7 +195,8 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
     // VoiceOver: land on the only thing there is to do in `through`.
     if (enteringThrough) outsideBtn.focus()
 
-    const say = narrator.next(v)
+    // Backgrounded: draw, but say nothing and keep the beacon off; resume re-says it.
+    const say = hidden ? null : narrator.next(v)
     if (say) {
       // Speech AND the live region, so VoiceOver gets it even with speech off.
       // Each part of the instruction plays its pre-synthesised clip; only a part with
@@ -198,7 +206,7 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
     }
 
     if (beacon) {
-      if (v.beaconPitch === undefined || v.relBearingDeg === null) {
+      if (hidden || v.beaconPitch === undefined || v.relBearingDeg === null) {
         if (beaconOn) beacon.stop()
         beaconOn = false
       } else {
@@ -234,10 +242,36 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
     run.stillOutside()
   })
 
+  // App backgrounded (lock screen, call, app switch): silence the beacon and the voice
+  // at once instead of letting them run on behind the user's back. Coming back says
+  // where things stand, since the world moved while the screen was away.
+  const onVisibility = () => {
+    const nowHidden = document.visibilityState === 'hidden'
+    if (nowHidden === hidden) return
+    hidden = nowHidden
+    if (hidden) {
+      beacon?.stop()
+      beaconOn = false
+      stopLines(lang)
+      try {
+        speechSynthesis?.cancel()
+      } catch {
+        /* ignored */
+      }
+    } else {
+      const a = session.audio
+      if (a && a.state !== 'running') void a.resume().catch(() => {})
+      narrator.reset()
+      if (current) render(current)
+    }
+  }
+  document.addEventListener('visibilitychange', onVisibility)
+
   let done = false
   function teardown() {
     if (done) return
     done = true
+    document.removeEventListener('visibilitychange', onVisibility)
     unsubscribe()
     run.stop()
     stopHeading.forEach((f) => f())
@@ -249,7 +283,11 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
       /* ignored */
     }
   }
+  let exited = false
   function exit() {
+    // Exit is a big target a shaky hand can hit twice; the map must open once.
+    if (exited) return
+    exited = true
     teardown()
     opts.onExit()
   }
@@ -298,7 +336,10 @@ function DoorCheckScreen(opts: { door: Entrance; config: OutputConfig; onExit: (
       /* ignored */
     }
   }
+  let exited = false
   function exit() {
+    if (exited) return
+    exited = true
     teardown()
     opts.onExit()
   }

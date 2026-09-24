@@ -31,6 +31,11 @@ export function knownLines(lang: string): SpokenPart[] {
 
 const METRES = /^(\d+) (Meter|metres?)$/
 
+/** Band and metres lines: only the newest one is worth saying. */
+export function isTransient(part: SpokenPart, lang: string): boolean {
+  return METRES.test(part.text) || /^(Ein Meter|One metre)$/.test(part.text) || BANDS.some((b) => bandText(b, lang) === part.text)
+}
+
 /**
  * Split a joined instruction back into its lines. Longest known line wins at each
  * position, and only on a word boundary ("1 Meter" never matches inside "10 Meter").
@@ -93,6 +98,11 @@ export class ClipPlayer {
   playInstruction(text: string, lang: string, opts: { interrupt?: boolean } = {}): Promise<void> {
     const parts = splitInstruction(text, lang)
     if (opts.interrupt) this.stop()
+    // A direction or a distance still waiting in the queue is stale once a newer view
+    // arrives: "Links" after the user already turned sends them the wrong way. One-off
+    // lines (unsure, map, through) stay; so does the line playing now. A pending copy
+    // of a line that is queued again is dropped too.
+    this.queue = this.queue.filter((q) => !isTransient(q, lang) && !parts.some((p) => p.text === q.text))
     this.queue.push(...parts)
     return this.drain()
   }

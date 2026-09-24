@@ -51,6 +51,9 @@ export interface ApproachView {
   unsure: boolean
   /** Beacon pitch in Hz. undefined: beacon silent. The engine owns the curve. */
   beaconPitch?: number
+  /** Bumped when the same instruction must be said again (a reminder after silence).
+   *  undefined until the first reminder. */
+  seq?: number
 }
 
 // ── what the screen hands the engine ────────────────────────────────────────

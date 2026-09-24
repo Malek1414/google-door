@@ -130,7 +130,7 @@ describe('the real engine, driven through ApproachIO', () => {
   it('never repeats the same instruction twice in a row while standing still', async () => {
     const r = rig(door(70, 8, () => 0))
     r.heading(100)
-    for (let i = 0; i < 40; i++) await r.tick(150)
+    for (let i = 0; i < 30; i++) await r.tick(150) // inside QUIET_MS; reminders are tested in approach-stress
     const spoken = r.spoken()
     for (let i = 1; i < spoken.length; i++) expect(spoken[i]).not.toBe(spoken[i - 1])
     expect(spoken.filter((x) => x.includes('Links'))).toHaveLength(1)

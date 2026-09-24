@@ -44,6 +44,29 @@ export const TICK_MS = 100
 /** CONTRACT "DoorFix": `inside` ends the guidance, so it needs an explicit true at
  *  this confidence or above. A wrong true abandons someone on the pavement. */
 export const INSIDE_MIN_CONFIDENCE = 0.6
+/** No compass reading this long after the start: say so instead of going silent. */
+export const NO_COMPASS_MS = 3000
+/** Longest stretch without a spoken line while guidance runs (blind user: silence reads as a crash). */
+export const QUIET_MS = 5000
+/** Once the reason for silence has been said (no compass), repeat it only this often. */
+export const EXPLAINED_QUIET_MS = 15000
+/** No camera frame this long counts as one vision miss, so the map fallback still fires. */
+export const NO_FRAME_MISS_MS = 1500
+/** After a 429 from /api/door-fix, wait this long before the next request. */
+export const RATE_LIMIT_BACKOFF_MS = 5000
+/** One /api/door-fix longer than this is a miss; the next try follows. */
+export const DOOR_FIX_TIMEOUT_MS = 8000
+
+// Two lines the engine needs that core/instruct.ts does not have yet (see questions.md).
+// Same register as the core lines; move them there once Malek agrees.
+export function noCompassLine(lang = 'de'): string {
+  return lang.startsWith('de')
+    ? 'Ich bekomme keine Kompassrichtung. Halte das Handy aufrecht vor dich.'
+    : "I'm not getting a compass direction. Hold the phone upright in front of you."
+}
+export function searchingLine(lang = 'de'): string {
+  return lang.startsWith('de') ? 'Ich suche noch den Eingang. Halte die Kamera nach vorn.' : 'Still looking for the entrance. Hold the camera forward.'
+}
 
 export interface EngineDeps {
   fetch: typeof fetch
@@ -93,16 +116,15 @@ export function parseDoorFix(raw: unknown): VisionFix | null {
   return { bearingDeg, distanceM, confidence, source }
 }
 
-const TIMEOUT_MS = 15000
-
 interface VisionReply {
   fix: VisionFix | null
   inside: boolean
 }
 
-async function requestFix(deps: EngineDeps, base: string, frame: string, headingDeg: number): Promise<VisionReply | null> {
+/** null: no usable answer (network, 5xx, timeout). 'rate-limited': 429, back off. */
+async function requestFix(deps: EngineDeps, base: string, frame: string, headingDeg: number): Promise<VisionReply | 'rate-limited' | null> {
   const ctl = new AbortController()
-  const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS)
+  const timer = setTimeout(() => ctl.abort(), DOOR_FIX_TIMEOUT_MS)
   try {
     const r = await deps.fetch(`${base}/api/door-fix`, {
       method: 'POST',
@@ -110,6 +132,7 @@ async function requestFix(deps: EngineDeps, base: string, frame: string, heading
       body: JSON.stringify({ frame, headingDeg }),
       signal: ctl.signal,
     })
+    if (r.status === 429) return 'rate-limited'
     if (!r.ok) return null
     const raw: unknown = await r.json()
     return { fix: parseDoorFix(raw), inside: saysInside(raw) }
@@ -133,6 +156,7 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     let anchor: Anchor | null = null
     let inFlight = false
     let lastRequestAt = -Infinity
+    let notBefore = -Infinity
     let failures = 0
     let saidUnsure = false
     let lastBand: Band | null = null
@@ -142,6 +166,10 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     let pendingUnsure = false
     let pendingNoDirection = false
     let saidNoDirection = false
+    const startedAt = deps.now()
+    /** When a line was last handed to the screen to be spoken. */
+    let lastSaidAt = startedAt
+    let seq = 0
 
     // The safety line is the first thing the session ever says, and it is said once.
     let view: ApproachView = {
@@ -157,9 +185,16 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     const emit = (v: ApproachView) => {
       const key = JSON.stringify(v)
       if (key === viewKey) return
+      if (v.instruction !== view.instruction || v.seq !== view.seq) lastSaidAt = deps.now()
       view = v
       viewKey = key
       subs.forEach((cb) => cb(v))
+    }
+
+    /** Say `text` again (or for the first time) even if it equals the current instruction. */
+    const remind = (text: string, patch: Partial<ApproachView> = {}) => {
+      seq += 1
+      emit({ ...view, ...patch, instruction: text, seq })
     }
 
     const fallbackAnchor = (): Anchor | null => {
@@ -173,21 +208,49 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     /** Is the current anchor still young enough to speak from? (Read-only: no tick.) */
     const anchorFresh = () => anchor !== null && deps.now() - anchor.ts <= MAX_AGE_MS
 
+    /** One try without a trusted fix: after FALLBACK_AFTER of them, the map bearing. */
+    const miss = () => {
+      failures += 1
+      if (failures >= FALLBACK_AFTER && !anchorFresh()) {
+        const fb = fallbackAnchor()
+        if (fb) {
+          anchor = fb
+          approach.setAnchor(fb)
+          failures = 0
+        } else if (!saidNoDirection) {
+          // Vision failed and the door has no surveyed bearing: nothing to point at.
+          // Never dead-reckon, but say so: silence reads as a crash.
+          pendingNoDirection = true
+        }
+      }
+    }
+
     const maybeRequest = (st: ApproachState) => {
       if (inFlight || heading === null || approach.currentPhase === 'through') return
       const now = deps.now()
+      if (now < notBefore) return
       const due = guard.mode === 'live' ? now - lastRequestAt >= LIVE_EVERY_MS : st.needsFix && now - lastRequestAt >= ONDEMAND_MIN_GAP_MS
       if (!due) return
       const frame = io.frame()
-      if (!frame) return
+      if (!frame) {
+        // No camera picture (denied, not started, backgrounded): count it as a miss at
+        // the on-demand cadence, so the map fallback or the no-direction line still come.
+        if (now - lastRequestAt >= NO_FRAME_MISS_MS) {
+          lastRequestAt = now
+          miss()
+        }
+        return
+      }
       // The fix is the truth at the moment of the frame: anchor it to the heading,
       // steps and time of the frame, not of the answer.
       const at = { heading, steps, ts: now }
       inFlight = true
       lastRequestAt = now
-      void requestFix(deps, io.apiBase, frame, at.heading).then((reply) => {
+      void requestFix(deps, io.apiBase, frame, at.heading).then((got) => {
         inFlight = false
         if (stopped) return
+        if (got === 'rate-limited') notBefore = deps.now() + RATE_LIMIT_BACKOFF_MS
+        const reply = got === 'rate-limited' ? null : got
         const fix = reply?.fix ?? null
         const wasLive = guard.mode === 'live'
         const verdict = fix ? guard.push({ bearingDeg: fix.bearingDeg, headingDeg: at.heading, confidence: fix.confidence }) : null
@@ -196,19 +259,7 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
           anchor = { bearingDeg: fix.bearingDeg, distanceM: fix.distanceM, headingDeg: at.heading, steps: at.steps, ts: at.ts, source: fix.source }
           approach.setAnchor(anchor)
         } else {
-          failures += 1
-          if (failures >= FALLBACK_AFTER && !anchorFresh()) {
-            const fb = fallbackAnchor()
-            if (fb) {
-              anchor = fb
-              approach.setAnchor(fb)
-              failures = 0
-            } else if (!saidNoDirection) {
-              // Vision failed and the door has no surveyed bearing: nothing to point at.
-              // Never dead-reckon, but say so: silence reads as a crash.
-              pendingNoDirection = true
-            }
-          }
+          miss()
         }
         // Interior proposes "through". Only from a reply the guard did not reject: a
         // found fix must be trusted; a found:false reply (entrance behind the camera,
@@ -220,8 +271,16 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     }
 
     const tick = () => {
-      if (stopped || heading === null) return
-      const st = approach.tick({ headingDeg: heading, steps, nowMs: deps.now() })
+      if (stopped) return
+      const now = deps.now()
+      if (heading === null) {
+        // No compass at all: nothing can be pointed at. Say why, and keep saying it now
+        // and then, instead of leaving a blind user with the safety line and silence.
+        const quiet = view.instruction === noCompassLine(L) ? EXPLAINED_QUIET_MS : 0
+        if (now - startedAt >= NO_COMPASS_MS && now - lastSaidAt >= quiet) remind(noCompassLine(L), { relBearingDeg: null, distanceM: null, beaconPitch: undefined })
+        return
+      }
+      const st = approach.tick({ headingDeg: heading, steps, nowMs: now })
       const lines: string[] = []
 
       if (pendingUnsure && !saidUnsure) {
@@ -264,7 +323,7 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
 
       // In `through` there is nothing left to point at: no arrow, no metres, no beacon.
       const aim = st.phase === 'through' ? null : p
-      emit({
+      const next: ApproachView = {
         phase: st.phase,
         relBearingDeg: aim ? aim.relBearingDeg : null,
         distanceM: aim && aim.source !== 'osm-fallback' ? aim.distanceM : null,
@@ -272,7 +331,16 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
         source: source ?? view.source,
         unsure: guard.hasFallenBack,
         beaconPitch: aim ? pitchFor(aim.relBearingDeg) : undefined,
-      })
+        ...(view.seq !== undefined ? { seq: view.seq } : {}),
+      }
+      emit(next)
+      // Nothing said for QUIET_MS: repeat where the door is, or say that it is still
+      // being looked for. Never in `through`: there the job is done and the button waits.
+      if (!lines.length && st.phase !== 'through' && now - lastSaidAt >= QUIET_MS) {
+        if (!aim) remind(searchingLine(L))
+        else if (st.phase === 'threshold' && aim.source !== 'osm-fallback') remind(thresholdLine(L))
+        else remind(aim.source === 'osm-fallback' ? bandText(st.band, L) : `${bandText(st.band, L)} ${metresLine(aim.distanceM, L)}`)
+      }
       maybeRequest(st)
     }
 
@@ -290,6 +358,7 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
         return () => subs.delete(cb)
       },
       stillOutside() {
+        if (stopped) return
         // Core takes the proposal back and restarts its stillness clock.
         approach.stillOutside()
         lastPhase = approach.currentPhase
@@ -297,6 +366,7 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
         tick()
       },
       stop() {
+        if (stopped) return
         stopped = true
         offTimer()
         offHeading()

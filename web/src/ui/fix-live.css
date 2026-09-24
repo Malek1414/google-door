@@ -69,3 +69,13 @@
 
 /* a11y #36: a focus ring that survives any camera image */
 .ar-round:focus-visible, .ar-look:focus-visible { outline: 3px solid #fff; outline-offset: 2px; box-shadow: 0 0 0 6px #000; }
+
+/* The health snackbar (z 10000, full width at the top) covered Stop and Feedback in
+   Live View and the exit button of the approach: a finger aimed at "stop" hit the
+   snackbar. On these two screens it keeps clear of the round buttons. */
+body:has(section.ar) .health-banner {
+  left: 16px; right: 140px; width: auto; max-width: none; transform: none;
+}
+body:has(section.apr) .health-banner {
+  left: 88px; right: 16px; width: auto; max-width: none; transform: none;
+}

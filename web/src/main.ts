@@ -82,15 +82,16 @@ function showMap(p: Profile) {
   MapView({
     profile: p,
     openDoor: params.openDoor,
-    onGuide: (target) => showLive(target, p),
+    onGuide: (target, name) => showLive(target, p, name),
     onSettings: () => Onboard({ initial: p, onDone: showMap }),
     onContribute: () => Recorder({ onBack: () => showMap(p) }),
   })
 }
 
-function showLive(target: ArrowTarget, p: Profile) {
+function showLive(target: ArrowTarget, p: Profile, name?: string) {
   LiveView({
     target,
+    ...(name ? { name } : {}),
     sensors: realSensors(),
     config: outputFor(p),
     onExit: () => showMap(p),

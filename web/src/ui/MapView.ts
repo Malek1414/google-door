@@ -29,6 +29,7 @@ import { loadMode, saveMode, showDoorMarkers, type Mode } from '../core/mode'
 import { loadSurvey, mergeSurvey } from '../core/survey'
 import { NORMAL_CHIPS, PlacesUnavailable, searchCategory, searchText, type PlaceHit } from '../places'
 import { lang } from '../strings'
+import { doorName } from './doorName'
 import { openSearchScreen } from './SearchScreen'
 import { exploreFeed } from './ExploreFeed'
 import { t } from '../strings'
@@ -164,7 +165,8 @@ function pinLogo(): SVGElement {
 export function MapView(opts: {
   profile: Profile
   openDoor?: string | null
-  onGuide: (target: ArrowTarget) => void
+  /** `name` is the distinguishable door name (doorName), shown and spoken in Live View. */
+  onGuide: (target: ArrowTarget, name?: string) => void
   onSettings: () => void
   onContribute: () => void
 }): () => void {
@@ -348,12 +350,22 @@ export function MapView(opts: {
   }
 
   /** The one gesture that unlocks compass, camera and sound. Must await first. */
+  // A double tap on Start must open one Live View, not two stacked ones.
+  let guiding = false
   async function beginGuidance(e: Entrance) {
+    if (guiding) return
     const g = guidanceFor(e, opts.profile)
     if (g.kind !== 'arrow') return
-    await unlockAll({ camera: true })
+    guiding = true
+    const name = doorName(e, origin(), buildings)
+    try {
+      await unlockAll({ camera: true })
+    } catch (err) {
+      guiding = false
+      throw err
+    }
     teardown()
-    opts.onGuide(g.target)
+    opts.onGuide(g.target, name)
   }
 
   const layersBtn = h('button', { class: 'gm-round gm-layers', type: 'button', 'aria-label': t.layers }, icon('layers'))
@@ -1191,7 +1203,7 @@ export function MapView(opts: {
     // A revolving door or steps decide whether this door works at all for a wheelchair:
     // named in the subtitle and shown right under the actions, above the fold.
     const warnShort = e.warnings.map((w) => (t.warning[w] ?? w).split('.')[0])
-    showCard(e, cardHead(e.name ?? t.unnamedEntrance, e), h('p', { class: 'gm-sheet-sub' }, [stepFreeLabel(e.stepFree), ...warnShort, t.metresShort(haversineM(origin(), e)), b?.name ?? b?.addr ?? null].filter(Boolean).join(' · ')), pills, warningsBlock(e), streetView(e), tabs, ...panels)
+    showCard(e, cardHead(doorName(e, origin(), buildings), e), h('p', { class: 'gm-sheet-sub' }, [stepFreeLabel(e.stepFree), ...warnShort, t.metresShort(haversineM(origin(), e)), b?.name ?? b?.addr ?? null].filter(Boolean).join(' · ')), pills, warningsBlock(e), streetView(e), tabs, ...panels)
   }
 
   function openBuilding(b: Building) {

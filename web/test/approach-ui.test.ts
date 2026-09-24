@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { AP, checkRows, Narrator } from '../src/ui/Approach'
-import { approachModeFor, parseDoorCheck, UNCLEAR, type ApproachView } from '../src/ui/approachPort'
+import { fallbackLine, safetyLine } from '../src/core/instruct'
+import { Narrator } from '../src/ui/Approach'
+import { approachModeFor, type ApproachView } from '../src/ui/approachPort'
 import { DEMO_SCRIPT } from '../src/ui/approachDemo'
 import { groundPlane, stackTransform } from '../src/ui/ar'
 
@@ -31,58 +32,38 @@ describe('approachModeFor: who sees the trigger', () => {
   })
 })
 
-describe('Narrator: what is said aloud', () => {
-  it('speaks the safety line exactly once, at the start, before the first instruction', () => {
-    const n = new Narrator()
-    const all = [
-      ...n.next(view()),
-      ...n.next(view()),
-      ...n.next(view({ instruction: 'Geradeaus', phase: 'walking' })),
-      ...n.next(view({ instruction: 'Die Tür ist direkt vor dir.', phase: 'threshold' })),
-    ]
-    expect(all.filter((l) => l === AP.safety)).toHaveLength(1)
-    expect(all[0]).toBe(AP.safety)
+describe('Narrator: when the screen speaks', () => {
+  const said = (n: Narrator, vs: ApproachView[]) => vs.map((v) => n.next(v)).filter((x) => x !== null)
+  it('the engine opens with the safety line; it is spoken once, and only it interrupts', () => {
+    const n = new Narrator('de')
+    const out = said(n, [
+      view({ instruction: safetyLine('de'), relBearingDeg: null, source: null }),
+      view({ instruction: safetyLine('de'), relBearingDeg: null, source: null }),
+      view({ instruction: 'Links' }),
+      view({ instruction: 'Geradeaus', phase: 'walking' }),
+      view({ instruction: 'Die Tür ist direkt vor dir.', phase: 'threshold' }),
+    ])
+    expect(out.filter((x) => x.text.includes(safetyLine('de')))).toHaveLength(1)
+    expect(out[0]).toEqual({ text: safetyLine('de'), interrupt: true })
+    expect(out.slice(1).every((x) => !x.interrupt)).toBe(true)
+  })
+  it('adds nothing of its own: the fallback line comes from the engine, verbatim', () => {
+    const n = new Narrator('de')
+    n.next(view({ instruction: safetyLine('de') }))
+    const fb = `${fallbackLine('de')} Links`
+    expect(n.next(view({ instruction: fb, source: 'osm-fallback' }))).toEqual({ text: fb, interrupt: false })
+    expect(n.next(view({ instruction: fb, source: 'osm-fallback' }))).toBeNull()
   })
   it('speaks an instruction only when it changes (no "links ... links ... links")', () => {
-    const n = new Narrator()
+    const n = new Narrator('de')
     n.next(view())
-    expect(n.next(view({ relBearingDeg: -18 }))).toEqual([])
-    expect(n.next(view({ instruction: 'Geradeaus' }))).toEqual(['Geradeaus'])
+    expect(n.next(view({ relBearingDeg: -18 }))).toBeNull()
+    expect(n.next(view({ instruction: 'Geradeaus' }))).toEqual({ text: 'Geradeaus', interrupt: false })
   })
-  it('names the map as the source when vision falls back, once per switch', () => {
-    const n = new Narrator()
-    n.next(view())
-    expect(n.next(view({ source: 'osm-fallback' }))).toEqual([AP.fromMap])
-    expect(n.next(view({ source: 'osm-fallback' }))).toEqual([])
-    n.next(view({ source: 'gemini-frame' }))
-    expect(n.next(view({ source: 'osm-fallback' }))).toEqual([AP.fromMap])
-  })
-  it('passes the engine words through verbatim', () => {
-    const n = new Narrator()
-    expect(n.next(view({ instruction: 'Ich bin mir gerade unsicher.' }))).toContain('Ich bin mir gerade unsicher.')
-  })
-})
-
-describe('wheelchair verdict: unsure renders unklar', () => {
-  it('garbage, 404 bodies and missing fields are all unclear', () => {
-    expect(parseDoorCheck(null)).toEqual(UNCLEAR)
-    expect(parseDoorCheck('nope')).toEqual(UNCLEAR)
-    expect(parseDoorCheck({ detail: 'Not Found' })).toEqual(UNCLEAR)
-  })
-  it('low confidence makes every field unclear', () => {
-    expect(parseDoorCheck({ step: false, widthCm: 90, opens: 'automatic', confidence: 0.3 })).toEqual(UNCLEAR)
-  })
-  it('keeps what the model is sure of and blanks the rest', () => {
-    expect(parseDoorCheck({ step: 'no', widthCm: null, opens: 'magic' })).toEqual({ step: 'no', widthCm: null, opens: 'unclear' })
-    expect(parseDoorCheck({ step: false, widthCm: 88, opens: 'automatic', confidence: 0.9 })).toEqual({ step: 'no', widthCm: 88, opens: 'automatic' })
-  })
-  it('implausible widths are unclear, never shown', () => {
-    expect(parseDoorCheck({ widthCm: 5 }).widthCm).toBeNull()
-    expect(parseDoorCheck({ widthCm: Number.NaN }).widthCm).toBeNull()
-  })
-  it('card rows say unklar for every unclear field', () => {
-    expect(checkRows(UNCLEAR).map(([, v]) => v)).toEqual([AP.unclear, AP.unclear, AP.unclear])
-    expect(checkRows({ step: 'no', widthCm: 88, opens: 'push' })[1][1]).toBe(AP.widthCm(90))
+  it('the screen holds no spoken wording of its own', () => {
+    const src = readFileSync(resolve(__dirname, '../src/ui/Approach.ts'), 'utf8')
+    expect(src).not.toContain('Ich führe dich nur zur Tür')
+    expect(src).not.toMatch(/AP\.safety/)
   })
 })
 

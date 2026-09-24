@@ -9,99 +9,61 @@
 
 import { BeaconAudio } from '../audio'
 import { apiBase } from '../config'
+import { beaconFor } from '../core/beacon'
 import { startHeading } from '../core/heading'
+import { safetyLine } from '../core/instruct'
 import type { OutputConfig } from '../core/profile'
 import type { Entrance } from '../core/types'
 import { announce, session, speak } from '../session'
 import { lang, t } from '../strings'
-import {
-  engine,
-  postDoorCheck,
-  postDoorFix,
-  type ApproachMode,
-  type ApproachView,
-  type DoorCheck,
-  type DoorFixSource,
-} from './approachPort'
+import { engine, type ApproachMode, type ApproachView } from './approachPort'
+import { checkDoor, runDoorCheckOnce, verdictNote, verdictRows } from './doorCheck'
 import { h, mount, s } from './dom'
 import { grabFrame } from './LiveView'
 import './approach.css'
 
+// Screen chrome only. Everything spoken during guidance comes from the engine
+// (core/instruct.ts); the verdict rows come from doorCheck.verdictRows.
 export const AP = {
   de: {
     title: 'Zum Eingang',
     exit: 'Beenden',
-    safety: 'Ich führe dich nur zur Tür. Achte weiter selbst auf deine Umgebung.',
     fromMap: 'Richtung aus der Karte, nicht aus der Kamera.',
     stillOutside: 'Noch draußen',
     checking: 'Ich prüfe die Tür.',
     checkTitle: 'Die Tür',
-    step: 'Stufe',
-    width: 'Breite',
-    opens: 'Öffnet',
-    unclear: 'unklar',
-    yes: 'ja',
-    no: 'nein',
-    widthCm: (cm: number) => `ca. ${cm} cm`,
-    open: { automatic: 'automatisch', push: 'drücken', pull: 'ziehen', revolving: 'Drehtür', unclear: 'unklar' },
     offline: 'Die Prüfung ist gerade nicht erreichbar.',
     noCamera: 'Kein Kamerabild.',
   },
   en: {
     title: 'To the entrance',
     exit: 'Stop',
-    safety: 'I only guide you to the door. Keep paying attention to your surroundings.',
     fromMap: 'Direction from the map, not the camera.',
     stillOutside: 'Still outside',
     checking: 'Checking the door.',
     checkTitle: 'The door',
-    step: 'Step',
-    width: 'Width',
-    opens: 'Opens',
-    unclear: 'unclear',
-    yes: 'yes',
-    no: 'no',
-    widthCm: (cm: number) => `about ${cm} cm`,
-    open: { automatic: 'automatic', push: 'push', pull: 'pull', revolving: 'revolving door', unclear: 'unclear' },
     offline: 'The check is not available right now.',
     noCamera: 'No camera picture.',
   },
 }[lang === 'de' ? 'de' : 'en']
 
 /**
- * Pure. Decides WHAT TO SAY ALOUD from the engine's views, never what the words are:
- * the safety line exactly once, at mode start, then each instruction only when it
- * changes, plus the source note when the direction starts coming from the map.
+ * Pure. Decides WHEN to speak, never what: the engine's instruction is spoken verbatim
+ * each time it changes. The engine already opens with the safety line and names the
+ * map fallback (core/instruct.ts), so nothing is added here. Only the safety line may
+ * cut off what was playing (the arrival card); every later line queues behind the
+ * previous one so a joined "Links 5 Meter" is never clipped by the next view.
  */
 export class Narrator {
-  private started = false
   private lastInstruction = ''
-  private lastSource: DoorFixSource | null = null
 
-  next(v: ApproachView): string[] {
-    const out: string[] = []
-    if (!this.started) {
-      this.started = true
-      out.push(AP.safety)
-    }
-    if (v.source === 'osm-fallback' && this.lastSource !== 'osm-fallback') out.push(AP.fromMap)
-    this.lastSource = v.source
-    if (v.instruction && v.instruction !== this.lastInstruction) out.push(v.instruction)
+  constructor(private readonly language: string = lang) {}
+
+  next(v: ApproachView): { text: string; interrupt: boolean } | null {
+    if (!v.instruction || v.instruction === this.lastInstruction) return null
     this.lastInstruction = v.instruction
-    return out
+    return { text: v.instruction, interrupt: v.instruction.startsWith(safetyLine(this.language)) }
   }
-}
-
-/** Card rows for a verdict. 'unclear' everywhere the model was not sure. */
-export function checkRows(c: DoorCheck): [string, string][] {
-  const step = c.step === 'yes' ? AP.yes : c.step === 'no' ? AP.no : AP.unclear
-  // Round to 5 cm: the model estimates from a picture, the card must not look like a tape measure.
-  const width = c.widthCm === null ? AP.unclear : AP.widthCm(Math.round(c.widthCm / 5) * 5)
-  return [
-    [AP.step, step],
-    [AP.width, width],
-    [AP.opens, AP.open[c.opens]],
-  ]
 }
 
 function cameraEl(): HTMLVideoElement {
@@ -191,24 +153,22 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
     srcEl.hidden = v.source !== 'osm-fallback'
     outsideBtn.hidden = v.phase !== 'through'
 
-    const lines = narrator.next(v)
-    if (lines.length) {
-      // Speech AND the live region, so VoiceOver gets it even with speech off. One call
-      // each: announce() replaces the region, so separate calls would drop all but the last.
-      // Only the opening (with the safety line) cuts off what the arrival card was saying.
-      const text = lines.join(' ')
-      speak(text, { interrupt: lines[0] === AP.safety })
-      announce(text)
+    const say = narrator.next(v)
+    if (say) {
+      // Speech AND the live region, so VoiceOver gets it even with speech off.
+      if (opts.config.speak) speak(say.text, { interrupt: say.interrupt })
+      announce(say.text)
     }
 
     if (beacon) {
-      if (v.beaconPitch === undefined) {
+      if (v.beaconPitch === undefined || v.relBearingDeg === null) {
         if (beaconOn) beacon.stop()
         beaconOn = false
       } else {
         if (!beaconOn) beacon.start()
         beaconOn = true
-        beacon.update({ pitchHz: v.beaconPitch, pulseHz: 4, panLR: 0, volume: 0.3 })
+        // Pitch is the engine's; pan, pulse and volume are the app's shared beacon grammar.
+        beacon.update({ ...beaconFor(v.distanceM ?? Number.NaN, v.relBearingDeg), pitchHz: v.beaconPitch })
       }
     }
   }
@@ -227,7 +187,6 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
       window.addEventListener('devicemotion', on)
       return () => window.removeEventListener('devicemotion', on)
     },
-    doorFix: postDoorFix,
     apiBase: apiBase(),
   })
   const unsubscribe = run.subscribe(render)
@@ -266,19 +225,24 @@ function DoorCheckScreen(opts: { door: Entrance; config: OutputConfig; onExit: (
 
   let closed = false
   // Exactly one request per screen. No retry loop, no beacon, no turn-by-turn.
-  void frameWhenReady(cam).then(async (frame) => {
-    const { check, reachable } = await postDoorCheck(frame)
+  let frame: string | null = null
+  void runDoorCheckOnce(
+    frameWhenReady(cam).then((f) => (frame = f)),
+    checkDoor,
+  ).then((result) => {
     if (closed) return
-    const rows = checkRows(check)
+    const rows = verdictRows(result, lang)
+    const modelNote = verdictNote(result)
     card.replaceChildren(
       h('h2', { class: 'apr-card-title' }, AP.checkTitle),
-      h('dl', { class: 'apr-rows' }, ...rows.flatMap(([k, v]) => [h('dt', {}, k), h('dd', { class: v === AP.unclear ? 'is-unclear' : '' }, v)])),
+      h('dl', { class: 'apr-rows' }, ...rows.flatMap((r) => [h('dt', {}, r.label), h('dd', { class: r.unclear ? 'is-unclear' : '' }, r.value)])),
+      ...(modelNote ? [h('p', { class: 'apr-note' }, modelNote)] : []),
     )
     card.hidden = false
-    const note = !frame ? AP.noCamera : !reachable ? AP.offline : ''
+    const note = !frame ? AP.noCamera : !result.reachable ? AP.offline : ''
     status.textContent = note
     status.hidden = !note
-    const spoken = [...rows.map(([k, v]) => `${k}: ${v}.`), note].filter(Boolean).join(' ')
+    const spoken = [...rows.map((r) => `${r.label}: ${r.value}.`), modelNote, note].filter(Boolean).join(' ')
     if (opts.config.speak) speak(spoken, { interrupt: true })
     announce(spoken)
   })

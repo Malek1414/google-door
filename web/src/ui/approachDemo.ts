@@ -7,6 +7,8 @@
 // ?approach=demo              plays the script, one step every 2.5 s, then stays in `through`
 // ?approach=demo&phase=X      holds the first step of phase X (for screenshots)
 
+import { safetyLine } from '../core/instruct'
+import { lang } from '../strings'
 import type { ApproachSession, ApproachView, Phase, StartApproach } from './approachPort'
 
 export const DEMO_SCRIPT: readonly ApproachView[] = [
@@ -25,8 +27,10 @@ export const startDemoApproach: StartApproach = () => {
   const q = new URLSearchParams(typeof location === 'undefined' ? '' : location.search)
   const hold = q.get('phase') as Phase | null
   const holdAt = hold ? DEMO_SCRIPT.findIndex((v) => v.phase === hold) : -1
-  let i = holdAt >= 0 ? holdAt : 0
-  let view: ApproachView = DEMO_SCRIPT[i]
+  // Like the real engine: the session opens with the safety line, then the script.
+  let i = holdAt >= 0 ? holdAt : -1
+  let view: ApproachView =
+    i >= 0 ? DEMO_SCRIPT[i] : { phase: 'orienting', relBearingDeg: null, distanceM: null, instruction: safetyLine(lang), source: null, unsure: false }
   const subs = new Set<(v: ApproachView) => void>()
   const emit = (v: ApproachView) => {
     view = v
@@ -47,7 +51,9 @@ export const startDemoApproach: StartApproach = () => {
       return () => subs.delete(cb)
     },
     stillOutside() {
-      // What the real engine is expected to do: back to threshold, guidance keeps running.
+      // What the real engine does: back to threshold, and the script stops advancing so
+      // it does not walk straight back into `through`.
+      if (timer) clearInterval(timer)
       i = DEMO_SCRIPT.findIndex((v) => v.phase === 'threshold')
       emit({ ...DEMO_SCRIPT[i], instruction: 'Weiter zur Tür.' })
     },

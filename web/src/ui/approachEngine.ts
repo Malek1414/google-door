@@ -18,6 +18,7 @@ import {
   atDoorLine,
   type Band,
   bandText,
+  doorTypeLine,
   fallbackLine,
   metresLine,
   noCameraLine,
@@ -333,6 +334,8 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
         if (st.phase !== 'through') {
           if (st.phase === 'threshold' && lastPhase !== 'threshold' && p.source !== 'osm-fallback') {
             lines.push(thresholdLine(L))
+            const doorType = doorTypeLine(io.door.door, io.door.automatic, L)
+            if (doorType) lines.push(doorType)
           } else if (st.band === lastBand) {
             candidateBand = null
           } else {

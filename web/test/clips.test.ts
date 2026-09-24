@@ -32,6 +32,13 @@ describe('splitInstruction: every line gets its clip key', () => {
       { text: metresLine(5, 'de'), key: 'm_5' },
     ])
   })
+  it('threshold plus surveyed door type splits into two clips', () => {
+    const joined = `${thresholdLine('de')} Automatische Schiebetür.`
+    expect(splitInstruction(joined, 'de')).toEqual([
+      { text: thresholdLine('de'), key: 'approach_threshold' },
+      { text: 'Automatische Schiebetür.', key: 'door_sliding_auto' },
+    ])
+  })
   it('longest band wins ("Leicht links" is not "Links")', () => {
     expect(splitInstruction(bandText('slight-left', 'de'), 'de')[0].key).toBe('band_slight_left')
   })

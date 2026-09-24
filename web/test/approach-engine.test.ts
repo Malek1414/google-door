@@ -6,7 +6,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { STEP_M } from '../src/core/anchor'
 import { STILL_MS } from '../src/core/approach'
-import { atDoorLine, bandText, fallbackLine, noCameraLine, noCompassLine, noDirectionLine, pitchFor, safetyLine, searchingLine, thresholdLine, throughLine, unsureLine } from '../src/core/instruct'
+import { atDoorLine, bandText, doorTypeLine, fallbackLine, noCameraLine, noCompassLine, noDirectionLine, pitchFor, safetyLine, searchingLine, thresholdLine, throughLine, unsureLine } from '../src/core/instruct'
 import { angleDelta } from '../src/core/stability'
 import type { Entrance } from '../src/core/types'
 import { createApproachEngine, FALLBACK_AFTER, TIMEOUT_MS, INSIDE_MIN_CONFIDENCE, parseDoorFix, saysInside } from '../src/ui/approachEngine'
@@ -447,6 +447,33 @@ describe('a slow or rate-limited model', () => {
     for (let i = 0; i < 300; i++) await r.tick()
     expect(r.spoken().filter((x) => x.includes(searchingLine('de')))).toHaveLength(1)
     expect(r.spoken().some((x) => x.includes(fallbackLine('de')))).toBe(true)
+  })
+})
+
+describe('door type at the threshold: surveyed record only', () => {
+  it('appends the surveyed door type to the threshold line', async () => {
+    const r = rig(atDoor()) // DOOR: sliding, automatic
+    r.heading(100)
+    await r.tick()
+    await r.tick()
+    expect(r.views.at(-1)!.phase).toBe('threshold')
+    expect(r.spoken().join(' ')).toContain(`${thresholdLine('de')} Automatische Schiebetür.`)
+  })
+
+  it('says no door type when the record has none, whatever vision calls it', async () => {
+    const r = rig(atDoor({ kind: 'revolving' }), { door: null, automatic: false })
+    r.heading(100)
+    await r.tick()
+    await r.tick()
+    expect(r.spoken().join(' ')).toContain(thresholdLine('de'))
+    expect(r.spoken().join(' ')).not.toMatch(/Drehtür|Schiebetür|Automatische/)
+  })
+
+  it('doorTypeLine covers the record', () => {
+    expect(doorTypeLine('sliding', true)).toBe('Automatische Schiebetür.')
+    expect(doorTypeLine('revolving', false, 'en')).toBe('Revolving door.')
+    expect(doorTypeLine('yes', false)).toBeNull()
+    expect(doorTypeLine(null, true)).toBe('Automatische Tür.')
   })
 })
 

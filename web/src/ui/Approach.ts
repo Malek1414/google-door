@@ -17,6 +17,7 @@ import type { Entrance } from '../core/types'
 import { announce, session, speak } from '../session'
 import { lang, t } from '../strings'
 import { engine, type ApproachMode, type ApproachView } from './approachPort'
+import { playInstruction, reportMissingClips, stopLines } from './clips'
 import { checkDoor, runDoorCheckOnce, verdictNote, verdictRows } from './doorCheck'
 import { h, mount, s } from './dom'
 import { grabFrame } from './LiveView'
@@ -160,6 +161,7 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
   mount(root)
 
   const narrator = new Narrator()
+  reportMissingClips(lang)
   const beacon = opts.config.beacon && session.audio ? new BeaconAudio(session.audio) : null
   let beaconOn = false
 
@@ -188,7 +190,9 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
     const say = narrator.next(v)
     if (say) {
       // Speech AND the live region, so VoiceOver gets it even with speech off.
-      if (opts.config.speak) speak(say.text, { interrupt: say.interrupt })
+      // Each part of the instruction plays its pre-synthesised clip; only a part with
+      // no clip goes to /api/speak (Q9).
+      if (opts.config.speak) playInstruction(say.text, { interrupt: say.interrupt, lang })
       announce(say.text)
     }
 
@@ -237,6 +241,7 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
     run.stop()
     stopHeading.forEach((f) => f())
     beacon?.stop()
+    stopLines(lang)
     try {
       speechSynthesis?.cancel()
     } catch {

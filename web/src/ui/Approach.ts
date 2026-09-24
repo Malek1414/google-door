@@ -14,7 +14,7 @@ import { startHeading } from '../core/heading'
 import { metresLine, safetyLine } from '../core/instruct'
 import type { OutputConfig } from '../core/profile'
 import type { Entrance } from '../core/types'
-import { announce, session, speak } from '../session'
+import { announce, keepScreenOn, session, speak } from '../session'
 import { lang, t } from '../strings'
 import { engine, type ApproachMode, type ApproachView } from './approachPort'
 import { playInstruction, preloadClips, reportMissingClips, stopLines } from './clips'
@@ -143,7 +143,23 @@ function bigArrow(): SVGSVGElement {
 }
 
 export function Approach(opts: { door: Entrance; mode: ApproachMode; config: OutputConfig; onExit: () => void }): () => void {
-  return opts.mode === 'check' ? DoorCheckScreen(opts) : GuideScreen(opts)
+  // The phone is held up for the whole approach: the screen must not lock under it.
+  const releaseScreen = keepScreenOn()
+  let released = false
+  const release = () => {
+    if (released) return
+    released = true
+    releaseScreen()
+  }
+  const onExit = () => {
+    release()
+    opts.onExit()
+  }
+  const teardown = opts.mode === 'check' ? DoorCheckScreen({ ...opts, onExit }) : GuideScreen({ ...opts, onExit })
+  return () => {
+    release()
+    teardown()
+  }
 }
 
 function shell(title: string, onExit: () => void) {

@@ -155,9 +155,59 @@ function iosTick(pattern: number[]): void {
   }
 }
 
+interface WakeLockLike {
+  release(): Promise<void>
+}
+interface WakeLockNav {
+  wakeLock?: { request(type: 'screen'): Promise<WakeLockLike> }
+}
+
+/**
+ * Keep the screen on for as long as the approach screen is open. The lock is dropped by
+ * the browser whenever the page is hidden, so it is taken again on visible, and the
+ * AudioContext (suspended by iOS in the background) is resumed then too.
+ * Returns release(). Never throws: no Wake Lock API simply means no lock.
+ */
+export function keepScreenOn(nav: WakeLockNav = navigator as unknown as WakeLockNav, doc: Document = document): () => void {
+  let lock: WakeLockLike | null = null
+  let released = false
+  const acquire = () => {
+    if (released || lock) return
+    try {
+      void nav.wakeLock
+        ?.request('screen')
+        .then((l) => {
+          if (released) void l.release().catch(() => {})
+          else lock = l
+        })
+        .catch(() => {})
+    } catch {
+      /* unsupported */
+    }
+  }
+  const onVisible = () => {
+    if (doc.visibilityState !== 'visible') {
+      lock = null // the browser has already let go of it
+      return
+    }
+    acquire()
+    const a = session.audio
+    if (a && a.state !== 'running') void a.resume().catch(() => {})
+  }
+  acquire()
+  doc.addEventListener('visibilitychange', onVisible)
+  return () => {
+    released = true
+    doc.removeEventListener('visibilitychange', onVisible)
+    void lock?.release().catch(() => {})
+    lock = null
+  }
+}
+
 /** Belt and braces: if the Start tap did not leave audio running, any later tap resumes it. */
 export function resumeAudioOnTap(): void {
   const resume = () => {
+    setPlaybackSession()
     const a = session.audio
     if (a && a.state === 'suspended') void a.resume()
   }

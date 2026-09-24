@@ -170,7 +170,7 @@ export function openBusinessAccess(el: HTMLElement, ctx: FeatureCtx, businessId:
         showError(q.key, errors[q.key])
       })
       row = h('div', { class: 'ax-q' },
-        h('label', { class: 'ax-q-label', for: fid }, `${q.label} in ${q.unitLong}`),
+        h('label', { class: 'ax-q-label', for: fid }, q.label.includes(q.unitLong) ? q.label : `${q.label} in ${q.unitLong}`),
         h('div', { class: 'ax-num' }, input, h('span', { class: 'ax-unit', 'aria-hidden': 'true' }, q.unit)),
         h('p', { class: 'ax-hint', id: hintId }, `${rangeText(q)}. Leer lassen, wenn du es nicht weißt.`),
         err,
@@ -305,7 +305,7 @@ export function openBusinessAccess(el: HTMLElement, ctx: FeatureCtx, businessId:
     el.replaceChildren(
       h('div', { class: 'ax' },
         h('header', { class: 'ax-head' },
-          h('button', { class: 'ax-back', type: 'button', 'aria-label': 'Zurück', onclick: () => opts.onDone() }, icon('arrow_back')),
+          h('button', { class: 'ax-back', type: 'button', 'aria-label': 'Zurück zu Mein Unternehmen', onclick: () => opts.onDone() }, icon('arrow_back')),
           h('div', { class: 'ax-head-text' },
             h('h2', { id: 'sheet-title', class: 'ax-title', tabindex: '-1' }, 'Barrierefreiheit'),
             h('p', { class: 'ax-sub' }, b!.name),

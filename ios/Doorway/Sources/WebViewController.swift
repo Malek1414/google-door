@@ -107,6 +107,11 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
         // second "localhost would like to use your location" alert never appears.
         location.delegate = self
         location.desiredAccuracy = kCLLocationAccuracyBest
+        // Walking navigation: every metre or two, tuned for someone on foot, and never paused
+        // by iOS mid-walk (the default pause fires when you stand at a crossing).
+        location.distanceFilter = 1.5
+        location.activityType = .fitness
+        location.pausesLocationUpdatesAutomatically = false
         if location.authorizationStatus == .notDetermined { location.requestWhenInUseAuthorization() }
 
         load(from: 0)
@@ -297,16 +302,35 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
             }
         case "stop":
             watching = false
+            heartbeat?.invalidate()
+            heartbeat = nil
             location.stopUpdatingLocation()
         default:
             break
         }
     }
 
+    /// distanceFilter keeps CoreLocation quiet while standing; the page still wants about one
+    /// fix a second (its watchers time out, and the arrow should not look frozen), so the
+    /// latest location is repeated once a second when nothing newer came in.
+    private var heartbeat: Timer?
+    private var lastPush = Date.distantPast
+
     private func beginUpdates() {
         watching = true
         location.startUpdatingLocation()
-        if let last = location.location { GeoBridge.push(webView, last) }
+        if let last = location.location { push(last) }
+        heartbeat?.invalidate()
+        heartbeat = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            guard let self, self.watching, Date().timeIntervalSince(self.lastPush) >= 0.9,
+                  let l = self.location.location else { return }
+            self.push(l)
+        }
+    }
+
+    private func push(_ l: CLLocation) {
+        lastPush = Date()
+        GeoBridge.push(webView, l)
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
@@ -322,7 +346,7 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard watching, let l = locations.last else { return }
-        GeoBridge.push(webView, l)
+        push(l)
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {

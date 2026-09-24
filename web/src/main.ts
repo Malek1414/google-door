@@ -7,12 +7,12 @@ import { loadProfile, output, session } from './session'
 import { demoWalkTrack, loadTrack, Recorder, replaySensors, type TrackPoint } from './sim/replay'
 import { t } from './strings'
 import { h, mount } from './ui/dom'
-import { LiveView, realSensors, applyContrast } from './ui/LiveView'
+import { LiveView, realSensors, applyContrast, type LivePlace } from './ui/LiveView'
 import { Approach } from './ui/Approach'
 import type { ApproachMode } from './ui/approachPort'
 import { startDemoApproach } from './ui/approachDemo'
 import type { Entrance } from './core/types'
-import { MapView } from './ui/MapView'
+import { MapView, type NavResume } from './ui/MapView'
 import { Onboard } from './ui/Onboard'
 import { Start } from './ui/Start'
 import { startHealthBanner } from './ui/healthBanner'
@@ -79,7 +79,7 @@ function withProfile(next: (p: Profile) => void) {
 // speech and large visuals); the accessibility button top right opens the three questions.
 const DEFAULT_PROFILE: Profile = { stepFreeRequired: false, channels: ['speech', 'visual'] }
 
-function showMap(p: Profile, resumeNav: Entrance | null = null) {
+function showMap(p: Profile, resumeNav: NavResume | null = null) {
   applyContrast(outputFor(p).contrast)
   MapView({
     profile: p,
@@ -87,6 +87,7 @@ function showMap(p: Profile, resumeNav: Entrance | null = null) {
     resumeNav,
     onApproach: (door, mode) => showApproach(door, p, mode),
     onGuide: (target, name, fromNav) => showLive(target, p, name, fromNav),
+    onLivePlace: (place, fromNav) => showLivePlace(place, p, fromNav),
     onSettings: () => Onboard({ initial: p, onDone: showMap }),
     onContribute: () => Recorder({ onBack: () => showMap(p) }),
   })
@@ -100,9 +101,24 @@ function showLive(target: ArrowTarget, p: Profile, name?: string, fromNav = fals
     sensors: realSensors(),
     config: outputFor(p),
     // Opened from nav mode: X goes back to nav mode, as in Maps.
-    onExit: () => showMap(p, fromNav ? target.entrance : null),
+    onExit: () => showMap(p, fromNav ? { lat: target.lat, lon: target.lon, name: name ?? target.entrance.name ?? '', door: target.entrance } : null),
     profile: p,
     onApproach: (mode) => showApproach(target.entrance, p, mode),
+  })
+}
+
+/**
+ * Live View to a destination that is not a guidable door: Maps-style (route, chevrons,
+ * turn card, pin, "Du bist angekommen"), no door handover. X or "Fertig" goes back to
+ * nav mode when it was opened from there.
+ */
+function showLivePlace(place: LivePlace, p: Profile, fromNav: boolean) {
+  LiveView({
+    place,
+    sensors: realSensors(),
+    config: outputFor(p),
+    onExit: () => showMap(p, fromNav ? { ...place, door: null } : null),
+    profile: p,
   })
 }
 

@@ -13,11 +13,17 @@ This file is the channel; PR comments are only a mirror.
   `closed` with the commit that implemented it, and moved to *Closed*.
 - Never delete a question; the history is the point.
 
-Last updated: 2026-09-24 08:57, by Sami's agent: Live View decluttered; Q15-Q16 open.
+Last updated: 2026-09-24 09:45, by Sami's agent: walking navigation joined (Start opens the map nav, arrival hands off to the real approach); Q15-Q17 open.
 
 ---
 
 ## Open
+
+### Q17 · Nav to approach handoff: radius and anchor for node/10795939972
+- **Area:** `web/src/main.ts` (showLive, onArrive), `web/src/ui/NavMode.ts`, `web/src/ui/approachEngine.ts`, door data
+- **Why:** the map navigation now ends at the door and "Ja" opens the real Approach engine, which starts at about 15 m. For node/10795939972 (real position 52.52721, 13.37117) the engine gets no `approachBearing`, so without vision it only gives the GPS text line, never the arrow sequence.
+- **Ask:** should the handoff radius change (hand off earlier or later than 15 m), or should the anchor come from another source (for example the bearing of the last route segment or the building outline)?
+- **Status:** open
 
 ### Q16 · `ApproachView.seq` in the contract
 - **Area:** `web/src/ui/approachPort.ts`, `approachEngine.ts`, `Approach.ts` (Narrator)

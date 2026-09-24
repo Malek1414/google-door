@@ -205,7 +205,12 @@ blockquote footer { color: var(--muted); font-size: 1rem; }
   background: var(--sheet); border-radius: 26px 26px 0 0;
   transform: translateY(calc(100% - var(--sheet-h) + var(--drag, 0px))); transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1); }
 .gm[data-sheet='full'] .gm-right, .gm[data-sheet='full'] .gm-layers, .gm[data-sheet='full'] .gm-top { display: none; }
-.gm-handle { flex: none; height: 22px; border: 0; background: none; display: grid; place-items: center; cursor: grab; touch-action: none; }
+/* The grabber stays 22px visually, as Maps draws it, but the TOUCH target is 44px:
+   it is the most-used control in the app and it was half Apple's minimum, which
+   matters most for the motor-impaired users this app is for. */
+.gm-handle { flex: none; height: 22px; border: 0; background: none; display: grid; place-items: center;
+  cursor: grab; touch-action: none; position: relative; }
+.gm-handle::before { content: ''; position: absolute; left: 0; right: 0; top: -11px; height: 44px; }
 .gm-handle span { width: 42px; height: 4px; border-radius: 2px; background: #5d5b5f; }
 .gm-sheet-body { flex: 1; overflow-y: auto; padding: 0 22px 22px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 .gm-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
@@ -442,3 +447,27 @@ html.ios-gap .gm-nav { padding-bottom: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+
+/* ── touch targets ──────────────────────────────────────────────────────
+   Maps' own chips are 36px and its round buttons 42, and we cloned those
+   faithfully — but Apple's minimum is 44 and this is an app for people with
+   motor impairments, so the two have to be reconciled rather than one dropped.
+   The visual stays exactly as Maps draws it; an invisible ::before extends the
+   hit area to 44. Nothing moves, everything becomes reachable.
+
+   Google's own attribution controls ("Kartendaten", "Nutzungsbedingungen") are
+   injected by the Maps SDK and are out of our hands — and legally required. */
+.gm-chip, .gm-avatar, .gm-round { position: relative; }
+.gm-chip::before,
+.gm-avatar::before,
+.gm-round::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  top: 50%;
+  height: 44px;
+  transform: translateY(-50%);
+  /* narrower controls also need horizontal reach */
+  min-width: 44px;
+}
+.gm-avatar::before, .gm-round::before { left: 50%; right: auto; width: 44px; transform: translate(-50%, -50%); }

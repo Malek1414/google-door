@@ -10,6 +10,7 @@
 //   3. and if both fail, a visible reason. Never a straight line posing as a route.
 
 import { apiBase } from '../config'
+import { reportApiResult } from '../data'
 import { haversineM, type LatLon } from '../core/geo'
 import { instructionLine, maneuverGlyph, type Route, type RouteStep } from '../core/route'
 import { lang } from '../strings'
@@ -20,7 +21,7 @@ export type RouteFailure = 'none' | 'auth' | 'network' | 'quota' | 'unknown'
 
 export type RouteOutcome =
   | { ok: true; route: Route; via: 'server' | 'maps' }
-  | { ok: false; reason: RouteFailure; message: string }
+  | { ok: false; reason: RouteFailure; message: string; /** our server gave no HTTP answer at all */ unreachable?: true }
 
 export const D = {
   de: {
@@ -87,7 +88,7 @@ async function viaServer(from: LatLon, to: LatLon, language: string): Promise<Ro
       signal: ctl.signal,
     }).finally(() => clearTimeout(timer))
   } catch {
-    return fail('network')
+    return { ok: false, reason: 'network', message: D.network, unreachable: true }
   }
   if (!r.ok) {
     let code: RouteFailure = 'unknown'
@@ -155,8 +156,14 @@ let last: { from: LatLon; to: LatLon; route: Route } | null = null
 export async function computeRoute(from: LatLon, to: LatLon): Promise<RouteOutcome> {
   const language = lang === 'de' ? 'de-DE' : 'en-GB'
   let out = await viaServer(from, to, language)
+  // Health snackbar: any HTTP answer means our server is up (a 502 here is Google's
+  // Routes refusing the key, handled by the fallback below). Only an unreachable
+  // server counts as a failure, and not when the browser route worked anyway.
+  const serverDown = !out.ok && out.unreachable === true
+  if (!serverDown) reportApiResult(true)
   if (!out.ok && out.reason !== 'none') {
     const js = await viaMapsJs(from, to, language)
+    if (serverDown && !js.ok) reportApiResult(false)
     // Keep the server's reason when the browser path has none better to give.
     out = js.ok || js.reason !== 'unknown' ? js : out
   }

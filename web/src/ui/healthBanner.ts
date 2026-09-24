@@ -198,6 +198,12 @@ export function startHealthBanner(intervalMs = HEALTH_INTERVAL_MS): () => void {
   run()
   const id = setInterval(run, intervalMs)
   const stopWatch = onApiResult((ok) => {
+    // An /api call just worked: "Keine Verbindung" is wrong now, so it goes at once;
+    // the recheck below confirms the rest.
+    if (ok && last && !last.reachable) {
+      bar?.remove()
+      bar = null
+    }
     if (pending || !contradicts(ok, last)) return
     pending = setTimeout(() => {
       pending = null

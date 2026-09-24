@@ -98,7 +98,7 @@ function loadMaps(key: string): Promise<void> {
     const cb = '__doorwayMapsReady'
     ;(window as unknown as Record<string, () => void>)[cb] = () => resolve()
     const sc = document.createElement('script')
-    sc.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&callback=${cb}`
+    sc.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&language=${lang === 'de' ? 'de' : 'en'}&callback=${cb}`
     sc.async = true
     sc.onerror = () => {
       mapsLoading = null
@@ -844,7 +844,23 @@ export function MapView(opts: {
     }
   }
 
+  // Street View panoramas in door cards: each holds listeners and a WebGL context, and
+  // an unclosed one kept them after the card was gone (fuzz: 30 to 140 listeners).
+  let panos: { p: google.maps.StreetViewPanorama; div: HTMLElement }[] = []
+  function disposePanos() {
+    for (const { p, div } of panos) {
+      try {
+        p.setVisible(false)
+        google.maps.event.clearInstanceListeners(p)
+        div.replaceChildren()
+      } catch {
+        /* already gone */
+      }
+    }
+    panos = []
+  }
   function showCard(item: Entrance | Building, ...children: (Node | null)[]) {
+    disposePanos()
     sheetEpoch++
     placeOpen = false
     // A new card replaces a route preview; the route was drawn for the old one.
@@ -864,6 +880,7 @@ export function MapView(opts: {
     sheetBody.querySelector<HTMLElement>('h2')?.focus({ preventScroll: true })
   }
   function closeCard() {
+    disposePanos()
     panelCleanup?.()
     panelCleanup = null
     selected = null
@@ -1083,13 +1100,15 @@ export function MapView(opts: {
     const pano = h('div', { class: 'gm-photo-pano', inert: '', 'aria-hidden': 'true', style: 'position:absolute;inset:0' })
     box.append(pano)
     new google.maps.StreetViewService().getPanorama({ location: { lat: e.lat, lng: e.lon }, radius: 40 }, (data, st) => {
+      // The card may be closed or replaced by the time the lookup answers.
+      if (gone || !box.isConnected) return
       if (st !== google.maps.StreetViewStatus.OK || !data?.location?.latLng) {
         box.remove()
         return
       }
       const from = data.location.latLng
       const heading = google.maps.geometry?.spherical ? google.maps.geometry.spherical.computeHeading(from, { lat: e.lat, lng: e.lon }) : bearingFromTo(from.lat(), from.lng(), e.lat, e.lon)
-      new google.maps.StreetViewPanorama(pano, { pano: data.location.pano, pov: { heading, pitch: 5 }, disableDefaultUI: true, clickToGo: false, linksControl: false, motionTracking: false })
+      panos.push({ div: pano, p: new google.maps.StreetViewPanorama(pano, { pano: data.location.pano, pov: { heading, pitch: 5 }, disableDefaultUI: true, clickToGo: false, linksControl: false, motionTracking: false }) })
     })
     return box
   }
@@ -1595,6 +1614,7 @@ export function MapView(opts: {
   function teardown() {
     if (gone) return
     gone = true
+    disposePanos()
     try {
       panelCleanup?.()
     } catch {

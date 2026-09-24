@@ -711,7 +711,7 @@ export function MapView(opts: {
 
   // ---- sheet content per tab ----
   function doorRow(e: Entrance, d: number) {
-    const meta = [stepFreeLabel(e.stepFree), t.metresShort(d), ...e.warnings.map((w) => t.door[w] ?? w)].join(' · ')
+    const meta = [stepFreeLabel(e.stepFree), t.metresShort(d), ...e.warnings.map((w) => t.door[w] ?? t.warning[w]?.split('.')[0] ?? w)].join(' · ')
     return h(
       'li',
       {},
@@ -1232,7 +1232,7 @@ export function MapView(opts: {
         e.door ? fact('door_front', `${t.door[e.door] ?? e.door}${e.automatic ? `, ${t.automatic}` : ''}`) : null,
         e.level !== null ? fact('stairs', `${t.levelLabel} ${e.level}`) : null,
         e.approachBearing !== null ? fact('explore', t.faceToEnter(t.compass[Math.round(e.approachBearing / 45) % 8])) : null,
-        fact('verified', t.confidence[e.confidence] ?? e.confidence),
+        fact('verified', (e as { by?: string }).by === 'business' ? t.ownerSource : t.confidence[e.confidence] ?? e.confidence),
       ),
       unknownNearby ? h('p', { class: 'gm-p' }, t.nearbyUnknown(unknownNearby)) : null,
     )

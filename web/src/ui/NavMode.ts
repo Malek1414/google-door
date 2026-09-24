@@ -85,28 +85,28 @@ export function openNav(opts: NavOpts): () => void {
   const ms = (n: string) => h('span', { class: 'ms', 'aria-hidden': 'true' }, n)
 
   const icon = ms('straight')
-  const dist = h('div', { class: 'nav-dist' }, '')
-  const instr = h('div', { class: 'nav-instr' }, T.waiting)
-  const offLine = h('div', { class: 'nav-off', hidden: true }, T.offRoute)
-  const live = h('div', { class: 'nav-sr', role: 'status', 'aria-live': 'polite' }, '')
-  const banner = h('div', { class: 'nav-banner' }, h('div', { class: 'nav-ic' }, icon), h('div', { class: 'nav-txt' }, dist, instr), offLine, live)
+  const dist = h('div', { class: 'wn-dist' }, '')
+  const instr = h('div', { class: 'wn-instr' }, T.waiting)
+  const offLine = h('div', { class: 'wn-off', hidden: true }, T.offRoute)
+  const live = h('div', { class: 'wn-sr', role: 'status', 'aria-live': 'polite' }, '')
+  const banner = h('div', { class: 'wn-banner' }, h('div', { class: 'wn-ic' }, icon), h('div', { class: 'wn-txt' }, dist, instr), offLine, live)
 
-  const etaMin = h('span', { class: 'nav-eta-min' }, '')
-  const etaSub = h('span', { class: 'nav-eta-sub' }, '')
-  const exitBtn = h('button', { class: 'nav-exit', type: 'button', 'aria-label': T.exit }, ms('close'))
+  const etaMin = h('span', { class: 'wn-eta-min' }, '')
+  const etaSub = h('span', { class: 'wn-eta-sub' }, '')
+  const exitBtn = h('button', { class: 'wn-exit', type: 'button', 'aria-label': T.exit }, ms('close'))
   const liveBtn = opts.onLiveView
-    ? h('button', { class: 'nav-live', type: 'button' }, ms('view_in_ar'), h('span', {}, T.live))
+    ? h('button', { class: 'wn-live', type: 'button' }, ms('view_in_ar'), h('span', {}, T.live))
     : null
   const bottom = h(
     'div',
-    { class: 'nav-bottom' },
+    { class: 'wn-bottom' },
     exitBtn,
-    h('div', { class: 'nav-eta' }, etaMin, etaSub),
+    h('div', { class: 'wn-eta' }, etaMin, etaSub),
     ...(liveBtn ? [liveBtn] : []),
   )
-  const recenter = h('button', { class: 'nav-recenter', type: 'button', hidden: true }, ms('navigation'), h('span', {}, T.recenter))
-  const mapEl = h('div', { class: 'nav-map' })
-  const root = h('section', { class: 'nav-root', 'aria-label': `${T.nav} ${T.toward} ${destination.name}` }, mapEl, banner, recenter, bottom)
+  const recenter = h('button', { class: 'wn-recenter', type: 'button', hidden: true }, ms('navigation'), h('span', {}, T.recenter))
+  const mapEl = h('div', { class: 'wn-map' })
+  const root = h('section', { class: 'wn-root', 'aria-label': `${T.nav} ${T.toward} ${destination.name}` }, mapEl, banner, recenter, bottom)
   ;(opts.parent ?? document.body).append(root)
 
   let closed = false
@@ -151,7 +151,7 @@ export function openNav(opts: NavOpts): () => void {
     const next = route.steps[i + 1] ?? null
     const glyph = last ? 'flag' : (maneuverGlyph(next?.maneuver ?? null) ?? 'straight')
     icon.textContent = glyph
-    dist.textContent = formatNavDistance(state.distToManeuverM)
+    dist.textContent = state.arrived ? '' : formatNavDistance(state.distToManeuverM)
     const text = last ? destination.name : stepText(i + 1)
     instr.textContent = state.arrived ? T.arrive : text
     if (i !== announcedStep) {
@@ -185,8 +185,9 @@ export function openNav(opts: NavOpts): () => void {
     const hd = headingFor(lastFix, state)
     dot?.setPosition(pos)
     cone?.setPosition(pos)
+    // Symbol rotation is drawn in screen space on a rotated vector map: subtract the camera.
     const ic = cone?.getIcon() as google.maps.Symbol | undefined
-    if (cone && ic) cone.setIcon({ ...ic, rotation: hd })
+    if (cone && ic) cone.setIcon({ ...ic, rotation: hd - (map.getHeading() ?? 0) })
   }
 
   function follow() {
@@ -204,8 +205,8 @@ export function openNav(opts: NavOpts): () => void {
     state = progress(route, f, state)
     render()
     drawRoute()
-    drawMe()
     follow()
+    drawMe()
     if (state.offRoute && !wasOff) opts.onOffRoute?.(f)
     wasOff = state.offRoute
     if (state.arrived && !arrivedFired) {
@@ -272,12 +273,13 @@ export function openNav(opts: NavOpts): () => void {
         recenter.hidden = false
       }
       listeners.push(map.addListener('dragstart', leave))
+      listeners.push(map.addListener('heading_changed', drawMe))
       drawRoute()
-      drawMe()
       follow()
+      drawMe()
     })
     .catch(() => {
-      mapEl.classList.add('nav-map-missing')
+      mapEl.classList.add('wn-map-missing')
     })
 
   stopWatch = (opts.watch ?? watchFixes)(onFix, () => {

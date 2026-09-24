@@ -15,61 +15,45 @@ export const AR_BLUE = '#1b56c4'
 export const AR_BLUE_DARK = '#123a86'
 export const AR_FACE = '#ffffff'
 
-/** One chevron: white face over a blue body offset down-left, which reads as extrusion. */
-function chevron(idx: number): SVGGElement {
-  // Classic ">" with a notched tail. 0,0 is the top-left of the body.
-  const d = 'M0 0 L26 0 L60 40 L26 80 L0 80 L34 40 Z'
-  const g = s('g', { class: 'ar-chev', 'data-i': String(idx) })
-  // body (the extruded sides), then the face lifted up and right
+/** Google blue and Maps red, flat (no gradients, no extrusion). */
+export const AR_ARROW_BLUE = '#1A73E8'
+export const AR_PIN_RED = '#EA4335'
+
+/**
+ * ONE flat Material arrow, pointing up (0 deg = straight ahead), its visual centre at
+ * the origin so rotate() turns it in place. White outline and a soft shadow (ar.css)
+ * keep it visible on any camera picture. An invisible ring of the arrow's full reach
+ * keeps the group's bounding box centred at every angle. (Name kept for callers.)
+ */
+export function chevronStack(): SVGGElement {
+  const g = s('g', { class: 'ar-stack ar-arrow' })
   g.append(
-    s('path', { d, fill: AR_BLUE, transform: 'translate(0 0)' }),
-    s('path', { d, fill: AR_BLUE_DARK, transform: 'translate(4 4)', opacity: '0.55' }),
-    s('path', { d, fill: AR_FACE, transform: 'translate(15 -7)' }),
-    // thin blue rim on the face so it never melts into a bright background
-    s('path', { d, fill: 'none', stroke: AR_BLUE, 'stroke-width': '2.5', transform: 'translate(15 -7)' }),
+    s('circle', { r: '78', fill: 'none', stroke: 'none' }),
+    s('path', {
+      d: 'M0 -72 L62 -2 L26 -2 L26 72 L-26 72 L-26 -2 L-62 -2 Z',
+      fill: AR_ARROW_BLUE,
+      stroke: '#fff',
+      'stroke-width': '5',
+      'stroke-linejoin': 'round',
+      'paint-order': 'stroke',
+    }),
   )
   return g
 }
 
-/** Three overlapping chevrons, the middle one largest, as in the recording. */
-export function chevronStack(): SVGGElement {
-  const g = s('g', { class: 'ar-stack' })
-  for (let i = 0; i < 3; i++) {
-    const c = chevron(i)
-    // Spread along the travel axis, NEAREST FIRST and largest, shrinking as they
-    // recede — so the group reads as three solids going away into the scene rather
-    // than as three stickers on the glass.
-    const sc = [1, 0.88, 0.76][i]
-    c.setAttribute('transform', `translate(${i * 88} ${(1 - sc) * 46}) scale(${sc})`)
-    g.append(c)
-  }
-  return g
-}
-
-/** The red Maps teardrop that replaces the chevrons on approach. Hole is see-through. */
+/** The Maps pin, same family: flat red, white outline, white dot. Centred on its head. */
 export function destinationPin(): SVGGElement {
   const g = s('g', { class: 'ar-pin' })
   g.append(
     s('path', {
-      d: 'M0 -62 C-34 -62 -62 -34 -62 0 C-62 34 -20 72 0 96 C20 72 62 34 62 0 C62 -34 34 -62 0 -62 Z',
-      fill: '#ea3323',
+      d: 'M0 -46 C-26 -46 -46 -26 -46 0 C-46 26 -14 52 0 72 C14 52 46 26 46 0 C46 -26 26 -46 0 -46 Z',
+      fill: AR_PIN_RED,
+      stroke: '#fff',
+      'stroke-width': '5',
+      'stroke-linejoin': 'round',
     }),
-    // specular edge, upper left, so it reads as a solid object rather than a sticker
-    s('path', {
-      d: 'M0 -62 C-34 -62 -62 -34 -62 0 C-62 12 -56 26 -47 40 C-58 18 -52 -8 -34 -26 C-20 -40 -2 -46 0 -62 Z',
-      fill: '#ff6a5c', opacity: '0.55',
-    }),
-    s('circle', { cx: '0', cy: '-4', r: '25', fill: '#000', 'fill-opacity': '0.001' }),
-    s('circle', { cx: '0', cy: '-4', r: '25', fill: 'none', stroke: '#ea3323', 'stroke-width': '0' }),
+    s('circle', { cx: '0', cy: '0', r: '16', fill: '#fff' }),
   )
-  // punch the hole with a mask so the scene shows through, exactly as Google's does
-  const mask = s('mask', { id: 'ar-pin-hole' })
-  mask.append(
-    s('rect', { x: '-80', y: '-80', width: '160', height: '190', fill: '#fff' }),
-    s('circle', { cx: '0', cy: '-4', r: '25', fill: '#000' }),
-  )
-  g.prepend(mask)
-  g.querySelectorAll('path').forEach((p) => p.setAttribute('mask', 'url(#ar-pin-hole)'))
   return g
 }
 
@@ -110,21 +94,14 @@ export function groundPlane(betaDeg: number): { squash: number; cyFrac: number }
  * that patch of pavement is on screen. Without it (no orientation events yet) the
  * output is exactly the old fixed-screen placement.
  */
-export function stackTransform(relDeg: number, w: number, h: number, betaDeg?: number | null): string {
-  const clamped = Math.max(-180, Math.min(180, relDeg))
-  // The chevron path points RIGHT, so -90 makes it point up-screen (away from the
-  // viewer) when you are on bearing — which is how Google's read when walking straight.
-  const rot = clamped - 90
-  // Mild foreshortening as the stack swings away, floored so it never vanishes.
-  // No mirroring: the rotation alone carries direction, and a scaleX flip made the
-  // chevrons point left while walking straight ahead.
-  const sx = Math.max(0.45, Math.abs(Math.cos((clamped * Math.PI) / 360)))
-  const cx = w * 0.5
-  const SIZE = 1.35 // measured against the recording: the stack spans ~45% of the width
-  const tail = `rotate(${rot.toFixed(1)}) scale(${(sx * SIZE).toFixed(3)} ${SIZE}) translate(-128 -40)`
-  if (betaDeg === undefined || betaDeg === null || !Number.isFinite(betaDeg)) {
-    return `translate(${cx} ${h * 0.44}) ${tail}`
-  }
-  const g = groundPlane(betaDeg)
-  return `translate(${cx} ${(h * g.cyFrac).toFixed(1)}) scale(1 ${g.squash.toFixed(3)}) ${tail}`
+export function stackTransform(relDeg: number, w: number, h: number, _betaDeg?: number | null): string {
+  // Fixed screen centre, rotation about the arrow's own centre, constant size: nothing
+  // but the angle depends on the input (no orbit, no pitch placement, no squash).
+  const rot = Number.isFinite(relDeg) ? relDeg : 0
+  return `translate(${(w * ARROW_CX).toFixed(1)} ${(h * ARROW_CY).toFixed(1)}) rotate(${rot.toFixed(1)}) scale(${ARROW_SCALE})`
 }
+
+/** Arrow placement as fractions of the SVG viewBox, and its size (~43 % of the width). */
+export const ARROW_CX = 0.5
+export const ARROW_CY = 0.46
+export const ARROW_SCALE = 1.35

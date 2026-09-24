@@ -697,17 +697,19 @@ export function LiveView(opts: {
         // guidance on screen and softens the wording, and an empty screen tells a
         // partially-sighted user nothing at all.
         coneG.replaceChildren()
-        stackG.setAttribute('visibility', arPhase === 'approach' ? 'hidden' : 'visible')
+        stackG.setAttribute('visibility', 'visible')
         stackG.setAttribute('opacity', '0.88')
       } else {
         coneG.replaceChildren()
         stackG.setAttribute('opacity', '1')
-        stackG.setAttribute('visibility', arPhase === 'approach' ? 'hidden' : 'visible')
+        stackG.setAttribute('visibility', 'visible')
       }
-      // Destination glyph where the door should be in the camera frame (about 70 degree FOV).
-      if (Math.abs(rel) <= 35) {
-        pinG.setAttribute('visibility', arPhase === 'approach' ? 'visible' : 'hidden')
-        pinG.setAttribute('transform', `translate(${(196 + (rel / 35) * 150).toFixed(0)} 300) scale(${(0.6 + Math.max(0, (APPROACH_PIN_M - dist)) / APPROACH_PIN_M).toFixed(2)})`)
+      // The pin marks "the door is ahead" when roughly aimed at it. Centred above the
+      // arrow, never sliding sideways: direction comes from the arrow's rotation only.
+      // It grows slowly as the door gets closer.
+      if (Math.abs(rel) <= 35 && arPhase === 'approach') {
+        pinG.setAttribute('visibility', 'visible')
+        pinG.setAttribute('transform', `translate(196.5 ${(760 * 0.2).toFixed(0)}) scale(${(0.7 + 0.3 * Math.max(0, APPROACH_PIN_M - dist) / APPROACH_PIN_M).toFixed(2)})`)
       } else pinG.setAttribute('visibility', 'hidden')
 
       if (beacon && !gpsLost && !isMuted()) {

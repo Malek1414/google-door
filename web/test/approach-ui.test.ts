@@ -68,32 +68,20 @@ describe('Narrator: when the screen speaks', () => {
   })
 })
 
-describe('ground-plane chevrons', () => {
-  it('without pitch the transform is the old fixed placement', () => {
-    expect(stackTransform(0, 393, 760)).toBe('translate(196.5 334.4) rotate(-90.0) scale(1.350 1.35) translate(-128 -40)')
-    expect(stackTransform(30, 393, 760, null)).toBe(stackTransform(30, 393, 760))
-  })
-  it('flattens more the more upright the phone is', () => {
-    const s90 = groundPlane(90).squash
-    const s60 = groundPlane(60).squash
-    const s20 = groundPlane(20).squash
-    expect(s90).toBeLessThan(s60)
-    expect(s60).toBeLessThan(s20)
-    expect(s20).toBeCloseTo(1, 5)
-    expect(s90).toBeGreaterThan(0.2) // never collapses to a line
-  })
-  it('the pavement patch moves up the screen as the phone tilts down, within bounds', () => {
-    expect(groundPlane(90).cyFrac).toBeGreaterThan(groundPlane(70).cyFrac)
-    expect(groundPlane(70).cyFrac).toBeGreaterThan(groundPlane(50).cyFrac)
-    for (const b of [-30, 0, 45, 90, 180]) {
-      const g = groundPlane(b)
-      expect(g.cyFrac).toBeGreaterThanOrEqual(0.36)
-      expect(g.cyFrac).toBeLessThanOrEqual(0.64)
+describe('the Live View arrow turns in place', () => {
+  const centre = (tr: string) => /^translate\(([\d.]+) ([\d.]+)\)/.exec(tr)!.slice(1).map(Number)
+  it('same screen centre and size for every bearing and every pitch; only the rotation changes', () => {
+    const ref = stackTransform(0, 393, 760)
+    for (let rel = -180; rel <= 180; rel += 7.5) {
+      for (const beta of [undefined, null, 0, 30, 60, 80, 90, 110]) {
+        const tr = stackTransform(rel, 393, 760, beta)
+        expect(centre(tr)).toEqual(centre(ref))
+        expect(tr).toBe(ref.replace('rotate(0.0)', `rotate(${rel.toFixed(1)})`))
+      }
     }
   })
-  it('only adds a vertical squash in front of the unchanged chevron transform', () => {
-    const t = stackTransform(-20, 393, 760, 75)
-    expect(t).toMatch(/^translate\(196\.5 [\d.]+\) scale\(1 0\.\d{3}\) rotate\(-110\.0\)/)
+  it('groundPlane stays a pure helper (not used for placement any more)', () => {
+    expect(groundPlane(90).squash).toBeGreaterThan(0.2)
   })
 })
 

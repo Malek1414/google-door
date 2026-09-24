@@ -10,7 +10,7 @@
 .apr {
   position: fixed; inset: 0; overflow: hidden; background: #000; color: #e6e1e5;
   font-family: 'Google Sans Flex', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
-  --apr-teal: #62c4cb; --apr-teal-ink: #00363a; --apr-blue: #4285f4;
+  --apr-teal: #62c4cb; --apr-teal-ink: #00363a; --apr-blue: #1A73E8;
   --apr-surface: #1f2029; --apr-line: #2e2c30; --apr-fg2: #c9c5ca;
 }
 .apr-cam { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
@@ -36,7 +36,7 @@
 .apr-arrow { width: 136px; height: 136px; transform-origin: 50% 50%; flex: none; }
 /* Blue body, white edge — the same read as the Live View chevrons, and legible
    against any facade the camera happens to be pointing at. */
-.apr-arrow path { fill: var(--apr-blue); stroke: #fff; stroke-width: 4; }
+.apr-arrow path { fill: var(--apr-blue); stroke: #fff; stroke-width: 5; paint-order: stroke; }
 
 /* Tabular figures without dropping to a monospace face: the numbers stay still
    while they count down, and the screen keeps one typeface. */

@@ -5,6 +5,7 @@
 // degradedReason() to explain WHY a feature is not doing its job.
 
 import { apiBase } from '../config'
+import { onApiResult } from '../data'
 import { lang } from '../strings'
 import { h } from './dom'
 import './health-banner.css'
@@ -162,23 +163,64 @@ function render(hl: Health): void {
   document.body.append(bar)
 }
 
-/** Check now, then every 60 s and whenever the page comes back. Returns a stop function. */
+/** Fastest re-check after an /api answer contradicts the last health result. */
+export const RECHECK_MIN_MS = 4_000
+
+/**
+ * Should an /api answer trigger a health check now? Only when it contradicts what the
+ * banner shows: a failure while all looked fine, or a success while the server looked
+ * unreachable. Everything else is already on screen.
+ */
+export function contradicts(ok: boolean, hl: Health | null): boolean {
+  if (!hl) return !ok
+  return ok ? !hl.reachable : hl.reachable
+}
+
+/** Check now, then every 60 s, whenever the page comes back, and as soon as an /api call
+ *  says the last result is out of date. Returns a stop function. */
+let stopActive: (() => void) | null = null
+
 export function startHealthBanner(intervalMs = HEALTH_INTERVAL_MS): () => void {
-  const run = () => void checkHealth().then(render)
+  // One poller per page. A second start (main.ts re-run by hot reload) used to add
+  // another interval and three more window listeners every time.
+  stopActive?.()
+  let inFlight = false
+  let lastRun = 0
+  let pending: ReturnType<typeof setTimeout> | null = null
+  const run = () => {
+    if (inFlight) return
+    inFlight = true
+    lastRun = Date.now()
+    void checkHealth()
+      .then(render)
+      .finally(() => (inFlight = false))
+  }
   run()
   const id = setInterval(run, intervalMs)
+  const stopWatch = onApiResult((ok) => {
+    if (pending || !contradicts(ok, last)) return
+    pending = setTimeout(() => {
+      pending = null
+      run()
+    }, Math.max(0, lastRun + RECHECK_MIN_MS - Date.now()))
+  })
   const onVisible = () => {
     if (document.visibilityState === 'visible') run()
   }
   window.addEventListener('online', run)
   window.addEventListener('offline', run)
   document.addEventListener('visibilitychange', onVisible)
-  return () => {
+  const stop = () => {
+    if (stopActive === stop) stopActive = null
     clearInterval(id)
+    stopWatch()
+    if (pending) clearTimeout(pending)
     window.removeEventListener('online', run)
     window.removeEventListener('offline', run)
     document.removeEventListener('visibilitychange', onVisible)
     bar?.remove()
     bar = null
   }
+  stopActive = stop
+  return stop
 }

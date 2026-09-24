@@ -84,6 +84,13 @@ const ICON_TIER2 = svgUrl(
 )
 
 let mapsLoading: Promise<void> | null = null
+/**
+ * One Google map per page. Every return from settings, guidance or the recorder used to
+ * build a new google.maps.Map: each one is a billed map load, and Maps never frees a map
+ * instance, so the page grew with every round trip. The map and its element are kept
+ * here and handed to the next MapView; teardown removes everything a view put on it.
+ */
+let sharedMap: { el: HTMLElement; map: google.maps.Map } | null = null
 function loadMaps(key: string): Promise<void> {
   if (window.google?.maps) return Promise.resolve()
   mapsLoading ??= new Promise<void>((resolve, reject) => {
@@ -182,10 +189,20 @@ export function MapView(opts: {
   let placeHits: PlaceHit[] = []
   let placeTitle = ''
   let activePlaceChip: string | null = null
+  /** Set by teardown: late network answers must not draw on a screen that is gone. */
+  let gone = false
+  /**
+   * Bumped whenever the user changes what the sheet is about (a tab, a card, a new
+   * search). A places answer that lands after that belongs to a question nobody is
+   * asking any more; showing it yanked the sheet away from what was just tapped.
+   */
+  let sheetEpoch = 0
 
   // ---- top: search bar, chips, layers ----
   const status = h('p', { class: 'gm-status', role: 'status' }, '')
-  const mapEl = h('div', { class: 'gm-map', role: 'region', 'aria-label': t.mapTitle })
+  const mapEl = sharedMap?.el ?? h('div', { class: 'gm-map', role: 'region', 'aria-label': t.mapTitle })
+  /** Listeners this view put on the shared map; teardown takes them off again. */
+  const mapListeners: google.maps.MapsEventListener[] = []
   // The pill is a button, not an input: it only opens the full-screen search. As an
   // input it opened the overlay on focus, so keyboard and Switch Control users tabbing
   // past it were trapped in the search (WCAG 2.1.1, 3.2.1).
@@ -200,7 +217,10 @@ export function MapView(opts: {
   setSearchQuery('')
   const micBtn = h('button', { class: 'gm-search-btn', type: 'button', 'aria-label': t.voiceSearch }, icon('mic'))
   const lensBtn = h('button', { class: 'gm-search-btn', type: 'button', 'aria-label': t.look }, icon('photo_camera'))
-  const avatar = h('button', { class: 'gm-avatar', type: 'button', 'aria-label': t.profileButton, onclick: opts.onSettings }, 'S')
+  // Settings replace this screen and come back through a new MapView: stop the GPS
+  // watch and take the markers off first, as guidance and the recorder do. Without
+  // this every visit to settings left one more watchPosition feeding a dead map.
+  const avatar = h('button', { class: 'gm-avatar', type: 'button', 'aria-label': t.profileButton, onclick: () => { teardown(); opts.onSettings() } }, 'S')
   const search = h('div', { class: 'gm-search' }, pinLogo(), searchInput, micBtn, lensBtn, avatar)
 
   const placeChips = NORMAL_CHIPS.map((c) => {
@@ -211,6 +231,8 @@ export function MapView(opts: {
   const modeChip = modeSwitch(mode, (m) => {
     mode = m
     saveMode(m)
+    sheetEpoch++
+    clearRoute(false)
     clearPlaces()
     selected = null
     renderChips()
@@ -361,6 +383,10 @@ export function MapView(opts: {
     if (!b) return
     const id = b.dataset.tab as Tab
     tab = id
+    sheetEpoch++
+    // A route belongs to the Erkunden sheet. Left drawn, it kept routePreview set, so
+    // the other tabs' sheets snapped to the route height and GPS redraws stopped.
+    clearRoute(false)
     nav.querySelectorAll<HTMLButtonElement>('.gm-tab').forEach((x) => {
       const on = x.dataset.tab === tab
       x.toggleAttribute('aria-current', on)
@@ -582,12 +608,16 @@ export function MapView(opts: {
       .map((e) => ({ e, d: haversineM(origin(), e) }))
       .sort((a, b) => a.d - b.d)
 
+  /** Bumped per entrance request: a slow answer for a box the user already left is dropped. */
+  let loadSeq = 0
   async function load(b: BBox) {
     const key = [b.south, b.west, b.north, b.east].map((x) => x.toFixed(4)).join(',')
     if (key === lastBox) return
     lastBox = key
+    const seq = ++loadSeq
     try {
       const r = await fetchEntrances(b)
+      if (seq !== loadSeq || gone) return
       let survey: ReturnType<typeof loadSurvey> = []
       try {
         survey = loadSurvey()
@@ -604,6 +634,8 @@ export function MapView(opts: {
         openEntrance(want)
       } else backgroundRender()
     } catch {
+      if (seq !== loadSeq || gone) return
+      lastBox = '' // the same view may be asked again once the network is back
       status.textContent = t.noDoors
     }
   }
@@ -801,6 +833,10 @@ export function MapView(opts: {
   }
 
   function showCard(item: Entrance | Building, ...children: (Node | null)[]) {
+    sheetEpoch++
+    placeOpen = false
+    // A new card replaces a route preview; the route was drawn for the old one.
+    clearRoute(false)
     panelCleanup?.()
     panelCleanup = null
     selected = item
@@ -1078,14 +1114,21 @@ export function MapView(opts: {
     map?.panTo({ lat: e.lat, lng: e.lon })
 
     const start = () => beginGuidance(e)
-    viewBtn.hidden = g.kind !== 'arrow'
+    // The card's own View pill is the one way in; a second floating View button beside
+    // it read as two different features. viewBtn stays as the Lens shortcut's target.
+    viewBtn.hidden = true
     viewBtn.onclick = () => void start()
 
+    // Like Maps' Directions/Start: one filled Google-blue action leads the row. For a
+    // door that can carry guidance it is View, and one tap opens the guidance itself.
+    const canGuide = g.kind === 'arrow'
     const pills = h(
       'div',
       { class: 'gm-actions' },
-      h('button', { class: 'gm-pill gm-pill-primary', type: 'button', onclick: () => drawRouteToEntrance(e) }, icon('assistant_direction', true), t.route),
-      g.kind === 'arrow' ? h('button', { class: 'gm-pill', type: 'button', onclick: () => void start() }, icon('navigation', true), t.guideMe) : null,
+      canGuide
+        ? h('button', { class: 'gm-pill gm-pill-view', type: 'button', 'aria-label': 'Live View zum Eingang starten', style: 'background:#1a73e8;color:#fff;min-height:48px', onclick: () => void start() }, icon('view_in_ar', true), t.view)
+        : null,
+      h('button', { class: canGuide ? 'gm-pill' : 'gm-pill gm-pill-primary', type: 'button', onclick: () => drawRouteToEntrance(e) }, icon('assistant_direction', true), t.route),
       h('button', { class: 'gm-pill', type: 'button', onclick: () => void share(e) }, icon('ios_share'), t.share),
     )
 
@@ -1192,6 +1235,7 @@ export function MapView(opts: {
     placeChips.forEach((b) => b.setAttribute('aria-pressed', 'false'))
   }
   function showPlaces(hits: PlaceHit[], title: string) {
+    clearRoute(false)
     placeMarkers.forEach((m) => m.setMap(null))
     placeMarkers = []
     placeHits = hits
@@ -1235,9 +1279,11 @@ export function MapView(opts: {
     }
     if (placeInFlight === placeId) return // second tap while the first is still running
     placeInFlight = placeId
+    const epoch = ++sheetEpoch
     placeOpen = true // claim the sheet immediately; the skeleton is about to fill it
 
     // --- immediate, same frame as the tap ---
+    clearRoute(false)
     if (at) map?.panTo(at)
     selected = null
     panelCleanup?.()
@@ -1250,20 +1296,24 @@ export function MapView(opts: {
 
     try {
       const hit = await fetchPlaceById(placeId)
-      if (hit) {
-        placeCache.set(placeId, hit)
-        openPlace(hit)
-      } else {
-        placeOpen = false
-        renderSheet()
-      }
+      if (hit) placeCache.set(placeId, hit)
+      // The user tapped something else while this loaded: keep the answer, not the card.
+      if (epoch !== sheetEpoch || gone) return
+      if (hit) openPlace(hit)
+      else closePlaceSkeleton()
     } catch (err) {
       console.warn('[doorway] place lookup failed', err)
-      placeOpen = false
-      renderSheet()
+      if (epoch === sheetEpoch && !gone) closePlaceSkeleton()
     } finally {
-      placeInFlight = null
+      if (placeInFlight === placeId) placeInFlight = null
     }
+  }
+
+  /** Back from a skeleton that never became a card: the chips and buttons it hid return. */
+  function closePlaceSkeleton() {
+    placeOpen = false
+    renderSheet()
+    setSheet(placeHits.length ? 'half' : 'peek')
   }
 
   /** Grey bars in the shape of the card that is coming, so the sheet is never empty. */
@@ -1280,6 +1330,8 @@ export function MapView(opts: {
 
 
   function openPlace(p: PlaceHit) {
+    sheetEpoch++
+    clearRoute(false)
     selected = null
     placeOpen = true
     lastPlace = p
@@ -1306,18 +1358,23 @@ export function MapView(opts: {
   async function runCategory(id: string, label: string) {
     if (!map) return
     if (activePlaceChip === id) {
+      sheetEpoch++
+      if (status.textContent === t.loading) status.textContent = ''
       clearPlaces()
       renderSheet()
       return
     }
     activePlaceChip = id
+    const epoch = ++sheetEpoch
     placeChips.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.chip === id)))
     status.textContent = t.loading
     try {
       const hits = await searchCategory(map, id)
+      if (epoch !== sheetEpoch || gone) return
       status.textContent = hits.length ? '' : t.searchNoResults
       showPlaces(hits, label)
     } catch (err) {
+      if (epoch !== sheetEpoch || gone) return
       activePlaceChip = null
       placeChips.forEach((b) => b.setAttribute('aria-pressed', 'false'))
       status.textContent = err instanceof PlacesUnavailable ? err.message : t.placesError
@@ -1334,13 +1391,18 @@ export function MapView(opts: {
   const runQuery = (q: string) => {
     setSearchQuery(q)
     if (!map) return
+    const epoch = ++sheetEpoch
     status.textContent = t.loading
     searchText(map, q)
       .then((hits) => {
+        if (epoch !== sheetEpoch || gone) return
         status.textContent = hits.length ? '' : t.searchNoResults
         showPlaces(hits, q)
       })
-      .catch((err) => (status.textContent = err instanceof PlacesUnavailable ? err.message : t.placesError))
+      .catch((err) => {
+        if (epoch !== sheetEpoch || gone) return
+        status.textContent = err instanceof PlacesUnavailable ? err.message : t.placesError
+      })
   }
   // Tapping the bar opens the full-screen search like Maps. Click also fires for Enter
   // and Space, and focus alone never opens it; closing hands focus back to the pill.
@@ -1458,8 +1520,12 @@ export function MapView(opts: {
   if (key) {
     loadMaps(key)
       .then(() => {
+        if (gone) return
         const c = me ?? DEFAULT_CENTER
-        map = new google.maps.Map(mapEl, {
+        if (sharedMap?.el === mapEl) {
+          map = sharedMap.map
+          if (me && !opts.openDoor) map.setCenter({ lat: me.lat, lng: me.lon })
+        } else map = new google.maps.Map(mapEl, {
           center: { lat: c.lat, lng: c.lon },
           zoom: 17,
           // Google's own POI labels stay tappable: in Maps, tapping a restaurant or a
@@ -1472,12 +1538,13 @@ export function MapView(opts: {
           keyboardShortcuts: true,
           mapTypeId: 'hybrid',
         })
+        sharedMap = { el: mapEl, map }
         drawMe()
         if (opts.openDoor)
           void findEntrance(opts.openDoor).then((e) => {
             if (e) map?.setCenter({ lat: e.lat, lng: e.lon })
           })
-        map.addListener('click', (ev: google.maps.MapMouseEvent | google.maps.IconMouseEvent) => {
+        mapListeners.push(map.addListener('click', (ev: google.maps.MapMouseEvent | google.maps.IconMouseEvent) => {
           const placeId = (ev as google.maps.IconMouseEvent).placeId
           if (placeId) {
             // A Google POI was tapped. Suppress the default InfoWindow and show our card.
@@ -1488,14 +1555,17 @@ export function MapView(opts: {
           // A panel (editor, business) may use map taps itself: do not collapse it then.
           if (panelCleanup) return
           if (sheet.dataset.state !== 'peek') setSheet('peek')
-        })
-        map.addListener('idle', () => {
-          const bb = map!.getBounds()
+        }))
+        const loadView = () => {
+          const bb = map?.getBounds()
           if (!bb) return
           const ne = bb.getNorthEast()
           const sw = bb.getSouthWest()
           void load({ south: sw.lat(), west: sw.lng(), north: ne.lat(), east: ne.lng() })
-        })
+        }
+        mapListeners.push(map.addListener('idle', loadView))
+        // A reused map is already idle and will not say so again until it moves.
+        loadView()
       })
       .catch(() => {
         mapEl.replaceChildren(h('p', { class: 'hint' }, t.mapUnavailable))
@@ -1511,6 +1581,8 @@ export function MapView(opts: {
   announce(t.mapTitle)
 
   function teardown() {
+    if (gone) return
+    gone = true
     try {
       panelCleanup?.()
     } catch {
@@ -1518,6 +1590,8 @@ export function MapView(opts: {
     }
     placeMarkers.forEach((m) => m.setMap(null))
     if (geoWatch !== null) navigator.geolocation.clearWatch(geoWatch)
+    geoWatch = null
+    mapListeners.splice(0).forEach((l) => l.remove())
     markers.forEach((m) => m.setMap(null))
     meMarker?.setMap(null)
     clearRoute(false)

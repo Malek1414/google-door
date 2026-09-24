@@ -22,6 +22,7 @@ import { checkDoor, runDoorCheckOnce, verdictNote, verdictRows } from './doorChe
 import { h, mount, s } from './dom'
 import { grabFrame } from './LiveView'
 import { SteadyAngle } from './arrowSteady'
+import { isMuted, muteButton } from './voiceCalm'
 import './approach.css'
 
 // Screen chrome only. Everything spoken during guidance comes from the engine
@@ -214,6 +215,13 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
 
   const narrator = new Narrator()
   preloadClips(lang)
+  const muteBtn = muteButton((m) => {
+    if (!m) return
+    beacon?.stop()
+    beaconOn = false
+    stopLines(lang)
+  })
+  root.append(muteBtn)
   reportMissingClips(lang)
   const beacon = opts.config.beacon && session.audio ? new BeaconAudio(session.audio) : null
   let beaconOn = false
@@ -258,12 +266,12 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
       // Speech AND the live region, so VoiceOver gets it even with speech off.
       // Each part of the instruction plays its pre-synthesised clip; a part with no
       // clip is spoken by the device voice, never /api/speak (Q9).
-      if (opts.config.speak) playInstruction(say.text, { interrupt: say.interrupt, lang })
+      if (opts.config.speak && !isMuted()) playInstruction(say.text, { interrupt: say.interrupt, lang })
       announce(say.text)
     }
 
     if (beacon) {
-      if (hidden || v.beaconPitch === undefined || v.relBearingDeg === null) {
+      if (hidden || isMuted() || v.beaconPitch === undefined || v.relBearingDeg === null) {
         if (beaconOn) beacon.stop()
         beaconOn = false
       } else {

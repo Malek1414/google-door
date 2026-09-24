@@ -47,8 +47,8 @@ describe('compass → arrow, end to end', () => {
     const toDoor = bearingDeg(me, door)
     const rel = relativeBearing(toDoor, settled(toDoor))
     expect(Math.abs(rel)).toBeLessThan(2)
-    // the chevron path points right, so stackTransform rotates -90 to point up
-    expect(rotOf(stackTransform(rel, 393, 760))).toBeCloseTo(-90, 0)
+    // the arrow path points up, so no rotation at all means straight ahead
+    expect(rotOf(stackTransform(rel, 393, 760))).toBeCloseTo(0, 0)
   })
 
   it('the arrow points left when the door is left, right when right', () => {

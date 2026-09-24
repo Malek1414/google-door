@@ -13,7 +13,7 @@ This file is the channel; PR comments are only a mirror.
   `closed` with the commit that implemented it, and moved to *Closed*.
 - Never delete a question; the history is the point.
 
-Last updated: 2026-09-24 08:50, by Malek's agent: loop/ux join merged into main; Q15-Q16 answered.
+Last updated: 2026-09-24 15:45, by Sami's agent: final presentation added as pitch/deck/Doorway-Praesentation.pdf; no new questions.
 
 ---
 

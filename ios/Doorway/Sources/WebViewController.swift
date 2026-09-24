@@ -21,7 +21,7 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
     /// flat: the phone's Tailscale has been offline for months and a LAN address only
     /// works on one network. Override at launch with -DoorwayURL <url>.
     private static let candidates: [String] = [
-        "https://1001573f425b3993-83-135-183-58.serveousercontent.com",
+        "https://cdbd09b281135d82-83-135-183-58.serveousercontent.com",
         "http://192.168.12.158:8090/",
     ]
 

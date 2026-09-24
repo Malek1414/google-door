@@ -150,6 +150,9 @@ blockquote footer { color: var(--muted); font-size: 1rem; }
   font: 400 16px/1.35 'Google Sans Flex', Roboto, -apple-system, BlinkMacSystemFont, sans-serif; -webkit-tap-highlight-color: transparent; }
 .gm button { font-family: inherit; }
 .gm :focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
+/* The sheet heading is tabindex=-1: it only ever gets focus from script, to move the
+   screen reader. Focus it silently — a ring around a title nobody tabbed to is noise. */
+.gm h2:focus, .gm h2:focus-visible { outline: none; }
 .gm-map { position: absolute; inset: 0; }
 .gm-map > .hint { position: absolute; top: 40%; left: 16px; right: 16px; text-align: center; color: var(--fg2); }
 

@@ -8,7 +8,8 @@ import { demoWalkTrack, loadTrack, Recorder, replaySensors, type TrackPoint } fr
 import { t } from './strings'
 import { h, mount } from './ui/dom'
 import { LiveView, realSensors, applyContrast, arrivalSheet } from './ui/LiveView'
-import { computeRoute, routeTo } from './ui/Directions'
+import { computeRoute, liveRouteTo, routeTo } from './ui/Directions'
+import { buildPayload, nativeArAvailable, openNativeAr } from './ui/nativeAr'
 import { isMuted } from './ui/voiceCalm'
 import { pathDoorName } from './ui/doorName'
 import type { Route } from './core/route'
@@ -201,8 +202,11 @@ function showLive(target: ArrowTarget, p: Profile, name?: string) {
     })
 }
 
-/** The camera Live View with the real sensors (GPS, compass, camera). */
-function showCameraLive(target: ArrowTarget, p: Profile, name?: string) {
+/** The camera Live View with the real sensors (GPS, compass, camera). Inside the iOS app
+ *  on an AR-capable phone the native ARCore Live View opens instead; when that cannot
+ *  start, this web one does. */
+function showCameraLive(target: ArrowTarget, p: Profile, name?: string, allowNative = true) {
+  if (allowNative && showNativeLive(target, p, name)) return
   LiveView({
     target,
     ...(name ? { name } : {}),
@@ -212,6 +216,61 @@ function showCameraLive(target: ArrowTarget, p: Profile, name?: string) {
     profile: p,
     onApproach: (mode) => showApproach(target.entrance, p, mode),
   })
+}
+
+/**
+ * The native AR Live View (ui/nativeAr.ts). False when it is not available here or has
+ * no route to follow, so the caller shows the web Live View. The native screen covers
+ * this page; at the door it closes and the web arrival sheet takes over, and "Ja" leads
+ * into the approach engine for the last metres.
+ */
+function showNativeLive(target: ArrowTarget, p: Profile, name?: string): boolean {
+  if (!nativeArAvailable()) return false
+  const route = liveRouteTo(target)
+  const destName = name ?? pathDoorName(target.entrance)
+  const payload = route ? buildPayload(route, target, destName) : null
+  if (!payload) return false
+  // ARKit takes the camera; the page's stream would come back frozen. The approach and
+  // the web Live View each ask for a fresh one.
+  session.stream?.getTracks().forEach((tr) => tr.stop())
+  session.stream = null
+  const host = h('section', { class: 'nav-host', 'aria-label': destName })
+  mount(host)
+  const cfg = outputFor(p)
+  const opened = openNativeAr(payload, (ev) => {
+    if (ev.type === 'arrived') {
+      arrivalSheet({
+        door: target.entrance,
+        name: destName,
+        profile: p,
+        speak: cfg.speak,
+        parent: host,
+        onYes: (mode) => showApproach(target.entrance, p, mode),
+        onNo: () => showMap(p),
+      })
+    } else if (ev.type === 'closed') {
+      showMap(p)
+    } else if (ev.type === 'error') {
+      console.warn('[doorway] native Live View unavailable, web Live View instead', ev.reason)
+      webLiveAgain(target, p, name)
+    }
+  })
+  if (!opened) webLiveAgain(target, p, name)
+  return true
+}
+
+function webLiveAgain(target: ArrowTarget, p: Profile, name?: string) {
+  void cameraAgain().then(() => showCameraLive(target, p, name, false))
+}
+
+/** A fresh camera stream after the native AR screen held the camera. */
+async function cameraAgain(): Promise<void> {
+  if (session.stream || !navigator.mediaDevices?.getUserMedia) return
+  try {
+    session.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+  } catch {
+    session.stream = null
+  }
 }
 
 function showApproach(door: Entrance, p: Profile, mode: ApproachMode) {

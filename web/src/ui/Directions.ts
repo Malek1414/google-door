@@ -205,7 +205,19 @@ export function cachedRoute(from: LatLon, to: LatLon): { route: Route; from: Lat
 /** Drop the remembered route, so the next guidance opens the camera Live View instead
  *  of the map navigation (main.showLive picks by whether a route exists). */
 export function forgetRoute(): void {
+  if (last) forLive = last
   last = null
+}
+
+// forgetRoute() sends the Live View button past the map navigation, but the native AR
+// Live View in the iOS app (ui/nativeAr.ts) still wants the route to anchor its arrows on.
+let forLive: { from: LatLon; to: LatLon; route: Route } | null = null
+
+/** The route to this destination for a Live View: the current one, or the one the Live
+ *  View button just set aside with forgetRoute(). */
+export function liveRouteTo(to: LatLon): Route | null {
+  const r = last ?? forLive
+  return r && haversineM(r.to, to) <= 3 ? r.route : null
 }
 
 /** The route last drawn to this destination, wherever it was asked from: what Start follows. */

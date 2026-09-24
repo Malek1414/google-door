@@ -192,23 +192,6 @@ export function MapView(opts: {
   const avatar = h('button', { class: 'gm-avatar', type: 'button', 'aria-label': t.profileButton, onclick: opts.onSettings }, 'S')
   const search = h('div', { class: 'gm-search' }, pinLogo(), searchInput, micBtn, lensBtn, avatar)
 
-  const chipDefs: [Filter, string, string][] = [
-    ['stepFree', 'accessible', t.chipStepFree],
-    ['withSteps', 'stairs', t.chipWithSteps],
-    ['automatic', 'door_sliding', t.chipAutomatic],
-    ['noRevolving', 'block', t.chipNoRevolving],
-  ]
-  const accessChips = chipDefs.map(([key, ic, label]) => {
-      const b = h('button', { class: 'gm-chip', type: 'button', 'aria-pressed': String(filters.has(key)) }, icon(ic), label)
-      b.addEventListener('click', () => {
-        if (filters.has(key)) filters.delete(key)
-        else filters.add(key)
-        b.setAttribute('aria-pressed', String(filters.has(key)))
-        renderMarkers()
-        renderSheet()
-      })
-      return b
-    })
   const placeChips = NORMAL_CHIPS.map((c) => {
     const b = h('button', { class: 'gm-chip', type: 'button', 'aria-pressed': 'false', 'data-chip': c.id }, icon(c.icon), lang === 'de' ? c.labelDe : c.labelEn)
     b.addEventListener('click', () => void runCategory(c.id, lang === 'de' ? c.labelDe : c.labelEn))
@@ -224,8 +207,29 @@ export function MapView(opts: {
     renderSheet()
     announce(m === 'access' ? t.modeOn : t.modeOff)
   })
+  const chipDefs: [Filter, string, string][] = [
+    ['stepFree', 'accessible', t.chipStepFree],
+    ['withSteps', 'stairs', t.chipWithSteps],
+    ['automatic', 'door_sliding', t.chipAutomatic],
+    ['noRevolving', 'block', t.chipNoRevolving],
+  ]
+  const accessChips = chipDefs.map(([key, ic, label]) => {
+    const b = h('button', { class: 'gm-chip', type: 'button', 'aria-pressed': String(filters.has(key)) }, icon(ic), label)
+    b.addEventListener('click', () => {
+      if (filters.has(key)) filters.delete(key)
+      else filters.add(key)
+      b.setAttribute('aria-pressed', String(filters.has(key)))
+      renderMarkers()
+      renderSheet()
+    })
+    return b
+  })
   const chips = h('div', { class: 'gm-chips', role: 'group', 'aria-label': t.filterLabel })
   function renderChips() {
+    // Search categories up top like Google, but the accessibility mode chip leads.
+    // Sami's branch moved it into settings to match Maps exactly; kept here instead,
+    // because the toggle between plain Maps and accessibility mode IS the product, and
+    // a setting three taps deep cannot show that. His result-list filters are taken.
     chips.replaceChildren(modeChip, ...(mode === 'access' ? accessChips : placeChips))
     placeChips.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.chip === activePlaceChip)))
   }
@@ -561,7 +565,11 @@ export function MapView(opts: {
     if (tab === 'contribute') return mountPanel(contributePanel)
     if (tab === 'business') return mountPanel(businessPanel)
     if (placeHits.length) {
-      panelCleanup = renderPlaceList(sheetBody, featureCtx, placeHits, placeTitle, (p) => openPlace(p))
+      panelCleanup = renderPlaceList(sheetBody, featureCtx, placeHits, placeTitle, (p) => openPlace(p), (visibleHits) => {
+        // Keep the map pins in step with the list filters.
+        const keep = new Set(visibleHits.map((x) => x.placeId))
+        placeMarkers.forEach((m, i) => m.setVisible(keep.has(placeHits[i]?.placeId ?? '')))
+      })
       return
     }
     if (!showDoorMarkers(mode)) {

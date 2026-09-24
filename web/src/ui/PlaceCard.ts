@@ -487,9 +487,24 @@ export function renderPlaceCard(el: HTMLElement, ctx: FeatureCtx, p: PlaceHit, o
   }
 }
 
-export function renderPlaceList(el: HTMLElement, ctx: FeatureCtx, hits: PlaceHit[], title: string, onPick: (p: PlaceHit) => void): () => void {
+// Result filters like Google's chips above a result list. Remembered while the app is open,
+// so an accessibility filter stays on from one category to the next.
+const listFilters = { access: false, open: false, top: false }
+const LF = {
+  de: { access: 'Rollstuhlgerechter Eingang', open: 'Jetzt geöffnet', top: 'Top-bewertet', count: (n: number) => (n === 1 ? '1 Ort' : `${n} Orte`), none: 'Keine passenden Orte. Filter anpassen.', label: 'Ergebnisse filtern' },
+  en: { access: 'Wheelchair accessible entrance', open: 'Open now', top: 'Top rated', count: (n: number) => (n === 1 ? '1 place' : `${n} places`), none: 'No matching places. Adjust the filters.', label: 'Filter results' },
+}[lang === 'en' ? 'en' : 'de']
+
+export function renderPlaceList(
+  el: HTMLElement,
+  ctx: FeatureCtx,
+  hits: PlaceHit[],
+  title: string,
+  onPick: (p: PlaceHit) => void,
+  onFilter?: (visible: PlaceHit[]) => void,
+): () => void {
   const origin = ctx.origin()
-  const rows = hits.map((p) => {
+  const row = (p: PlaceHit) => {
     const sub: (Node | string)[] = []
     const catDist = [p.category, fmtDistance(haversineM(origin, p))].filter(Boolean).join(' · ')
     sub.push(catDist)
@@ -513,13 +528,44 @@ export function renderPlaceList(el: HTMLElement, ctx: FeatureCtx, hits: PlaceHit
           : null,
       ),
     )
-  })
+  }
+  const visible = () =>
+    hits.filter(
+      (p) =>
+        (!listFilters.access || p.access.entrance === true) &&
+        (!listFilters.open || p.openNow === true) &&
+        (!listFilters.top || (typeof p.rating === 'number' && p.rating >= 4.5)),
+    )
+  const list = h('div', {})
+  const count = h('p', { class: 'gm-sheet-sub', 'aria-live': 'polite' })
+  const draw = () => {
+    const v = visible()
+    count.textContent = LF.count(v.length)
+    list.replaceChildren(v.length ? h('ul', { class: 'gm-list' }, ...v.map(row)) : h('p', { class: 'gm-empty' }, hits.length ? LF.none : L.listNone))
+    onFilter?.(v)
+  }
+  const chip = (key: keyof typeof listFilters, ic: string, label: string) => {
+    const b = h('button', { class: 'gm-chip', type: 'button', 'aria-pressed': String(listFilters[key]) }, icon(ic), label)
+    b.addEventListener('click', () => {
+      listFilters[key] = !listFilters[key]
+      b.setAttribute('aria-pressed', String(listFilters[key]))
+      draw()
+    })
+    return b
+  }
   const root = h(
     'div',
     { class: 'pc-list' },
     h('div', { class: 'gm-sheet-head' }, h('h2', { id: 'sheet-title', class: 'gm-sheet-title', tabindex: '-1' }, title)),
-    rows.length ? h('ul', { class: 'gm-list' }, ...rows) : h('p', { class: 'gm-empty' }, L.listNone),
+    h('div', { class: 'gm-chips pc-filters', role: 'group', 'aria-label': LF.label },
+      chip('access', 'accessible', LF.access),
+      chip('open', 'schedule', LF.open),
+      chip('top', 'star', LF.top),
+    ),
+    count,
+    list,
   )
+  draw()
   el.replaceChildren(root)
   el.scrollTop = 0
   root.querySelector<HTMLElement>('h2')?.focus({ preventScroll: true })

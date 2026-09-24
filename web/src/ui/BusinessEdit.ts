@@ -230,7 +230,7 @@ export function openBusinessEdit(el: HTMLElement, ctx: FeatureCtx, businessId: s
   )
 
   // Barrierefreiheit
-  const accessRows = ACCESS_ATTRS.map((a) => {
+  const accessRow = (a: (typeof ACCESS_ATTRS)[number]) => {
     const name = nextId('acc')
     const lid = nextId('l')
     return h(
@@ -252,7 +252,21 @@ export function openBusinessEdit(el: HTMLElement, ctx: FeatureCtx, businessId: s
         }),
       ),
     )
+  }
+  const mainRows = ACCESS_ATTRS.filter((a) => !('more' in a)).map(accessRow)
+  const moreId = nextId('more')
+  const moreBox = h('div', { class: 'be-attrs', id: moreId, hidden: true }, ...ACCESS_ATTRS.filter((a) => 'more' in a).map(accessRow))
+  const moreLabel = h('span', {}, 'Mehr')
+  const moreIcon = h('span', { class: 'ms', 'aria-hidden': 'true' }, 'expand_more')
+  const moreBtn = h('button', { type: 'button', class: 'gm-pill be-more', 'aria-expanded': 'false', 'aria-controls': moreId }, moreIcon, moreLabel) as HTMLButtonElement
+  moreBtn.addEventListener('click', () => {
+    const open = moreBox.hidden
+    moreBox.hidden = !open
+    moreBtn.setAttribute('aria-expanded', String(open))
+    moreLabel.textContent = open ? 'Weniger' : 'Mehr'
+    moreIcon.textContent = open ? 'expand_less' : 'expand_more'
   })
+  const accessRows = [...mainRows, moreBtn, moreBox]
 
   // Sticky bar
   const cancel = h('button', { type: 'button', class: 'gm-pill be-bar-btn', onclick: () => finish() }, 'Abbrechen')

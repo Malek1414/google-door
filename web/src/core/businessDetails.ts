@@ -17,6 +17,24 @@ export const ACCESS_ATTRS = [
   { id: 'tactile', label: 'Blindenleitsystem' },
   { id: 'assistanceDogs', label: 'Assistenzhunde willkommen' },
   { id: 'hearingLoop', label: 'Induktionsschleife' },
+  // Shown under "Mehr" in Profil bearbeiten.
+  { id: 'doorWide', label: 'Türbreite mindestens 90 cm', more: true },
+  { id: 'automaticDoor', label: 'Automatische Tür', more: true },
+  { id: 'doorButton', label: 'Türöffner-Taster', more: true },
+  { id: 'noThreshold', label: 'Keine Schwelle über 2 cm', more: true },
+  { id: 'ramp', label: 'Rampe', more: true },
+  { id: 'handrail', label: 'Handlauf an Stufen oder Rampe', more: true },
+  { id: 'bellReach', label: 'Klingel in Greifhöhe (höchstens 85 cm)', more: true },
+  { id: 'smoothFloor', label: 'Ebener Boden, kein Kopfsteinpflaster', more: true },
+  { id: 'noSlope', label: 'Kein starkes Gefälle am Zugang', more: true },
+  { id: 'wideCorridors', label: 'Flure mindestens 120 cm breit', more: true },
+  { id: 'lowCounter', label: 'Tresen höchstens 80 cm hoch', more: true },
+  { id: 'goodLight', label: 'Gute Beleuchtung ohne Blendung', more: true },
+  { id: 'contrast', label: 'Kontrastmarkierungen an Stufen und Glas', more: true },
+  { id: 'braille', label: 'Braille oder tastbare Beschriftung', more: true },
+  { id: 'visualAlarm', label: 'Alarm mit Lichtsignal', more: true },
+  { id: 'grabBars', label: 'Haltegriffe im WC', more: true },
+  { id: 'quietRoom', label: 'Ruhiger Raum', more: true },
 ] as const
 
 export type AccessAttrId = (typeof ACCESS_ATTRS)[number]['id']

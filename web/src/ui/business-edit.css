@@ -62,3 +62,4 @@
 .be-bar-btn { flex: 1; justify-content: center; min-height: 48px; padding: 0 16px; cursor: pointer; }
 .be-bar-btn:not(.gm-pill-primary) { background: var(--chip); color: var(--fg); }
 .be .gm-sheet-title { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+.be-more { align-self: flex-start; min-height: 48px; margin-top: 8px; }

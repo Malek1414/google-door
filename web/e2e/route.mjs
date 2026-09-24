@@ -205,7 +205,8 @@ async function routeToFirstDoor(page, { withSteps = false } = {}) {
   const name = ((await row.locator('.gm-row-title').textContent().catch(() => '')) || '').trim()
   await row.tap()
   unguidableCard = await page.locator('.gm-sheet .reason').first().isVisible({ timeout: 3000 }).catch(() => false)
-  const route = page.locator('.gm-sheet .gm-pill-primary', { hasText: /^\s*\S*\s*Route\s*$/ }).first()
+  // Since loop2/B the door card's one primary pill is View; Route is a plain pill.
+  const route = page.locator('.gm-sheet .gm-pill', { hasText: /^\s*\S*\s*Route\s*$/ }).first()
   await route.waitFor({ state: 'visible', timeout: 8000 })
   await route.tap()
   await page.locator('.gm-routehead').first().waitFor({ state: 'visible', timeout: 20000 })

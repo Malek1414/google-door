@@ -215,7 +215,8 @@ await step('contribute-report', page, async () => {
     await page.waitForTimeout(1500)
   }
   await form.waitFor({ state: 'visible', timeout: 8000 })
-  const label = form.locator('.ee-label', { hasText: /^Stufenlos/ }).first()
+  // The step-free question was reworded (Stufenlos? -> Kommt man ohne Stufen hinein?).
+  const label = form.locator('.ee-label', { hasText: /^Stufenlos|ohne Stufen/ }).first()
   await label.waitFor({ state: 'visible', timeout: 5000 })
   const inputs = await page.locator('.ee-input:visible, .ee-seg-btn:visible').count()
   if (inputs === 0) throw new Error('"Stufenlos" found but no editor inputs')

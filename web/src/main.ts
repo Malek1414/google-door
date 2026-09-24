@@ -14,6 +14,7 @@ import type { Entrance } from './core/types'
 import { MapView } from './ui/MapView'
 import { Onboard } from './ui/Onboard'
 import { Start } from './ui/Start'
+import { startHealthBanner } from './ui/healthBanner'
 // Pixel fixes measured against the Maps recording; loaded last so they win.
 import './ui/fix-search.css'
 import './ui/fix-sheet.css'
@@ -51,6 +52,7 @@ function fitStandalone() {
 }
 fitStandalone()
 window.addEventListener('resize', fitStandalone)
+startHealthBanner()
 
 const params = readParams()
 session.profile = loadProfile()

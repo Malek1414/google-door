@@ -9,12 +9,13 @@
 //   tier 0 / 3            no marker; surfaced as text in the detail sheet
 
 import { haversineM, type LatLon } from '../core/geo'
-import type { Route } from '../core/route'
+import { CONNECTOR_MIN_M, instructionLine, walkMinutes, type Route } from '../core/route'
+import { computeRoute, D, formatDistance, stepsList, type RouteOutcome } from './Directions'
 import type { Profile } from '../core/profile'
 import { guidanceFor, markerKind, type ArrowTarget } from '../core/target'
 import type { Building, Entrance } from '../core/types'
 import { mapsKey } from '../config'
-import { bboxAround, fetchEntrances, fetchLived, fetchRoute, findEntrance, type BBox } from '../data'
+import { bboxAround, fetchEntrances, fetchLived, findEntrance, type BBox } from '../data'
 import { announce } from '../session'
 import { unlockAll } from './Start'
 import type { FeatureCtx, Panel } from './ctx'
@@ -240,14 +241,16 @@ export function MapView(opts: {
   // the sheet, not in a floating pill. One line of "4 min - 260 m" with round buttons
   // on the right, then a row of actions, the first of them filled.
   let routePreview = false
+  /** Bumped by every draw and clear, so a route that lands after a close is dropped. */
+  let routeSeq = 0
   let routeTarget: Entrance | null = null
 
-  function showRoutePreview(summary: string, label: string | null, r: Route | null) {
+  function showRoutePreview(summary: string, label: string | null, out: RouteOutcome, retry: () => void, crowM: number) {
     routePreview = true
     morePill.hidden = true
     const e = routeTarget
     const g = e ? guidanceFor(e, opts.profile) : null
-    const steps = (r?.steps ?? []).map((st) => st.text?.split('\n')[0]).filter((x): x is string => Boolean(x))
+    const r = out.ok ? out.route : null
 
     const action = (cls: string, ic: string, text: string, on: () => void) =>
       h('button', { class: `gm-pill ${cls}`, type: 'button', onclick: on }, icon(ic, true), text)
@@ -267,17 +270,27 @@ export function MapView(opts: {
       t.startGuidance,
     )
 
-    const stepList = h('ol', { class: 'gm-steps', hidden: true }, ...steps.map((x) => h('li', {}, x)))
+    // The turn-by-turn list is always in the sheet, as in Maps: pull the sheet up, or
+    // press "Schritte", and it is there. Without a route there is nothing to list, and
+    // the sheet says why instead of showing a straight line.
+    const body = r
+      ? stepsList(r, label ?? D.destination)
+      : h(
+          'div',
+          { class: 'dir-error', role: 'alert' },
+          icon('wrong_location', true),
+          h('p', {}, out.ok ? '' : out.message, h('small', {}, D.crow(t.metresShort(crowM)))),
+        )
 
     sheetBody.replaceChildren(
       h(
         'div',
         { class: 'gm-routehead' },
-        h('span', { class: 'gm-routehead-ic', 'aria-hidden': 'true' }, icon('directions_walk', true)),
-        h('h2', { id: 'sheet-title', class: 'gm-routehead-t' }, summary),
+        h('span', { class: 'gm-routehead-ic', 'aria-hidden': 'true' }, icon(r ? 'directions_walk' : 'wrong_location', true)),
+        h('h2', { id: 'sheet-title', class: 'gm-routehead-t', tabindex: '-1' }, summary),
         h('span', { class: 'gm-routehead-sub' }, label ?? ''),
         h('div', { class: 'gm-routehead-btns' },
-          h('button', { class: 'gm-round-s', type: 'button', 'aria-label': t.share, onclick: () => e && void share(e) }, icon('ios_share')),
+          e ? h('button', { class: 'gm-round-s', type: 'button', 'aria-label': t.share, onclick: () => void share(e) }, icon('ios_share')) : null,
           h('button', { class: 'gm-round-s', type: 'button', 'aria-label': t.clearRoute, onclick: () => clearRoute() }, icon('close')),
         ),
       ),
@@ -285,13 +298,10 @@ export function MapView(opts: {
         'div',
         { class: 'gm-actions gm-routeactions' },
         startBtn,
-        steps.length ? action('', 'list', t.steps, () => {
-          stepList.hidden = !stepList.hidden
-          setSheet(stepList.hidden ? 'route' : 'half')
-        }) : null,
-        action('', 'door_front', t.otherDoors, () => closeCard()),
+        r ? action('', 'list', t.steps, () => setSheet(sheet.dataset.state === 'full' ? 'route' : 'full')) : action('', 'refresh', D.retry, retry),
+        e ? action('', 'door_front', t.otherDoors, () => closeCard()) : null,
       ),
-      stepList,
+      body,
     )
     setSheet('route')
   }
@@ -357,6 +367,10 @@ export function MapView(opts: {
     nav,
   )
   mount(root)
+  // The root and the sheet are fixed frames, never scroll containers. focus() and
+  // scrollIntoView() still scroll overflow:hidden boxes, which leaves the tab bar
+  // mid-screen; snap them back whenever that happens.
+  for (const frame of [root, sheet]) frame.addEventListener('scroll', () => { if (frame.scrollTop || frame.scrollLeft) frame.scrollTo(0, 0) }, { passive: true })
 
   // ---- sheet snap states: drag or tap the handle ----
   const setSheet = (st: SheetState) => {
@@ -399,13 +413,27 @@ export function MapView(opts: {
   let dragging = false
   let decided = false
   const stateIdx = () => order.indexOf(sheet.dataset.state as SheetState)
+  /** Handle tap: one step up, from full back to the bottom; the route summary counts as the bottom. */
+  const nextState = (): SheetState => {
+    const st = sheet.dataset.state as SheetState
+    if (st === 'route') return 'half'
+    if (st === 'full') return routePreview ? 'route' : 'peek'
+    return order[stateIdx() + 1]
+  }
   const snap = (dy: number, dt: number) => {
     const v = dy / Math.max(dt, 1) // px per ms, negative = up
+    // 'route' is not in `order`; index -1 used to make an upward swipe land on peek.
+    // Up opens the route to half, down keeps the route summary as its lowest state.
+    if (sheet.dataset.state === 'route') {
+      setSheet(v < -0.5 || dy < -60 ? (dy < -420 ? 'full' : 'half') : 'route')
+      return
+    }
     const i = stateIdx()
     let step = 0
     if (v < -0.5 || dy < -60) step = dy < -420 && i === 0 ? 2 : 1
     else if (v > 0.5 || dy > 60) step = dy > 420 && i === 2 ? -2 : -1
-    setSheet(order[Math.max(0, Math.min(order.length - 1, i + step))])
+    const next = order[Math.max(0, Math.min(order.length - 1, i + step))]
+    setSheet(next === 'peek' && routePreview ? 'route' : next)
   }
   sheet.addEventListener(
     'touchstart',
@@ -453,7 +481,7 @@ export function MapView(opts: {
     sheet.style.transition = ''
     if (dragging) snap(dy, performance.now() - dragT0)
     // A plain tap on the handle cycles peek, half, full.
-    else if (!decided && handle.contains(ev.target as Node)) setSheet(stateIdx() === order.length - 1 ? 'peek' : order[stateIdx() + 1])
+    else if (!decided && handle.contains(ev.target as Node)) setSheet(nextState())
     dragging = false
   }
   sheet.addEventListener('touchend', endDrag)
@@ -474,8 +502,8 @@ export function MapView(opts: {
     const dy = clientY === null ? 0 : clientY - mouseY0
     mouseY0 = null
     if (Math.abs(dy) < 6) {
-      if (clientY !== null) setSheet(stateIdx() === order.length - 1 ? 'peek' : order[stateIdx() + 1])
-      else setSheet(order[stateIdx()])
+      if (clientY !== null) setSheet(nextState())
+      else setSheet(sheet.dataset.state as SheetState)
     } else snap(dy, performance.now() - dragT0)
   }
   handle.addEventListener('pointermove', (ev) => {
@@ -488,15 +516,14 @@ export function MapView(opts: {
   handle.addEventListener('lostpointercapture', (ev) => endMouse(ev.clientY))
   // Safety net: any scroll or wheel on the sheet without an active gesture clears a stale offset.
   const clearStale = () => {
-    if (mouseY0 === null && dragY0 === null && sheet.style.getPropertyValue('--drag')) setSheet(order[stateIdx()])
+    if (mouseY0 === null && dragY0 === null && sheet.style.getPropertyValue('--drag')) setSheet(sheet.dataset.state as SheetState)
   }
   sheetBody.addEventListener('scroll', clearStale, { passive: true })
   sheet.addEventListener('wheel', clearStale, { passive: true })
   handle.addEventListener('keydown', (ev) => {
     if (ev.key !== 'Enter' && ev.key !== ' ') return
     ev.preventDefault()
-    const i = order.indexOf(sheet.dataset.state as SheetState)
-    setSheet(i === order.length - 1 ? 'peek' : order[i + 1])
+    setSheet(nextState())
   })
 
   const origin = () => me ?? (map?.getCenter() ? { lat: map.getCenter()!.lat(), lon: map.getCenter()!.lng() } : DEFAULT_CENTER)
@@ -731,7 +758,9 @@ export function MapView(opts: {
     sheetBody.replaceChildren(...children.filter((c): c is Node => c !== null))
     setSheet('half')
     sheetBody.scrollTop = 0
-    sheetBody.querySelector<HTMLElement>('h2')?.focus()
+    // preventScroll: the sheet is still sliding up, and a plain focus() scrolls the
+    // fixed root so the tab bar ends up in the middle of the screen.
+    sheetBody.querySelector<HTMLElement>('h2')?.focus({ preventScroll: true })
   }
   function closeCard() {
     panelCleanup?.()
@@ -740,11 +769,13 @@ export function MapView(opts: {
     clearRoute()
     renderMarkers()
     renderSheet()
-    setSheet('peek')
+    // Back to a result list: show the list, not a peek that hides every row.
+    setSheet(placeHits.length ? 'half' : 'peek')
   }
 
   const ROUTE_BLUE = '#1a73e8'
   let routeCasing: google.maps.Polyline | null = null
+  let routeTail: google.maps.Polyline | null = null
   let routeEnd: google.maps.Marker | null = null
   let routeBadge: google.maps.Marker | null = null
 
@@ -773,8 +804,11 @@ export function MapView(opts: {
   }
 
   function clearRoute() {
+    routeSeq++
     routeLine?.setMap(null)
     routeCasing?.setMap(null)
+    routeTail?.setMap(null)
+    routeTail = null
     routeEnd?.setMap(null)
     routeBadge?.setMap(null)
     routeLine = null
@@ -829,9 +863,10 @@ export function MapView(opts: {
   }
 
   /**
-   * Draw the way to a point. Real walking directions when the Routes API answers;
-   * grey dots only as a fallback, and that case is announced as "roughly" so nobody
-   * reads a crow-flight hint as a route.
+   * Draw the way to a point: the real walking route from the Routes API, blue dots as
+   * Maps draws a walk, the time on the line, and the steps in the sheet. When no route
+   * can be computed nothing is drawn but the destination pin, and the sheet says why.
+   * A straight line is never drawn: it read as a route and pointed through buildings.
    */
   async function drawRoute(to: LatLon, label?: string, target: Entrance | null = null): Promise<Route | null> {
     if (!map) return null
@@ -841,39 +876,55 @@ export function MapView(opts: {
     routeTarget = target
     const from = origin()
     clearRoute()
+    const seq = ++routeSeq
 
-    let r: Route | null = null
-    try {
-      r = await fetchRoute(from, to)
-    } catch {
-      r = null
+    const out = await computeRoute(from, to)
+    // Closed, or another route asked for, while this one was in flight.
+    if (seq !== routeSeq || !map) return out.ok ? out.route : null
+    clearRoute()
+    const retry = () => void drawRoute(to, label, target)
+    endCap(to)
+
+    if (!out.ok) {
+      const crow = haversineM(from, to)
+      showRoutePreview(D.noRouteTitle, label ?? null, out, retry, crow)
+      announce(`${D.noRouteTitle}. ${out.message}`)
+      map.panTo({ lat: to.lat, lng: to.lon })
+      return null
     }
 
-    const bounds = new google.maps.LatLngBounds()
-    const walked = Boolean(r?.found && r.path.length > 1)
-    const coords = walked
-      ? r!.path.map(([lat, lng]) => ({ lat, lng }))
-      : [{ lat: from.lat, lng: from.lon }, { lat: to.lat, lng: to.lon }]
-
-    // Maps draws no casing under walking dots. Neither do we now.
+    const r = out.route
+    const coords = r.path.map(([lat, lng]) => ({ lat, lng }))
+    // Maps draws no casing under walking dots. Neither do we.
     routeLine = new google.maps.Polyline({
-      map, path: coords, strokeOpacity: 0, zIndex: 5, clickable: false, icons: walkDots(!walked),
+      map, path: coords, strokeOpacity: 0, zIndex: 5, clickable: false, icons: walkDots(false),
     })
-    endCap(to)
+    // Where the route starts away from the user (snapped to the nearest walkable way),
+    // Maps joins the two with small grey dots. Guidance follows the same connector.
+    if (haversineM(from, { lat: coords[0].lat, lon: coords[0].lng }) > CONNECTOR_MIN_M) {
+      routeCasing = new google.maps.Polyline({
+        map, path: [{ lat: from.lat, lng: from.lon }, coords[0]], strokeOpacity: 0, zIndex: 5, clickable: false, icons: walkDots(true),
+      })
+    }
+    const endPt = coords[coords.length - 1]
+    if (haversineM(to, { lat: endPt.lat, lon: endPt.lng }) > CONNECTOR_MIN_M) {
+      routeTail = new google.maps.Polyline({
+        map, path: [endPt, { lat: to.lat, lng: to.lon }], strokeOpacity: 0, zIndex: 5, clickable: false, icons: walkDots(true),
+      })
+    }
+    const bounds = new google.maps.LatLngBounds()
     coords.forEach((c) => bounds.extend(c))
+    bounds.extend({ lat: from.lat, lng: from.lon })
+    bounds.extend({ lat: to.lat, lng: to.lon })
 
-    const mins = walked ? Math.max(1, Math.round(Number(String(r!.duration ?? '0').replace('s', '')) / 60)) : null
-    const metres = walked ? (r!.distanceM ?? 0) : haversineM(from, to)
-    const summary = mins !== null ? `${t.walkMin(mins)} · ${t.metresShort(metres)}` : `${t.roughly} · ${t.metresShort(metres)}`
+    const mins = walkMinutes(r)
+    const metres = r.distanceM ?? 0
+    const summary = mins !== null ? `${t.walkMin(mins)} · ${formatDistance(metres)}` : formatDistance(metres)
     if (mins !== null) timeBadge(midpoint(coords), t.walkMin(mins))
 
-    showRoutePreview(summary, label ?? null, r)
-    if (walked) {
-      const first = r!.steps[0]?.text?.split('\n')[0] ?? ''
-      announce(`${t.metres(metres)}, ${mins} min. ${label ?? ''} ${first}`.trim())
-    } else {
-      announce(`${t.roughly}. ${t.metres(metres)}. ${label ?? ''}`.trim())
-    }
+    showRoutePreview(summary, label ?? null, out, retry, metres)
+    const first = instructionLine(r.steps[0] ?? null) ?? ''
+    announce(`${mins !== null ? `${t.walkMin(mins)}, ` : ''}${t.metres(metres)}. ${label ?? ''}. ${first}`.trim())
 
     // Maps fills the map area with the route. Padding clears the search bar above and
     // the preview sheet below, and nothing more.

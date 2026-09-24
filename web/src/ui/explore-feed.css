@@ -18,9 +18,20 @@
   padding-bottom: 24px;
 }
 
+/* The feed runs full bleed with its own 23px insets; cancel the sheet body's 23px
+   side padding so the title does not start at 46px. */
+.gm-sheet-body > .gx-feed { margin-inline: -23px; }
+
 .gx-section { padding-top: 12px; }
 .gx-section[hidden] { display: none; }
-.gx-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-right: 16px; }
+.gx-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-right: 23px; }
+/* measured (rec/full_home.png): peek title centre 40px under the sheet top and the weather
+   chip ends just above the tab bar. The first visible section drops its top padding so the
+   title lands there instead of 56px down with the chip under the nav. */
+.gx-feed > .gx-section:first-child,
+.gx-feed > .gx-section[hidden] + .gx-section { padding-top: 0; }
+.gx-feed > .gx-section:first-child .gx-h--lead,
+.gx-feed > .gx-section[hidden] + .gx-section .gx-h--lead { padding-top: 4px; }
 .gx-h {
   margin: 0;
   padding: 12px 23px 14px;

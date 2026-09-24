@@ -12,13 +12,12 @@ to the surveyed OSM bearing and says which source is talking.
 """
 import base64, json, os
 from typing import Optional
-import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from server import upstream
+
 router = APIRouter()
-GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 MODEL_FIX = os.environ.get("GEMINI_MODEL_DOORFIX", "gemini-3.6-flash")
 
 FIX_PROMPT = """You are looking through the camera of a blind person standing outside a
@@ -77,8 +76,6 @@ class FrameReq(BaseModel):
 
 
 async def _ask(prompt: str, frame_b64: str) -> dict:
-    if not GEMINI_KEY:
-        raise HTTPException(503, "GEMINI_API_KEY not configured")
     body = {
         "contents": [{"parts": [
             {"text": prompt},
@@ -94,10 +91,10 @@ async def _ask(prompt: str, frame_b64: str) -> dict:
             "maxOutputTokens": 512,
         },
     }
-    from server.app import gemini_post
-    r = await gemini_post(MODEL_FIX, body)
-    if r is None or r.status_code != 200:
-        raise HTTPException(502, f"gemini {r.status_code if r else 'no response'}")
+    # 503 naming GEMINI_API_KEY when it is missing; 429/5xx retried; outcome recorded.
+    r = await upstream.gemini(MODEL_FIX, body)
+    if r.status_code != 200:
+        raise HTTPException(502, f"gemini {r.status_code}")
     try:
         return json.loads(r.json()["candidates"][0]["content"]["parts"][0]["text"])
     except Exception:

@@ -146,7 +146,7 @@ blockquote footer { color: var(--muted); font-size: 1rem; }
 .gm { --sheet: #151316; --search: #33343b; --chip: #3b393c; --round: #2b2b2f; --circle: #323033; --teal: #62c4cb; --teal-ink: #00363a; --tonal: #063c40; --tonal-ink: #cdeef0;
   --nav: #1c2224; --tips: #1f2029; --fg: #e6e1e5; --fg2: #c9c5ca; --line: #2e2c30;
   --nav-h: calc(66px + env(safe-area-inset-bottom)); --top: max(10px, env(safe-area-inset-top));
-  position: fixed; inset: 0; overflow: hidden; background: #000; color: var(--fg); color-scheme: dark;
+  position: fixed; inset: 0; overflow: hidden; overflow: clip; background: #000; color: var(--fg); color-scheme: dark;
   font: 400 16px/1.35 'Google Sans Flex', Roboto, -apple-system, BlinkMacSystemFont, sans-serif; -webkit-tap-highlight-color: transparent; }
 .gm button { font-family: inherit; }
 .gm :focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }

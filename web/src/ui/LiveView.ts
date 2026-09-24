@@ -7,8 +7,8 @@ import { arrowPulseHz, ARRIVE_M, beaconFor, cuePan, hapticFor, HAPTIC_ARRIVED, O
 import { bearingDeg, haversineM, relativeBearing } from '../core/geo'
 import { distanceKey } from '../core/speech'
 import { HeadingSmoother } from '../core/smooth'
-import { progressAlong, stepAhead, type Route } from '../core/route'
-import { fetchRoute } from '../data'
+import { connected, tailLength, instructionLine, maneuverGlyph, nextManeuver, progressAlong, type Route } from '../core/route'
+import { cachedRoute, computeRoute, D } from './Directions'
 import { chevronStack, destinationPin, stackTransform, type ArPhase } from './ar'
 import './ar.css'
 import { startHeading, startPitch, type Heading } from '../core/heading'
@@ -163,32 +163,6 @@ function turnGlyph(rel: number): string {
   return 'u_turn_left'
 }
 
-/**
- * Google's manoeuvre enum to a Material turn glyph. Used in preference to the raw
- * relative bearing whenever we are on a route: the route knows a left turn is coming,
- * the compass only knows the door is currently off to the left.
- */
-function maneuverGlyph(m: string | null): string | null {
-  if (!m) return null
-  const map: Record<string, string> = {
-    DEPART: 'straight',
-    STRAIGHT: 'straight',
-    TURN_LEFT: 'turn_left',
-    TURN_RIGHT: 'turn_right',
-    TURN_SLIGHT_LEFT: 'turn_slight_left',
-    TURN_SLIGHT_RIGHT: 'turn_slight_right',
-    TURN_SHARP_LEFT: 'turn_sharp_left',
-    TURN_SHARP_RIGHT: 'turn_sharp_right',
-    TURN_U_TURN_LEFT: 'u_turn_left',
-    TURN_U_TURN_RIGHT: 'u_turn_right',
-    ROUNDABOUT_LEFT: 'roundabout_left',
-    ROUNDABOUT_RIGHT: 'roundabout_right',
-    FERRY: 'directions_boat',
-    NAME_CHANGE: 'straight',
-  }
-  return map[m] ?? null
-}
-
 function compassWord(deg: number): string {
   return t.compass[Math.round(deg / 45) % 8]
 }
@@ -302,6 +276,9 @@ export function LiveView(opts: {
   const fbBtn = h('button', { class: 'ar-round', type: 'button', 'aria-label': 'Feedback' }, ms('feedback'))
   const endRow = h('div', { class: 'ar-endrow' })
   const turnIcon = h('span', { class: 'sr-only' }, '')
+  // Said on screen when guidance has no route: the arrow then aims straight at the
+  // door, and pretending that is a route is how people get sent into a wall.
+  const noRouteEl = h('p', { class: 'ar-noroute', role: 'status', hidden: true }, '')
 
   const warnEl =
     e.warnings.length > 0
@@ -316,6 +293,7 @@ export function LiveView(opts: {
     svg,
     h('div', { class: 'ar-top' }, fbBtn, stopBtn),
     manBanner,
+    noRouteEl,
     scanText, scanArt, pill, follow,
     opts.sensors.banner ? h('p', { class: 'banner' }, opts.sensors.banner) : null,
     warnEl,
@@ -356,7 +334,35 @@ export function LiveView(opts: {
   // back to a straight-line bearing, which points through buildings — so the UI says
   // "direkt" in that case rather than pretending it is a route.
   let route: Route | null = null
+  /** The route's path plus the connector from where it was asked to where it starts. */
+  let followPath: [number, number][] = []
   let routeAsked = false
+  let routeBusy = false
+  let lastRouteAt = 0
+  let offRouteSince = 0
+  /** Re-route after this long off the path, and never more often than REROUTE_EVERY_MS. */
+  const OFF_ROUTE_GRACE_MS = 6000
+  const REROUTE_EVERY_MS = 20000
+
+  function askRoute(from: { lat: number; lon: number }) {
+    if (routeBusy) return
+    routeBusy = true
+    lastRouteAt = performance.now()
+    void computeRoute(from, target).then((out) => {
+      routeBusy = false
+      if (out.ok) {
+        route = out.route
+        followPath = connected(from, out.route.path, target)
+        noRouteEl.hidden = true
+        lastWord = ''
+      } else if (!route) {
+        noRouteEl.textContent = `${out.message} ${D.liveNoRoute}`
+        noRouteEl.hidden = false
+        announce(noRouteEl.textContent)
+      }
+      update()
+    })
+  }
 
   const smoother = new HeadingSmoother({ tau: 0.2, deadbandDeg: 1.5 })
   const beacon = cfg.beacon && session.audio ? new BeaconAudio(session.audio) : null
@@ -513,26 +519,45 @@ export function LiveView(opts: {
 
     // One request, on the first real fix. Re-routing on every frame would burn quota
     // and make the arrow jitter between slightly different paths.
+    // The route drawn in the preview is reused, so Start follows exactly what was shown.
     if (!routeAsked) {
       routeAsked = true
-      void fetchRoute(pos, target).then((r) => { route = r.found ? r : null })
+      const hit = cachedRoute(pos, target)
+      if (hit) {
+        route = hit.route
+        followPath = connected(hit.from, hit.route.path, target)
+      } else askRoute(pos)
     }
     // Straight line as the floor; the route overrides both bearing and distance.
     dist = haversineM(pos, target)
     let toDoor = bearingDeg(pos, target)
     let onRoute = false
-    if (route && route.path.length > 1) {
-      const p = progressAlong(pos, route.path)
+    if (route && followPath.length > 1) {
+      const p = progressAlong(pos, followPath)
       if (p && !p.offRoute) {
         toDoor = p.bearing          // aim along the path, not through the building
         dist = p.remainingM         // metres still to WALK, not as the crow flies
         onRoute = true
+        offRouteSince = 0
+      } else if (p) {
+        // Left the path: after a grace period, ask for a new route from here.
+        const nowMs = performance.now()
+        if (!offRouteSince) offRouteSince = nowMs
+        if (nowMs - offRouteSince > OFF_ROUTE_GRACE_MS && nowMs - lastRouteAt > REROUTE_EVERY_MS) {
+          dirEl.textContent = D.rerouting
+          askRoute(pos)
+        }
       }
     }
+    // What to do next, from the route alone. Needs GPS, not a compass.
+    const ahead = onRoute && route ? nextManeuver(dist, route, tailLength(route.path, followPath)) : null
+    const aheadText = ahead ? instructionLine(ahead.step) ?? D.thenArrive(name) : null
     const hasHeading = heading !== null && heading.source !== 'none'
     const smoothedDeg = hasHeading ? smoother.push(heading!.deg) : 0
     rel = hasHeading ? relativeBearing(toDoor, smoothedDeg) : 0
-    const cone = heading?.source === 'gps-course' || (fix.accuracy ?? 0) > CONE_ACCURACY_M
+    // "Roughly this way" is for poor GPS only, and only when there is no route to follow.
+    const cone = (fix.accuracy ?? 0) > CONE_ACCURACY_M
+    const softHeading = heading?.source === 'gps-course'
     const now = performance.now()
     if (dist > LEAVE_M) spokeArrival = false
 
@@ -554,38 +579,50 @@ export function LiveView(opts: {
       return
     }
 
-    if (!hasHeading) {
-      dirEl.textContent = t.noCompass
-      manBanner.hidden = true
-      stackG.setAttribute('visibility', 'hidden')
-      coneG.replaceChildren()
-      beacon?.update(beaconFor(dist, 0))
-    } else {
-      const ahead = onRoute && route ? stepAhead(dist, route) : null
-      const step = ahead?.step ?? null
-      const word = step?.text
-        ? step.text.split('\n')[0]
-        : cone
-          ? `${t.roughly}. ${directionWord(rel)}`
-          : directionWord(rel)
-      dirEl.textContent = word
-      const glyph = maneuverGlyph(step?.maneuver ?? null) ?? turnGlyph(rel)
-      turnIcon.textContent = glyph
-      // The banner only claims a manoeuvre while we are actually following a route.
-      // Off route it would be inventing turns, and inventing turns is the one thing
-      // a blind user cannot check.
-      if (ahead && arPhase !== 'approach') {
-        manGlyph.textContent = glyph
+    const showBanner = (glyph: string) => {
+      if (ahead && aheadText && arPhase !== 'approach' && arPhase !== 'scanning') {
+        manGlyph.textContent = ahead.step ? glyph : 'location_on'
         manDist.textContent = t.inMetres(ahead.toManeuverM)
-        manText.textContent = word
+        manText.textContent = aheadText
         manBanner.hidden = false
       } else {
         manBanner.hidden = true
       }
+    }
+
+    if (!hasHeading) {
+      // No compass: the route still says what to do and how far away it is.
+      dirEl.textContent = aheadText ? `${t.inMetres(ahead!.toManeuverM)}. ${aheadText}` : t.noCompass
+      const glyph = maneuverGlyph(ahead?.step?.maneuver ?? null) ?? 'straight'
+      if (arPhase === 'scanning' && aheadText) setPhase('ready')
+      showBanner(glyph)
+      if (aheadText && aheadText !== lastWord && now - lastSpoken > SPEAK_EVERY_MS) {
+        lastWord = aheadText
+        lastSpoken = now
+        const line = `${t.inMetres(ahead!.toManeuverM)}. ${aheadText}`
+        if (cfg.speak) speak(line)
+        else announce(line)
+      }
+      stackG.setAttribute('visibility', 'hidden')
+      coneG.replaceChildren()
+      beacon?.update(beaconFor(dist, 0))
+    } else {
+      const word = aheadText
+        ? aheadText
+        : cone
+          ? `${t.roughly}. ${directionWord(rel)}`
+          : directionWord(rel)
+      dirEl.textContent = aheadText ? `${t.inMetres(ahead!.toManeuverM)}. ${aheadText}` : word
+      const glyph = maneuverGlyph(ahead?.step?.maneuver ?? null) ?? turnGlyph(rel)
+      turnIcon.textContent = glyph
+      // The banner only claims a manoeuvre while we are actually following a route.
+      // Off route it would be inventing turns, and inventing turns is the one thing
+      // a blind user cannot check.
+      showBanner(glyph)
       // Chevrons foreshorten as they swing away, the way an extruded plate would.
       // Attribute rather than CSS transform: the group lives in the SVG user space.
       stackG.setAttribute('transform', stackTransform(rel, 393, 760, pitch))
-      if (cone) {
+      if (cone || softHeading) {
         // Poor localisation dims the chevrons rather than hiding them: Google keeps
         // guidance on screen and softens the wording, and an empty screen tells a
         // partially-sighted user nothing at all.
@@ -620,7 +657,13 @@ export function LiveView(opts: {
       if (word !== lastWord && now - lastSpoken > SPEAK_EVERY_MS) {
         lastWord = word
         lastSpoken = now
-        if (cfg.speak) speak(word, { key: turnKey(rel) })
+        // A route line carries street names, so it goes to speech in full; the short
+        // pre-generated clips only cover the compass words.
+        if (aheadText) {
+          const line = `${t.inMetres(ahead!.toManeuverM)}. ${aheadText}`
+          if (cfg.speak) speak(line)
+          else announce(line)
+        } else if (cfg.speak) speak(word, { key: turnKey(rel) })
         else announce(word)
       }
     }

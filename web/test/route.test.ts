@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { progressAlong, cumulative, currentStep, stepAhead, LOOKAHEAD_M, OFF_ROUTE_M, type Route } from '../src/core/route'
+import { progressAlong, cumulative, currentStep, stepAhead, nextManeuver, connected, durationSeconds, walkMinutes, instructionLine, maneuverGlyph, LOOKAHEAD_M, OFF_ROUTE_M, type Route } from '../src/core/route'
 
 // ~1 m per step due north, 60 points
 const path: [number, number][] = Array.from({ length: 60 }, (_, i) => [52.5250 + i * 0.000009, 13.3694])
@@ -78,5 +78,90 @@ describe('route following', () => {
 
   it('has no step to show for a route without steps', () => {
     expect(stepAhead(40, { found: true, distanceM: 40, path: [], steps: [] })).toBeNull()
+  })
+})
+
+describe('next manoeuvre (what the banner shows)', () => {
+  const route: Route = { found: true, distanceM: 250, duration: '206s', path: [], steps: [
+    { distanceM: 99, maneuver: 'DEPART', text: 'Auf Ella-Trebe-Straße nach Norden', endLat: null, endLon: null },
+    { distanceM: 19, maneuver: 'TURN_RIGHT', text: 'Rechts abbiegen auf Europaplatz', endLat: null, endLon: null },
+    { distanceM: 23, maneuver: 'TURN_LEFT', text: 'Links Richtung Invalidenstraße abbiegen', endLat: null, endLon: null },
+    { distanceM: 109, maneuver: 'TURN_RIGHT', text: 'Rechts abbiegen auf Invalidenstraße\nDas Ziel befindet sich rechts', endLat: null, endLon: null },
+  ] }
+
+  it('at the start, the next thing to do is the first turn, not "depart"', () => {
+    const n = nextManeuver(250, route)!
+    expect(n.walking).toBe(0)
+    expect(n.step?.maneuver).toBe('TURN_RIGHT')
+    expect(n.toManeuverM).toBe(250 - 109 - 23 - 19)
+  })
+
+  it('counts down to the manoeuvre, then moves on to the next one', () => {
+    expect(nextManeuver(135, route)!.step?.maneuver).toBe('TURN_LEFT')
+    expect(nextManeuver(135, route)!.toManeuverM).toBe(3)
+  })
+
+  it('on the last step the next thing is arriving', () => {
+    const n = nextManeuver(40, route)!
+    expect(n.step).toBeNull()
+    expect(n.toManeuverM).toBe(40)
+  })
+
+  it('reads the duration and the first instruction line', () => {
+    expect(durationSeconds(route)).toBe(206)
+    expect(walkMinutes(route)).toBe(3)
+    expect(instructionLine(route.steps[3])).toBe('Rechts abbiegen auf Invalidenstraße')
+    expect(maneuverGlyph('TURN_LEFT')).toBe('turn_left')
+  })
+})
+
+describe('sparse paths and the connector', () => {
+  // Three points for 130 m, as the Routes API returns them: 80 m north, then 50 m east.
+  const sparse: [number, number][] = [[52.5240, 13.3680], [52.52472, 13.3680], [52.52472, 13.36874]]
+
+  it('walking the middle of a long straight segment is on route', () => {
+    const p = progressAlong({ lat: 52.5244, lon: 13.36803 }, sparse)!
+    expect(p.offPathM).toBeLessThan(5)
+    expect(p.offRoute).toBe(false)
+    expect(p.remainingM).toBeGreaterThan(80)
+    expect(p.remainingM).toBeLessThan(90)
+  })
+
+  it('aims ahead along the path, round the corner when it is close', () => {
+    const p = progressAlong({ lat: 52.52465, lon: 13.3680 }, sparse)!
+    // 8 m before the corner, 18 m lookahead: aim is past the corner, so east of north
+    expect(p.bearing).toBeGreaterThan(20)
+    expect(p.bearing).toBeLessThan(90)
+  })
+
+  it('joins a user standing away from the snapped start to the route', () => {
+    const from = { lat: 52.5240, lon: 13.3685 } // ~34 m east of the route start
+    const path = connected(from, sparse)
+    expect(path.length).toBe(4)
+    expect(progressAlong(from, path)!.offRoute).toBe(false)
+    expect(connected({ lat: 52.5240, lon: 13.36801 }, sparse).length).toBe(3)
+  })
+})
+
+describe('connector to a door off the street', () => {
+  it('appends the door when the route ends on the street away from it', () => {
+    const path: [number, number][] = [[52.5240, 13.3680], [52.5245, 13.3680]]
+    expect(connected({ lat: 52.5240, lon: 13.3680 }, path, { lat: 52.5245, lon: 13.3686 }).length).toBe(3)
+    expect(connected({ lat: 52.5240, lon: 13.3680 }, path, { lat: 52.5245, lon: 13.36801 }).length).toBe(2)
+  })
+})
+
+describe('next manoeuvre with a tail connector', () => {
+  it('does not shift the turn by the length of the walk from street to door', () => {
+    const route: Route = { found: true, distanceM: 130, path: [], steps: [
+      { distanceM: 78, maneuver: 'DEPART', text: 'Auf Ella-Trebe-Straße', endLat: null, endLon: null },
+      { distanceM: 53, maneuver: 'TURN_LEFT', text: 'Links abbiegen', endLat: null, endLon: null },
+    ] }
+    // 20 m tail: 100 m remaining = 80 of route = 27 before the turn
+    expect(nextManeuver(100, route, 20)!.toManeuverM).toBe(27)
+    // in the last step, arriving is next, and the countdown is to the door
+    const n = nextManeuver(40, route, 20)!
+    expect(n.step).toBeNull()
+    expect(n.toManeuverM).toBe(40)
   })
 })

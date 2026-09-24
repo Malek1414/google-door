@@ -14,7 +14,11 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 router = APIRouter()
-MAPS_KEY = os.environ.get("MAPS_API_KEY", "")
+# The Routes API only takes classic API keys (AIza...). An AQ. key (the Gemini kind)
+# gets a 401 "API keys are not supported by this API", which is what silently turned
+# every route into a grey straight line. ROUTES_API_KEY lets the server use a Maps key
+# with the Routes API enabled even when MAPS_API_KEY holds something else.
+MAPS_KEY = os.environ.get("ROUTES_API_KEY") or os.environ.get("MAPS_API_KEY", "")
 ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
 FIELDS = (
     "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline,"
@@ -61,7 +65,7 @@ class RouteReq(BaseModel):
 @router.post("/api/route")
 async def route(req: RouteReq):
     if not MAPS_KEY:
-        raise HTTPException(503, "MAPS_API_KEY not configured")
+        raise HTTPException(503, {"code": "not_configured", "message": "ROUTES_API_KEY / MAPS_API_KEY not configured"})
     body = {
         "origin": {"location": {"latLng": {"latitude": req.fromLat, "longitude": req.fromLon}}},
         "destination": {"location": {"latLng": {"latitude": req.toLat, "longitude": req.toLon}}},
@@ -70,11 +74,21 @@ async def route(req: RouteReq):
         "languageCode": req.lang,
         "units": "METRIC",
     }
-    async with httpx.AsyncClient(timeout=20) as c:
-        r = await c.post(ROUTES_URL, json=body,
-                         headers={"X-Goog-Api-Key": MAPS_KEY, "X-Goog-FieldMask": FIELDS})
+    try:
+        async with httpx.AsyncClient(timeout=20) as c:
+            r = await c.post(ROUTES_URL, json=body,
+                             headers={"X-Goog-Api-Key": MAPS_KEY, "X-Goog-FieldMask": FIELDS})
+    except httpx.HTTPError:
+        raise HTTPException(504, {"code": "network", "message": "Routes API unreachable"})
     if r.status_code != 200:
-        raise HTTPException(502, f"routes {r.status_code}")
+        # Say WHY, so the client can tell "key cannot call Routes" from "no path".
+        # Google's message names the problem and never contains the key.
+        try:
+            reason = (r.json().get("error") or {}).get("message", "")
+        except ValueError:
+            reason = ""
+        code = "auth" if r.status_code in (401, 403) else "quota" if r.status_code == 429 else "upstream"
+        raise HTTPException(502, {"code": code, "status": r.status_code, "message": reason[:200]})
     data = r.json()
     routes = data.get("routes") or []
     if not routes:

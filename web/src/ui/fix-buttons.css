@@ -8,7 +8,9 @@
 /* measured: layers 42px circle, fill #2b2b2f, outlined icon 21x22 (24px glyph), light grey;
    top edge 121px below the search-bar top (search top = --top + 6px), 20px under the chip row */
 .gm-round { width: 42px; height: 42px; background: #2b2b2f; color: #e5e5e7; box-shadow: 0 1px 3px rgb(0 0 0 / 0.45), 0 0 1px rgb(0 0 0 / 0.3); }
-.gm-layers { top: calc(var(--top) + 127px); }
+/* .gm-round sets position: relative for its 44px hit area (style.css), which also
+   pulled layers back into flow at the left edge; restate absolute here. */
+.gm-round.gm-layers { position: absolute; left: auto; top: calc(var(--top) + 127px); }
 .gm-layers .ms { font-size: 24px; color: #d9d8dc; }
 
 /* measured: column of 60px circles / squares, 20px between them, 20px above the sheet top (go bottom 771, sheet 791) */

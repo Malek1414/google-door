@@ -13,17 +13,16 @@ Two rules this file exists to enforce, both in code rather than by prompt:
 """
 import json, os, sys, tempfile, base64
 from typing import Optional
-import httpx
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 sys.path.insert(0, "pipeline")
 from surface_align import align  # noqa: E402
 
+from server import upstream  # noqa: E402
+
 router = APIRouter()
 
-GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 MODEL = os.environ.get("GEMINI_MODEL_SURFACE", "gemini-3.8-flash")
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
 MAX_BYTES = 50 * 1024 * 1024
 OK_TYPES = {"video/mp4", "video/quicktime", "video/mov"}
@@ -114,8 +113,7 @@ def derive_summary(segs: list[dict]) -> str:
 
 @router.post("/api/surface")
 async def surface(video: UploadFile = File(...), track: str = Form("")):
-    if not GEMINI_KEY:
-        raise HTTPException(503, "GEMINI_API_KEY not configured")
+    upstream.require("gemini")
     if video.content_type not in OK_TYPES:
         raise HTTPException(415, f"expected mp4/mov, got {video.content_type}")
 
@@ -139,9 +137,8 @@ async def surface(video: UploadFile = File(...), track: str = Form("")):
             ]}],
             "generationConfig": {"temperature": 0.0, "responseMimeType": "application/json"},
         }
-        async with httpx.AsyncClient(timeout=180) as c:
-            r = await c.post(f"{GEMINI_URL}/{MODEL}:generateContent",
-                             json=body, headers={"x-goog-api-key": GEMINI_KEY})
+        # Two tries only: a 50 MB upload is not something to repeat three times.
+        r = await upstream.gemini(MODEL, body, timeout=180, tries=2, backoff=2.0)
         if r.status_code != 200:
             raise HTTPException(502, f"gemini {r.status_code}")
         try:

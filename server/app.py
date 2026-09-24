@@ -8,19 +8,42 @@ bundle. Everything else the app needs is a static file.
     pip install fastapi uvicorn httpx
     GEMINI_API_KEY=... MAPS_API_KEY=... uvicorn server.app:app --port 8080
 """
-import json, os, re, base64, asyncio
+import json, os, re
 from collections import OrderedDict
 from typing import Optional
-import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi import Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
-MAPS_KEY   = os.environ.get("MAPS_API_KEY", "")
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models"
+def _load_dotenv() -> None:
+    """Read .env next to the repo root, without adding a dependency.
+
+    The server was once restarted without its environment and came back up answering
+    200 on every route while silently having no keys: routing fell through to "roughly
+    this way" and every Gemini call refused. Nothing in the logs said why. Loading the
+    file the keys already live in removes the whole class of mistake — however the
+    process is started, it finds them.
+
+    Real environment variables win, so a deliberate override still works.
+    """
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip("'\""))
+    except OSError:
+        pass
+
+
+_load_dotenv()
+
+# Keys are read by server/upstream.py at call time, never held here.
 
 # Model IDs verified against ai.google.dev 2026-09-23. gemini-2.0-flash was SHUT DOWN
 # on 2026-06-01 — do not reintroduce it. Env-overridable so a model can be swapped
@@ -39,6 +62,7 @@ MODEL_TTS   = os.environ.get("GEMINI_MODEL_TTS",   "gemini-3.1-flash-tts-preview
 TTS_VOICE   = os.environ.get("GEMINI_TTS_VOICE",   "Kore")
 
 app = FastAPI(title="Doorway")
+from server import upstream
 from server.surface import router as surface_router
 from server.route import router as route_router
 from server.approach import router as approach_router
@@ -54,11 +78,49 @@ def data():
     return DATA
 
 
+async def gemini_post(model: str, body: dict, *, timeout: float = 20, tries: int = 3):
+    """POST to Gemini, riding out the 429s this tier hands out on a busy minute.
+
+    Vision has no fallback: when /api/look or /api/door-fix gives up, a blind user
+    gets silence, and silence is indistinguishable from a crash to someone who cannot
+    see the screen. Delegates to server/upstream.py, which retries 429/5xx, answers 503
+    naming GEMINI_API_KEY when it is missing, and records the outcome for /api/health.
+    """
+    return await upstream.gemini(model, body, timeout=timeout, tries=tries)
+
+
+# /api/route lives in server/route.py and calls the Routes API itself; its outcome is
+# recorded here from the response status, so health covers routing without touching it.
+@app.middleware("http")
+async def _record_route_outcome(request, call_next):
+    is_route = request.url.path == "/api/route" and request.method == "POST"
+    try:
+        resp = await call_next(request)
+    except Exception:
+        if is_route:
+            upstream.record_error("routes", "/api/route crashed")
+        raise
+    if is_route:
+        if resp.status_code == 200:
+            upstream.record_ok("routes")
+        elif resp.status_code >= 500:
+            upstream.record_error("routes", f"/api/route answered {resp.status_code}")
+    return resp
+
+
 @app.get("/api/health")
 def health():
+    """Server up is not the same as features working. `gemini` and `maps` are false
+    when the key is missing OR the last call to that service failed within the last
+    few minutes; `deps` says which and why, so the app can tell the user."""
     d = data()
+    deps = upstream.status()
     return {"ok": True, "counts": d["meta"]["counts"],
-            "gemini": bool(GEMINI_KEY), "maps": bool(MAPS_KEY),
+            "gemini": deps["gemini"]["ok"],
+            # "maps" is what the banner reads as "routes work": the Routes call is
+            # healthy and the Maps key is there. A Places hiccup shows in deps.maps only.
+            "maps": deps["routes"]["ok"] and deps["maps"]["key"],
+            "deps": deps,
             "models": {"look": MODEL_LOOK, "lived": MODEL_LIVED,
                        "tts": MODEL_TTS, "voice": TTS_VOICE}}
 
@@ -122,8 +184,7 @@ class LookReq(BaseModel):
 @app.post("/api/look")
 async def look(req: LookReq):
     """Opt-in single-frame description. NEVER called from the render loop."""
-    if not GEMINI_KEY:
-        raise HTTPException(503, "GEMINI_API_KEY not configured")
+    upstream.require("gemini")
     prompt = (
         f"You are helping a partially-blind person find a building entrance.\n"
         f"They are about {req.distanceM:.0f} metres away, facing {req.heading:.0f} degrees.\n"
@@ -146,9 +207,7 @@ async def look(req: LookReq):
             "thinkingConfig": {"thinkingBudget": 0},
             "maxOutputTokens": 256,
         }}
-    async with httpx.AsyncClient(timeout=20) as c:
-        r = await c.post(f"{GEMINI_URL}/{MODEL_LOOK}:generateContent",
-                         json=body, headers={"x-goog-api-key": GEMINI_KEY})
+    r = await gemini_post(MODEL_LOOK, body)
     if r.status_code != 200:
         raise HTTPException(502, f"gemini {r.status_code}")
     try:
@@ -165,16 +224,18 @@ def _norm(s: str) -> str:
 @app.get("/api/lived/{place_id}")
 async def lived(place_id: str):
     """Tier 3. Live only, never persisted. See docs/CONTRACT.md."""
-    if not (GEMINI_KEY and MAPS_KEY):
-        raise HTTPException(503, "keys not configured")
+    maps_key = upstream.require("maps")
+    upstream.require("gemini")
 
-    async with httpx.AsyncClient(timeout=20) as c:
-        pr = await c.get(
-            f"https://places.googleapis.com/v1/places/{place_id}",
-            headers={"X-Goog-Api-Key": MAPS_KEY,
-                     "X-Goog-FieldMask": "reviews,displayName"})
-    if pr.status_code != 200:
+    pr = await upstream.request(
+        "maps", "GET", f"https://places.googleapis.com/v1/places/{place_id}",
+        headers={"X-Goog-Api-Key": maps_key, "X-Goog-FieldMask": "reviews,displayName"})
+    # An unknown place id honestly has no claims. A refused key, quota or outage is not
+    # "nobody mentioned access" and must not be rendered as that.
+    if pr.status_code in (400, 404):
         return {"placeId": place_id, "claims": []}
+    if pr.status_code != 200:
+        raise HTTPException(502, f"places {pr.status_code}")
     reviews = pr.json().get("reviews", []) or []
     corpus = [{"text": (rv.get("text") or {}).get("text", ""),
                "when": rv.get("relativePublishTimeDescription", "")} for rv in reviews]
@@ -205,11 +266,9 @@ async def lived(place_id: str):
 
     body = {"contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {"temperature": 0.0, "responseMimeType": "application/json"}}
-    async with httpx.AsyncClient(timeout=25) as c:
-        gr = await c.post(f"{GEMINI_URL}/{MODEL_LIVED}:generateContent",
-                          json=body, headers={"x-goog-api-key": GEMINI_KEY})
+    gr = await gemini_post(MODEL_LIVED, body, timeout=25)
     if gr.status_code != 200:
-        return {"placeId": place_id, "claims": []}
+        raise HTTPException(502, f"gemini {gr.status_code}")
     try:
         parsed = json.loads(gr.json()["candidates"][0]["content"]["parts"][0]["text"])
     except Exception:
@@ -255,8 +314,7 @@ async def speak(req: SpeakReq):
     the client MUST fall back to browser speechSynthesis — a blind user is never left
     in silence because a request timed out.
     """
-    if not GEMINI_KEY:
-        raise HTTPException(503, "GEMINI_API_KEY not configured")
+    upstream.require("gemini")
     if len(req.text) > 400:
         raise HTTPException(413, "text too long for the walking loop")
 
@@ -274,16 +332,9 @@ async def speak(req: SpeakReq):
 
     # 429 is routine on this tier and is not a failure; back off rather than give up,
     # because the client falling through to speechSynthesis is a worse voice.
-    r = None
-    for attempt in range(3):
-        async with httpx.AsyncClient(timeout=20) as c:
-            r = await c.post(f"{GEMINI_URL}/{MODEL_TTS}:generateContent",
-                             json=body, headers={"x-goog-api-key": GEMINI_KEY})
-        if r.status_code != 429:
-            break
-        await asyncio.sleep(1.5 * (2 ** attempt))
-    if r is None or r.status_code != 200:
-        raise HTTPException(502, f"tts {r.status_code if r else 'no response'}")
+    r = await upstream.gemini(MODEL_TTS, body, backoff=1.5)
+    if r.status_code != 200:
+        raise HTTPException(502, f"tts {r.status_code}")
     try:
         b64 = r.json()["candidates"][0]["content"]["parts"][0]["inlineData"]["data"]
     except (KeyError, IndexError):

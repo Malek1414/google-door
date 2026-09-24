@@ -22,6 +22,13 @@ export const AIMED_DEG = 8
 export const LOST_AIM_DEG = 35
 /** Under this, the door is within reach. */
 export const THRESHOLD_M = 1.5
+/** Standing still this long at the threshold proposes that the user has gone through.
+ *
+ *  The spec said "if vision never fires, the threshold phase ends when the user stops",
+ *  and nothing implemented it — so `through` was unreachable with the real engine, as
+ *  PR #5 found. Stillness is the honest signal: someone who has walked through a door
+ *  stops walking. It PROPOSES, exactly as vision does, and "Noch draußen" takes it back. */
+export const STILL_MS = 4000
 
 export interface Sensors {
   headingDeg: number
@@ -47,15 +54,20 @@ export class Approach {
   private lowestSpoken: number | null = null
   private wasStale = false
   private confirmedThrough = false
+  private lastSteps = -1
+  private stillSinceMs: number | null = null
 
   /** Feed a fresh vision (or fallback) fix. */
   setAnchor(a: Anchor): void {
     this.anchor = a
   }
 
-  /** The user pressed "Noch draußen": vision was wrong, keep guiding. */
+  /** The user pressed "Noch draußen": the proposal was wrong, keep guiding.
+   *  Also restarts the stillness clock, so simply standing there does not immediately
+   *  re-propose the thing they just rejected. */
   stillOutside(): void {
     this.confirmedThrough = false
+    this.stillSinceMs = null
     if (this.phase === 'through') this.phase = 'threshold'
   }
 
@@ -87,17 +99,40 @@ export class Approach {
     const band = bandFor(p.relBearingDeg)
     const aimed = Math.abs(p.relBearingDeg) <= AIMED_DEG
 
+    // Stillness is only meaningful at the threshold; anywhere else a pause is just a
+    // pause. Reset the clock on any step.
+    if (s.steps !== this.lastSteps) {
+      this.lastSteps = s.steps
+      this.stillSinceMs = null
+    } else if (this.phase === 'threshold' && this.stillSinceMs === null) {
+      this.stillSinceMs = s.nowMs
+    }
+
     if (this.confirmedThrough) {
       this.phase = 'through'
-    } else if (this.phase === 'orienting') {
-      if (aimed) this.phase = 'walking'
-    } else if (this.phase === 'walking') {
-      if (p.distanceM <= THRESHOLD_M) this.phase = 'threshold'
-      // Hysteresis, not AIMED_DEG: a person sways while walking, and bouncing them
-      // back to orienting every few steps would make the mode unusable.
-      else if (Math.abs(p.relBearingDeg) > LOST_AIM_DEG) this.phase = 'orienting'
-    } else if (this.phase === 'threshold') {
-      if (p.distanceM > THRESHOLD_M * 2) this.phase = 'walking'
+    } else {
+      // Evaluate transitions until the phase settles, so a user who is already aimed
+      // AND already at the door lands in `threshold` on the first tick rather than
+      // spending one tick in `walking`. Bounded, so a rule that oscillated could not
+      // spin here.
+      for (let guard = 0; guard < 4; guard++) {
+        const before = this.phase
+        if (this.phase === 'orienting') {
+          if (aimed) this.phase = 'walking'
+        } else if (this.phase === 'walking') {
+          if (p.distanceM <= THRESHOLD_M) this.phase = 'threshold'
+          // Hysteresis, not AIMED_DEG: a person sways while walking, and bouncing them
+          // back to orienting every few steps would make the mode unusable.
+          else if (Math.abs(p.relBearingDeg) > LOST_AIM_DEG) this.phase = 'orienting'
+        } else if (this.phase === 'threshold') {
+          if (p.distanceM > THRESHOLD_M * 2) this.phase = 'walking'
+          // Stood still at the door long enough: propose that they are through.
+          else if (this.stillSinceMs !== null && s.nowMs - this.stillSinceMs >= STILL_MS) {
+            this.phase = 'through'
+          }
+        }
+        if (this.phase === before) break
+      }
     }
 
     // Distance is only spoken while walking: during orienting the user is standing
@@ -124,5 +159,7 @@ export class Approach {
     this.lowestSpoken = null
     this.wasStale = false
     this.confirmedThrough = false
+    this.lastSteps = -1
+    this.stillSinceMs = null
   }
 }

@@ -231,6 +231,23 @@ export function MapView(opts: {
   }
   renderChips()
   const morePill = h('button', { class: 'gm-more', type: 'button', hidden: true, onclick: () => closeCard() }, t.moreDoors)
+  // ---- route summary, the strip Maps puts above the sheet once a route is drawn ----
+  const routeBarMain = h('span', { class: 'gm-routebar-main' })
+  const routeBarSub = h('span', { class: 'gm-routebar-sub' })
+  const routeBar = h(
+    'div',
+    { class: 'gm-routebar', hidden: true, role: 'status' },
+    h('span', { class: 'gm-routebar-ic', 'aria-hidden': 'true' }, icon('directions_walk', true)),
+    h('span', { class: 'gm-routebar-text' }, routeBarMain, routeBarSub),
+    h('button', { class: 'gm-routebar-x', type: 'button', 'aria-label': t.clearRoute, onclick: () => clearRoute() }, icon('close')),
+  )
+  function showRouteBar(main: string, sub?: string) {
+    routeBarMain.textContent = main
+    routeBarSub.textContent = sub ?? ''
+    routeBarSub.hidden = !sub
+    routeBar.hidden = false
+  }
+
   const layersBtn = h('button', { class: 'gm-round gm-layers', type: 'button', 'aria-label': t.layers }, icon('layers'))
 
   // ---- right column above the sheet ----
@@ -278,6 +295,7 @@ export function MapView(opts: {
     mapEl,
     h('div', { class: 'gm-top' }, search, results, chips, morePill, status),
     layersBtn,
+    routeBar,
     rightCol,
     sheet,
     nav,
@@ -659,26 +677,73 @@ export function MapView(opts: {
     panelCleanup?.()
     panelCleanup = null
     selected = null
-    routeLine?.setMap(null)
-    routeLine = null
+    clearRoute()
     renderMarkers()
     renderSheet()
     setSheet('peek')
   }
 
   let routeCasing: google.maps.Polyline | null = null
+  let routeEnd: google.maps.Marker | null = null
+
+  /**
+   * Maps draws a walking route as a run of blue dots, never a solid line — the solid
+   * line means driving. Each dot carries a white ring so it survives satellite tiles,
+   * and a soft dark casing runs underneath so the path still reads as one thing where
+   * the dots cross something bright.
+   */
+  function walkDots(rough: boolean): google.maps.IconSequence[] {
+    return [{
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: rough ? 3.2 : 4.2,
+        fillColor: rough ? '#9aa0a6' : '#4285f4',
+        fillOpacity: 1,
+        strokeColor: rough ? '#16181c' : '#ffffff',
+        strokeOpacity: rough ? 0.55 : 0.95,
+        strokeWeight: rough ? 1 : 1.4,
+      },
+      offset: '0',
+      repeat: rough ? '13px' : '17px',
+    }]
+  }
 
   function clearRoute() {
     routeLine?.setMap(null)
     routeCasing?.setMap(null)
+    routeEnd?.setMap(null)
     routeLine = null
     routeCasing = null
+    routeEnd = null
+    routeBar.hidden = true
+  }
+
+  /**
+   * The dot the walk ends on, so the line terminates in something instead of stopping
+   * mid-air. Ringed, not filled: the filled blue disc is "you", and two identical discs
+   * at opposite ends of a route is the one thing worse than no marker at all.
+   */
+  function endCap(to: LatLon) {
+    routeEnd = new google.maps.Marker({
+      map,
+      position: { lat: to.lat, lng: to.lon },
+      zIndex: 6,
+      clickable: false,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 6.5,
+        fillColor: '#ffffff',
+        fillOpacity: 1,
+        strokeColor: '#1a73e8',
+        strokeWeight: 4,
+      },
+    })
   }
 
   /**
    * Draw the way to a point. Real walking directions when the Routes API answers;
-   * a dotted straight line only as a fallback, and that case is announced as
-   * "direkt" so nobody reads a crow-flight hint as a route.
+   * grey dots only as a fallback, and that case is announced as "roughly" so nobody
+   * reads a crow-flight hint as a route.
    */
   async function drawRoute(to: LatLon, label?: string): Promise<Route | null> {
     if (!map) return null
@@ -693,34 +758,33 @@ export function MapView(opts: {
     }
 
     const bounds = new google.maps.LatLngBounds()
-    if (r?.found && r.path.length > 1) {
-      const coords = r.path.map(([lat, lng]) => ({ lat, lng }))
-      // Maps draws a dark casing under the blue line so it survives light tiles and
-      // satellite alike.
+    const walked = Boolean(r?.found && r.path.length > 1)
+    const coords = walked
+      ? r!.path.map(([lat, lng]) => ({ lat, lng }))
+      : [{ lat: from.lat, lng: from.lon }, { lat: to.lat, lng: to.lon }]
+
+    if (walked) {
       routeCasing = new google.maps.Polyline({
-        map, path: coords, strokeColor: '#0b1a33', strokeOpacity: 0.9, strokeWeight: 11, zIndex: 4,
+        map, path: coords, strokeColor: '#0a1f44', strokeOpacity: 0.3, strokeWeight: 10, zIndex: 3,
       })
-      routeLine = new google.maps.Polyline({
-        map, path: coords, strokeColor: '#4285f4', strokeOpacity: 1, strokeWeight: 6, zIndex: 5,
-      })
-      coords.forEach((c) => bounds.extend(c))
-      const mins = Math.max(1, Math.round(Number(String(r.duration ?? '0').replace('s', '')) / 60))
-      const first = r.steps[0]?.text?.split('\n')[0] ?? ''
-      announce(`${t.metres(r.distanceM ?? 0)}, ${mins} min. ${label ?? ''} ${first}`.trim())
+    }
+    routeLine = new google.maps.Polyline({
+      map, path: coords, strokeOpacity: 0, zIndex: 5, clickable: false, icons: walkDots(!walked),
+    })
+    endCap(to)
+    coords.forEach((c) => bounds.extend(c))
+
+    if (walked) {
+      const mins = Math.max(1, Math.round(Number(String(r!.duration ?? '0').replace('s', '')) / 60))
+      const first = r!.steps[0]?.text?.split('\n')[0] ?? ''
+      showRouteBar(`${t.walkMin(mins)} · ${t.metresShort(r!.distanceM ?? 0)}`, label)
+      announce(`${t.metres(r!.distanceM ?? 0)}, ${mins} min. ${label ?? ''} ${first}`.trim())
     } else {
-      // No walkable route: dotted straight line, and say so.
-      routeLine = new google.maps.Polyline({
-        map,
-        path: [{ lat: from.lat, lng: from.lon }, { lat: to.lat, lng: to.lon }],
-        strokeOpacity: 0,
-        icons: [{ icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: '#62c4cb', fillOpacity: 1, strokeColor: '#00363a', strokeWeight: 1.5, scale: 4 }, offset: '0', repeat: '14px' }],
-      })
-      bounds.extend({ lat: from.lat, lng: from.lon })
-      bounds.extend({ lat: to.lat, lng: to.lon })
+      showRouteBar(t.roughly, label ? `${label} · ${t.metresShort(haversineM(from, to))}` : t.metresShort(haversineM(from, to)))
       announce(`${t.roughly}. ${t.metres(haversineM(from, to))}. ${label ?? ''}`.trim())
     }
 
-    map.fitBounds(bounds, { top: 140, bottom: 260, left: 40, right: 40 })
+    map.fitBounds(bounds, { top: 140, bottom: 300, left: 40, right: 40 })
     setSheet('peek')
     return r
   }
@@ -1262,7 +1326,7 @@ export function MapView(opts: {
     if (geoWatch !== null) navigator.geolocation.clearWatch(geoWatch)
     markers.forEach((m) => m.setMap(null))
     meMarker?.setMap(null)
-    routeLine?.setMap(null)
+    clearRoute()
   }
   return teardown
 }

@@ -25,6 +25,11 @@ function staticData(): Plugin {
     },
     generateBundle() {
       this.emitFile({ type: 'asset', fileName: 'data/berlin-mitte.json', source: readFileSync(DATA_FILE) })
+      // config.js carries the Maps key and lives outside dist/, which the build empties.
+      // Emit it here so a rebuild can never leave the deployed app without a map.
+      if (existsSync(CONFIG_FILE)) {
+        this.emitFile({ type: 'asset', fileName: 'config.js', source: readFileSync(CONFIG_FILE) })
+      }
     },
   }
 }

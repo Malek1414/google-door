@@ -35,9 +35,20 @@ describe('bands', () => {
     for (const b of bands) {
       expect(bandText(b, 'de')).toBeTruthy()
       expect(bandText(b, 'en')).toBeTruthy()
-      expect(bandClipKey(b)).toMatch(/^band_[a-z_]+$/)
+      expect(bandClipKey(b)).toMatch(/^[a-z_]+$/)
     }
     expect(new Set(bands.map((b) => bandText(b, 'de'))).size).toBe(bands.length)
+    // every band resolves to a distinct clip
+    expect(new Set(bands.map(bandClipKey)).size).toBe(bands.length)
+  })
+
+  it('reuses the Live View clips where the German is identical', () => {
+    // TTS is capped at 100 requests a day; these three need no generating at all.
+    expect(bandClipKey('straight')).toBe('straight')
+    expect(bandClipKey('left')).toBe('turn_left')
+    expect(bandClipKey('right')).toBe('turn_right')
+    expect(bandClipKey('slight-left')).toBe('band_slight_left')
+    expect(bandClipKey('turn-around')).toBe('band_turn_around')
   })
 })
 

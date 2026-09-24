@@ -34,6 +34,10 @@ Report where the entrance is RELATIVE TO THE CENTRE OF THIS IMAGE.
   kind         sliding | hinged | revolving | opening | unknown
   note         one short German phrase naming what you see, e.g. "Glastür links neben
                der Treppe". Only what is visible.
+  inside       true only if this photo was clearly taken INDOORS — a ceiling overhead,
+               no sky, interior lighting, the entrance now behind the camera. When in
+               any doubt, false. This ends the guidance, so a wrong true abandons
+               someone on the pavement.
   confidence   0.0 to 1.0.
 
 Rules you must not break:
@@ -46,7 +50,7 @@ Rules you must not break:
   would invite someone to stop using their cane.
 
 Return JSON only:
-{"found":true,"bearingDeg":0,"distanceM":0,"kind":"unknown","note":"","confidence":0}"""
+{"found":true,"bearingDeg":0,"distanceM":0,"kind":"unknown","note":"","inside":false,"confidence":0}"""
 
 CHECK_PROMPT = """You are looking through the camera of a wheelchair user who has
 reached an entrance. They can see the door. They need to know whether they can get
@@ -132,6 +136,9 @@ async def door_fix(req: FrameReq):
         "confidence": conf,
         "kind": d.get("kind") if d.get("kind") in KINDS else "unknown",
         "note": str(d.get("note") or "")[:120] if found else None,
+        # Ends the guidance, so it must be an explicit true at real confidence — an
+        # absent or hedged value is "still outside", never "probably inside".
+        "inside": bool(d.get("inside")) and conf >= 0.6,
         "source": "gemini-frame",
     }
 

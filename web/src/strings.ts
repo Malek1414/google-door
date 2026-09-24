@@ -49,6 +49,8 @@ export const en = {
   loading: 'Loading doors.',
   metres: (m: number) => (Math.round(m) === 1 ? '1 metre' : `${Math.round(m)} metres`),
   metresShort: (m: number) => `${Math.round(m)} m`,
+  walkMin: (n: number) => `${n} min`,
+  clearRoute: 'Clear route',
 
   searchPlaceholder: 'Search here',
   searchLabel: 'Search for a place or an entrance',
@@ -246,6 +248,8 @@ export const de: Strings = {
   loading: 'Eingänge werden geladen.',
   metres: (m: number) => (Math.round(m) === 1 ? '1 Meter' : `${Math.round(m)} Meter`),
   metresShort: (m: number) => `${Math.round(m)} m`,
+  walkMin: (n: number) => `${n} Min.`,
+  clearRoute: 'Route entfernen',
   searchPlaceholder: 'Hier suchen',
   searchLabel: 'Nach einem Ort oder Eingang suchen',
   searchNoResults: 'Kein passender Ort oder Eingang.',

@@ -51,9 +51,22 @@ export function bandText(band: Band, lang = 'de'): string {
   return (lang.startsWith('de') ? DE : EN)[band]
 }
 
-/** Pre-synthesised clip key, so the common phrases never wait on the network. */
+/**
+ * Pre-synthesised clip key, so the common phrases never wait on the network.
+ *
+ * Three bands reuse clips the Live View bank already has, because the German wording
+ * is identical. That is not a micro-optimisation: Gemini TTS is capped at 100 requests
+ * PER DAY on this tier, so every clip that does not need generating is one left for
+ * the demo.
+ */
+const REUSED: Partial<Record<Band, string>> = {
+  straight: 'straight',   // "Geradeaus."
+  left: 'turn_left',      // "Links."
+  right: 'turn_right',    // "Rechts."
+}
+
 export function bandClipKey(band: Band): string {
-  return `band_${band.replace(/-/g, '_')}`
+  return REUSED[band] ?? `band_${band.replace(/-/g, '_')}`
 }
 
 /** Metres, spoken only at these steps so the voice is not a running commentary. */
@@ -97,4 +110,53 @@ export function fallbackLine(lang = 'de'): string {
 /** Said once when Live streaming has been abandoned for the rest of the approach. */
 export function unsureLine(lang = 'de'): string {
   return lang.startsWith('de') ? 'Ich bin mir gerade unsicher.' : "I'm not certain right now."
+}
+
+
+// ── lines that were living in the UI ────────────────────────────────────────
+// approachEngine.ts had the threshold phrase, the metres wording and the beacon
+// pitch curve inline. Wording and the sound of guidance are guidance, so they
+// belong here with the bands, not in a screen.
+
+/** Spoken when the door is within reach. Matches CONTRACT § Phases. */
+export function thresholdLine(lang = 'de'): string {
+  return lang.startsWith('de') ? 'Die Tür ist direkt vor dir.' : 'The door is right in front of you.'
+}
+
+/** Spoken when vision fails AND the door has no surveyed bearing either — so there
+ *  is genuinely nothing to point at. Saying "according to the map" would be a lie.
+ *  Rule 2 says never dead-reckon; it does not say fall silent, and silence is
+ *  indistinguishable from a crash to someone who cannot see the screen. */
+export function noDirectionLine(lang = 'de'): string {
+  return lang.startsWith('de')
+    ? 'Ich sehe den Eingang nicht und habe keine Richtung dafür. Schwenke die Kamera langsam.'
+    : "I can't see the entrance and have no direction for it. Pan the camera slowly."
+}
+
+/** Spoken when the user should be inside. Vision proposes; the user can take it back. */
+export function throughLine(lang = 'de'): string {
+  return lang.startsWith('de') ? 'Du müsstest jetzt drin sein.' : 'You should be inside now.'
+}
+
+export function metresLine(m: number, lang = 'de'): string {
+  const n = Math.max(0, Math.round(m))
+  if (lang.startsWith('de')) return n === 1 ? 'Ein Meter' : `${n} Meter`
+  return n === 1 ? 'One metre' : `${n} metres`
+}
+
+/**
+ * Beacon pitch for a bearing error: the sound the user actually steers by.
+ *
+ * Squared so the change is sharpest near centre — a linear curve feels vague exactly
+ * where precision matters, because the last few degrees produce almost no audible
+ * change and people stop turning too early.
+ */
+export const PITCH_MIN_HZ = 330
+export const PITCH_MAX_HZ = 740
+
+export function pitchFor(relDeg: number): number {
+  if (!Number.isFinite(relDeg)) return PITCH_MIN_HZ
+  const a = Math.min(180, Math.abs(relDeg))
+  const closeness = 1 - a / 180
+  return PITCH_MIN_HZ + (PITCH_MAX_HZ - PITCH_MIN_HZ) * closeness * closeness
 }

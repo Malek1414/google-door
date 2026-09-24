@@ -205,19 +205,19 @@ async function routeToFirstDoor(page, { withSteps = false } = {}) {
   const name = ((await row.locator('.gm-row-title').textContent().catch(() => '')) || '').trim()
   await row.tap()
   unguidableCard = await page.locator('.gm-sheet .reason').first().isVisible({ timeout: 3000 }).catch(() => false)
-  // Since loop2/B the door card's one primary pill is View; Route is a plain pill.
+  // The door card leads with Route, filled Google blue; it opens directions mode.
   const route = page.locator('.gm-sheet .gm-pill', { hasText: /^\s*\S*\s*Route\s*$/ }).first()
   await route.waitFor({ state: 'visible', timeout: 8000 })
   await route.tap()
-  await page.locator('.gm-routehead').first().waitFor({ state: 'visible', timeout: 20000 })
+  await page.locator('.dir-head').first().waitFor({ state: 'visible', timeout: 20000 })
   await page.waitForTimeout(800)
   return name
 }
 /** Slot 1 of the route actions. */
 const startSlot = (page) =>
-  page.locator('.gm-routeactions').first().evaluate((el) => {
+  page.locator('.dir-actions').first().evaluate((el) => {
     const b = el.children[0]
-    return b ? { text: b.textContent.trim(), primary: b.classList.contains('gm-pill-primary'), disabled: b.disabled === true, ariaDisabled: b.getAttribute('aria-disabled') } : null
+    return b ? { text: b.textContent.trim(), primary: b.classList.contains('dir-start'), disabled: b.disabled === true, ariaDisabled: b.getAttribute('aria-disabled') } : null
   }).catch(() => null)
 const sheetText = (page) => page.locator('.gm-sheet').first().innerText().catch(() => '')
 const summaryOk = (s) => /\d+\s*Min\./.test(s) && /\d+(,\d)?\s*k?m\b/.test(s)
@@ -225,7 +225,7 @@ const summaryOk = (s) => /\d+\s*Min\./.test(s) && /\d+(,\d)?\s*k?m\b/.test(s)
 /** Bug 4: move the user a few metres (a watchPosition tick), then pan the map (its idle
  *  event reloads /api/entrances). The route preview must still be there after both. */
 async function survivesTickAndReload({ page, ctx, entranceCalls }, what, n) {
-  const head0 = (await page.locator('.gm-routehead-t').first().textContent().catch(() => '')) || ''
+  const head0 = (await page.locator('.dir-sum').first().textContent().catch(() => '')) || ''
   const ticks0 = await page.evaluate(() => window.__geoTicks)
   await ctx.setGeolocation({ latitude: HBF.latitude + 0.00008 * n, longitude: HBF.longitude + 0.00005 * n })
   await page.waitForTimeout(2500)
@@ -242,8 +242,8 @@ async function survivesTickAndReload({ page, ctx, entranceCalls }, what, n) {
   await page.waitForTimeout(3000)
   const reloads = entranceCalls.length - loads0
   await shot(page, `02-after-tick-reload-${n}`)
-  const head = (await page.locator('.gm-routehead-t').first().textContent().catch(() => '')) || ''
-  const visible = await page.locator('.gm-routehead').first().isVisible().catch(() => false)
+  const head = (await page.locator('.dir-sum').first().textContent().catch(() => '')) || ''
+  const visible = await page.locator('.dir-head').first().isVisible().catch(() => false)
   const line = await routeLine(page)
   check(`${what}: a location tick reached the app`, ticked)
   check(`${what}: a data reload happened`, reloads > 0, `${reloads} reloads`)
@@ -270,7 +270,7 @@ if (runs('mock')) {
     await shot(page, '01-door-route')
     const line = await routeLine(page)
     check('mock: a real multi-point route is drawn', !!line && line.n >= RECORDED.path.length, line ? `${line.n} points` : 'no blue line on the map')
-    const head = (await page.locator('.gm-routehead-t').first().textContent().catch(() => '')) || ''
+    const head = (await page.locator('.dir-sum').first().textContent().catch(() => '')) || ''
     check('mock: sheet shows duration and distance', summaryOk(head), head)
     check('mock: no crow-flight "Ungefähr in diese Richtung"', !CROW.test(await sheetText(page)))
     const slot = await startSlot(page)
@@ -287,7 +287,7 @@ if (runs('mock')) {
     try {
       // "Andere Türen": back to the map without clearing routeTarget by hand, which is
       // exactly how the stale door survived into the next route.
-      await page.locator('.gm-routeactions button', { hasText: 'Andere Türen' }).first().tap({ timeout: 8000 })
+      await page.locator('.dir-more button', { hasText: 'Andere Türen' }).first().tap({ timeout: 8000 })
       await page.waitForTimeout(600)
       const modeChip = page.locator('.gm-chips button').first()
       if (!(await page.locator('[data-chip="kaffee"]').isVisible().catch(() => false))) await modeChip.tap()
@@ -299,7 +299,7 @@ if (runs('mock')) {
       await poiRoute.waitFor({ state: 'visible', timeout: 15000 })
       const before = routeCalls.length
       await poiRoute.tap()
-      await page.locator('.gm-routehead').first().waitFor({ state: 'visible', timeout: 20000 })
+      await page.locator('.dir-head').first().waitFor({ state: 'visible', timeout: 20000 })
       await page.waitForTimeout(800)
       poiOk = routeCalls.length > before
     } catch (e) {
@@ -318,7 +318,7 @@ if (runs('mock')) {
         !!slot && slot.primary && /Start/.test(slot.text) && (slot.disabled ? slot.ariaDisabled === 'true' : true), JSON.stringify(slot))
       // Tap Start the way a thumb would. Disabled: nothing may happen. Enabled: guidance
       // must name the POI's door, never the door routed to before.
-      await page.locator('.gm-routeactions > :first-child').first().tap({ force: true, timeout: 3000 }).catch(() => {})
+      await page.locator('.dir-actions > :first-child').first().tap({ force: true, timeout: 3000 }).catch(() => {})
       const live = page.locator('#live-title')
       await live.waitFor({ state: 'attached', timeout: 4000 }).catch(() => {})
       const title = ((await live.textContent().catch(() => '')) || '').trim()
@@ -348,15 +348,15 @@ if (runs('slot')) {
     const door = await routeToFirstDoor(page, { withSteps: true })
     await shot(page, '08-unguidable-door')
     check('slot: setup: the door card says this door cannot be guided to', unguidableCard, door)
-    const labels = await page.locator('.gm-routeactions > *').evaluateAll((els) => els.map((b) => b.textContent.trim()))
+    const labels = await page.locator('.dir-actions > *').evaluateAll((els) => els.map((b) => b.textContent.trim()))
     const slot = await startSlot(page)
     check('slot: Start is slot 1 on a door without guidance, not omitted', !!slot && /Start/.test(slot.text), `${door}: [${labels.join(' | ')}]`)
     check('slot: that Start is disabled, and says so to a screen reader', !!slot && slot.disabled && slot.ariaDisabled === 'true', JSON.stringify(slot))
     check('slot: "Andere Türen" never slides into slot 1', !/Andere Türen/.test(labels[0] ?? ''))
-    await page.locator('.gm-routeactions > :first-child').first().tap({ force: true, timeout: 3000 }).catch(() => {})
+    await page.locator('.dir-actions > :first-child').first().tap({ force: true, timeout: 3000 }).catch(() => {})
     await page.waitForTimeout(1500)
     check('slot: tapping the disabled Start neither guides nor leaves the preview',
-      (await page.locator('#live-title').count()) === 0 && (await page.locator('.gm-routehead').first().isVisible().catch(() => false)))
+      (await page.locator('#live-title').count()) === 0 && (await page.locator('.dir-head').first().isVisible().catch(() => false)))
   } catch (e) {
     check('slot: unguidable door -> Route opens the route preview', false, String(e.message || e).split('\n')[0])
   }
@@ -385,17 +385,17 @@ if (runs('retry')) {
     const poiRoute = page.locator('.gm-sheet .gm-pill-primary', { hasText: /Route/ }).first()
     await poiRoute.waitFor({ state: 'visible', timeout: 15000 })
     await poiRoute.tap()
-    await page.locator('.gm-routehead').first().waitFor({ state: 'visible', timeout: 20000 })
+    await page.locator('.dir-head').first().waitFor({ state: 'visible', timeout: 20000 })
     await page.waitForTimeout(800)
     const text = await sheetText(page)
-    const retry = page.locator('.gm-routeactions button', { hasText: 'Erneut versuchen' }).first()
+    const retry = page.locator('.dir-more button', { hasText: 'Erneut versuchen' }).first()
     const hasRetry = await retry.isVisible().catch(() => false)
     check('retry: a failed POI route is never a crow-flight guess', !CROW.test(text))
     pendingOr('retry: quota failure says "Zu viele Routenanfragen" and offers a retry', hasRetry, /Zu viele Routenanfragen/.test(text),
       'agent A: route error UI not rendered yet', text.split('\n').slice(0, 3).join(' | '))
     if (hasRetry) {
       await retry.tap()
-      await page.locator('.gm-routehead-t', { hasText: 'Min.' }).first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {})
+      await page.locator('.dir-sum', { hasText: 'Min.' }).first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {})
       await page.waitForTimeout(800)
       const line = await routeLine(page)
       check('retry: "Erneut versuchen" draws the route', !!line && line.n >= RECORDED.path.length, line ? `${line.n} points` : 'no line')
@@ -416,14 +416,14 @@ if (runs('real')) {
     await page.waitForTimeout(2500)
     await shot(page, '05-real-route')
     const line = await routeLine(page)
-    const head = (await page.locator('.gm-routehead-t').first().textContent().catch(() => '')) || ''
+    const head = (await page.locator('.dir-sum').first().textContent().catch(() => '')) || ''
     check('real: backend route is a real multi-point line', !!line && line.n >= 3, `${door}: ${line ? line.n : 0} points, ${routeCalls.length} /api/route call(s)`)
     check('real: sheet shows duration and distance', summaryOk(head), head)
     check('real: no crow-flight "Ungefähr in diese Richtung"', !CROW.test(await sheetText(page)))
     // "Route entfernen" must take the route off the map AND out of the sheet.
-    await page.locator('.gm-routehead-btns button').last().tap({ timeout: 8000 })
+    await page.locator('.dir-head-btns button').last().tap({ timeout: 8000 })
     await page.waitForTimeout(1200)
-    const headLeft = await page.locator('.gm-routehead').count()
+    const headLeft = await page.locator('.dir-head').count()
     const lineLeft = await routeLine(page)
     check('real: "Route entfernen" clears the line from the map', !lineLeft, lineLeft ? `${lineLeft.n} points still drawn` : '')
     check('real: "Route entfernen" clears the route summary from the sheet', headLeft === 0,
@@ -450,14 +450,14 @@ async function run503(tag, blockBrowser) {
     await shot(page, `06-${tag}`)
     const text = await sheetText(page)
     const line = await routeLine(page)
-    const errEl = page.locator('.gm-sheet [role="alert"]').first()
+    const errEl = page.locator('.gm-sheet .dir-error').first()
     const errShown = await errEl.isVisible().catch(() => false)
     check(`${tag}: no crow-flight "Ungefähr in diese Richtung"`, !CROW.test(text))
     if (blockBrowser) {
       check(`${tag}: no line posing as a route`, !line || line.n < 2, line ? `${line.n} points` : 'nothing drawn')
       pendingOr(`${tag}: a visible German reason instead of a route`, errShown, GERMAN_REASON.test(text) && /Keine Route/.test(text),
         'agent A: route error UI ([role=alert] in the sheet) not rendered yet', text.split('\n').slice(0, 3).join(' | '))
-      const retry = await page.locator('.gm-routeactions button', { hasText: 'Erneut versuchen' }).count()
+      const retry = await page.locator('.dir-more button', { hasText: 'Erneut versuchen' }).count()
       pendingOr(`${tag}: offers "Erneut versuchen"`, errShown, retry === 1, 'agent A: route error UI not rendered yet')
     } else {
       const drawn = !!line && line.n >= 3

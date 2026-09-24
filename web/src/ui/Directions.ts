@@ -40,6 +40,17 @@ export const D = {
     rerouting: 'Neue Route wird berechnet …',
     walking: 'Zu Fuß',
     fromHere: (to: string) => `Von deinem Standort nach ${to}`,
+    myLocation: 'Dein Standort',
+    back: 'Zurück',
+    swap: 'Start und Ziel tauschen',
+    swapWhy: 'Nicht verfügbar: Doorway führt immer von dir zum Eingang.',
+    modes: 'Verkehrsmittel',
+    fastest: 'Schnellste Route · meist eben',
+    startNav: 'Navigation starten',
+    liveView: 'Live View',
+    liveViewLabel: 'Live View: Kamera zeigt den Weg zum Eingang',
+    spoken: (min: number | null, m: number) => `Zu Fuß ${min !== null ? `${min} ${min === 1 ? 'Minute' : 'Minuten'}, ` : ''}${Math.round(m)} Meter`,
+    from: 'Start',
     startWhy: {
       place: 'Start braucht einen erfassten Eingang. Für diesen Ort gibt es noch keinen.',
       'not-tier1': 'Start braucht einen genau vermessenen Eingang. Dieser ist es noch nicht.',
@@ -64,6 +75,17 @@ export const D = {
     rerouting: 'Recalculating route …',
     walking: 'Walking',
     fromHere: (to: string) => `From your location to ${to}`,
+    myLocation: 'Your location',
+    back: 'Back',
+    swap: 'Swap start and destination',
+    swapWhy: 'Not available: Doorway always guides from you to the entrance.',
+    modes: 'Travel mode',
+    fastest: 'Fastest route · mostly level',
+    startNav: 'Start navigation',
+    liveView: 'Live View',
+    liveViewLabel: 'Live View: the camera shows the way to the entrance',
+    spoken: (min: number | null, m: number) => `Walking ${min !== null ? `${min} ${min === 1 ? 'minute' : 'minutes'}, ` : ''}${Math.round(m)} metres`,
+    from: 'Start',
     startWhy: {
       place: 'Start needs a mapped entrance. This place has none yet.',
       'not-tier1': 'Start needs a precisely surveyed entrance. This one is not yet.',
@@ -178,6 +200,12 @@ export function cachedRoute(from: LatLon, to: LatLon): { route: Route; from: Lat
   if (haversineM(last.to, to) > 3) return null
   if (haversineM(last.from, from) > 40) return null
   return { route: last.route, from: last.from }
+}
+
+/** Drop the remembered route, so the next guidance opens the camera Live View instead
+ *  of the map navigation (main.showLive picks by whether a route exists). */
+export function forgetRoute(): void {
+  last = null
 }
 
 /** The route last drawn to this destination, wherever it was asked from: what Start follows. */

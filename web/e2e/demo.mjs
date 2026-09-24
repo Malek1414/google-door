@@ -1,8 +1,8 @@
 // The demo loop end to end. Usage: node e2e/demo.mjs [baseUrl]
 //
-// ?demo=1&door=… → View → short simulated walk → arrival sheet ("Du bist angekommen",
+// ?demo=1&door=… → Route → Live View → short simulated walk → arrival sheet ("Du bist angekommen",
 // "Sollen wir dir zeigen, wo du reinkommst?") → "Ja, zeig mir den Eingang" → scripted
-// approach (ui/approachDemo.ts) → through → back at the map, View again ready.
+// approach (ui/approachDemo.ts) → through → back at the map, Route again ready.
 // A second run takes "Nein, danke" and must land on the map at once.
 //
 // Env: PLAYWRIGHT_CORE, CHROME_PATH as in smoke.mjs; SHOTS=/dir for the arrival screenshots
@@ -66,7 +66,12 @@ const phaseOf = (page) => page.locator('section.apr').first().getAttribute('data
 
 async function openAndView(page) {
   if (!page.url().includes('demo=1')) await page.goto(`${BASE}?demo=1&door=${DOOR}`, { waitUntil: 'domcontentloaded', timeout: 30000 })
-  const view = page.locator('button.gm-pill-view:visible').first()
+  // Door card: Route (the filled pill) opens directions, whose Live View button opens
+  // the camera guidance to the same door.
+  const route = page.locator('button.dir-route-pill:visible').first()
+  await route.waitFor({ state: 'visible', timeout: 20000 })
+  await route.click()
+  const view = page.locator('button.dir-live:visible').first()
   await view.waitFor({ state: 'visible', timeout: 20000 })
   await view.click()
   const t0 = Date.now()
@@ -80,7 +85,7 @@ async function openAndView(page) {
   let secs = 0
   try {
     secs = await openAndView(page)
-    check('arrival sheet appears within 12 s of View', secs <= 12, `${secs.toFixed(1)} s`)
+    check('arrival sheet appears within 12 s of Live View', secs <= 12, `${secs.toFixed(1)} s`)
   } catch (e) {
     check('arrival sheet appears', false, String(e.message || e).split('\n')[0])
   }
@@ -125,20 +130,20 @@ async function openAndView(page) {
       if (through) await page.screenshot({ path: join(OUT, 'demo-through.png') })
       let back = false
       try {
-        await page.locator('button.gm-pill-view:visible').first().waitFor({ state: 'visible', timeout: 25000 })
+        await page.locator('button.dir-route-pill:visible').first().waitFor({ state: 'visible', timeout: 25000 })
         back = (await page.locator('section.apr').count()) === 0
       } catch (e) {
         await page.screenshot({ path: join(OUT, 'demo-back-fail.png') })
         console.log(String(e.message || e).split('\n')[0], 'apr:', await page.locator('section.apr').count(), 'gm:', await page.locator('.gm').count())
       }
-      check('back at the map with View ready', back)
+      check('back at the map with Route ready', back)
       if (back) {
-        // Repeatable: View again reaches the sheet a second time.
+        // Repeatable: Route, Live View again reaches the sheet a second time.
         try {
           const again = await openAndView(page)
           check('the loop runs a second time', true, `${again.toFixed(1)} s`)
           await page.locator('button.arrival-no').first().click()
-          await page.locator('button.gm-pill-view:visible').first().waitFor({ state: 'visible', timeout: 10000 })
+          await page.locator('button.dir-route-pill:visible').first().waitFor({ state: 'visible', timeout: 10000 })
           check('"Nein, danke" goes back to the map', (await page.locator('.arrival').count()) === 0)
         } catch (e) {
           check('the loop runs a second time', false, String(e.message || e).split('\n')[0])

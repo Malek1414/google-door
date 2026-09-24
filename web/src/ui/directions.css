@@ -21,3 +21,60 @@
 .ar-noroute { position: absolute; left: 16px; right: 16px; top: calc(env(safe-area-inset-top) + 150px); z-index: 4; margin: 0; padding: 10px 14px;
   border-radius: 14px; background: rgba(60, 42, 29, 0.92); color: #fdd8b5; font: 500 15px/1.3 'Google Sans Flex', Roboto, sans-serif; }
 .ar-man-next { display: block; margin-top: 2px; font-size: 14px; color: #9aa0a6; }
+
+/* ---- Directions mode, laid out like Maps walking directions ----
+   Search bar, chips, the right column and the tab bar give way to a top card with
+   the two stacked fields; the sheet runs to the bottom edge. */
+.gm[data-dir] .gm-top, .gm[data-dir] .gm-nav, .gm[data-dir] .gm-layers, .gm[data-dir] .gm-right { display: none !important; }
+.gm[data-dir] { --nav-h: 0px; }
+.gm[data-dir] .gm-sheet { top: calc(var(--top) + 150px); bottom: 0; padding-bottom: env(safe-area-inset-bottom); }
+.gm[data-dir][data-sheet='route'] { --sheet-h: calc(214px + env(safe-area-inset-bottom)); }
+.gm[data-dir][data-sheet='route']:has(.gm-route-why) { --sheet-h: calc(274px + env(safe-area-inset-bottom)); }
+.gm[data-dir][data-sheet='route']:has(.dir-error) { --sheet-h: calc(300px + env(safe-area-inset-bottom)); }
+
+.dir-top { position: absolute; z-index: 5; left: 8px; right: 8px; top: calc(var(--top) + 4px); padding: 6px 6px 10px; border-radius: 20px;
+  background: var(--sheet, #1f1f1f); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.3); color: var(--fg, #e3e3e3); }
+.dir-top-row { display: grid; grid-template-columns: 48px 1fr 48px; align-items: center; gap: 4px; }
+.dir-back, .dir-swap { width: 48px; height: 48px; display: grid; place-items: center; border: 0; border-radius: 24px; background: transparent; color: #e3e3e3; cursor: pointer; }
+.dir-back .ms, .dir-swap .ms { font-size: 24px; }
+.dir-swap[aria-disabled='true'] { color: #9aa0a6; cursor: default; }
+.dir-back:focus-visible, .dir-swap:focus-visible, .dir-mode:focus-visible, .dir-start:focus-visible, .dir-live:focus-visible, .dir-textbtn:focus-visible { outline: 3px solid #a8c7fa; outline-offset: 2px; }
+.dir-fields { display: flex; flex-direction: column; gap: 6px; min-width: 0; position: relative; }
+.dir-field { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid #5f6368; background: transparent; }
+.dir-field-t { font: 400 16px/1.2 'Google Sans Flex', Roboto, sans-serif; color: #e3e3e3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dir-dot { flex: none; width: 14px; height: 14px; border-radius: 50%; background: #4285f4; box-shadow: 0 0 0 2.5px #fff; margin: 0 3px; }
+.dir-pin { flex: none; display: grid; place-items: center; width: 20px; }
+.dir-pin .ms { font-size: 22px; color: #ea4335; }
+/* The dotted connector between the origin dot and the pin, as Maps draws it. */
+.dir-fields::before { content: ''; position: absolute; left: 23px; top: 33px; height: 22px; border-left: 2px dotted #9aa0a6; }
+.dir-modes { display: flex; gap: 8px; padding: 10px 6px 0 56px; }
+.dir-mode { display: inline-flex; align-items: center; gap: 6px; min-height: 48px; padding: 0 16px; border-radius: 24px; border: 0;
+  background: #004a77; color: #c2e7ff; font: 500 15px/1 'Google Sans Flex', Roboto, sans-serif; }
+.dir-mode .ms { font-size: 20px; }
+
+/* Sheet head: big time and distance, grey line under it, then Start and Live View. */
+.dir-head { padding: 6px 6px 0; }
+.dir-sum { margin: 0; font: 400 24px/1.25 'Google Sans Flex', Roboto, sans-serif; color: #fff; }
+.gm-sheet .dir-sum:focus { outline: none; }
+.dir-sub { margin: 4px 0 0; font-size: 15px; color: #c4c7c5; }
+.dir-actions { display: flex; gap: 10px; padding: 14px 4px 0; }
+.dir-actions .gm-pill { flex: 1; justify-content: center; min-height: 48px; height: 48px; border-radius: 24px; font-size: 16px; font-weight: 500; }
+.gm-pill.dir-start { background: #1a73e8; color: #fff; }
+.gm-pill.dir-live { background: transparent; color: #a8c7fa; border: 1px solid #8e918f; }
+.gm-pill.dir-start:disabled, .gm-pill.dir-live:disabled { background: #2d2f31; color: #bdc1c6; border-color: #5f6368; }
+.dir-more { display: flex; gap: 4px; padding: 6px 0 0; }
+.dir-textbtn { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 12px; border: 0; border-radius: 24px; background: transparent;
+  color: #a8c7fa; font: 500 15px/1 'Google Sans Flex', Roboto, sans-serif; cursor: pointer; }
+.dir-textbtn .ms { font-size: 20px; }
+.dir-steps { margin-top: 8px; border-top: 1px solid #3c4043; padding: 12px 6px 0; }
+.dir-steps-h { margin: 0; font: 500 16px/1.3 'Google Sans Flex', Roboto, sans-serif; color: #e3e3e3; }
+.gm-sheet .dir-error { margin: 10px 4px 0; background: #2d2f31; color: #e3e3e3; }
+.gm-sheet .dir-error .ms { color: #a8c7fa; }
+.gm-sheet .dir-error small { color: #c4c7c5; }
+
+/* Door card: Route leads, filled Google blue, as Maps' Directions button. */
+.gm-pill.dir-route-pill { background: #1a73e8; color: #fff; min-height: 48px; height: 48px; }
+
+/* Directions mode has its own error line in the sheet; the health snackbar would sit
+   on the top card's fields, so it waits until the user leaves directions. */
+body:has(.gm[data-dir]) .health-banner { display: none; }

@@ -9,8 +9,8 @@
 //   tier 0 / 3            no marker; surfaced as text in the detail sheet
 
 import { haversineM, type LatLon } from '../core/geo'
-import { CONNECTOR_MIN_M, instructionLine, walkMinutes, type Route } from '../core/route'
-import { computeRoute, D, formatDistance, routeSubline, startBlockedReason, stepsList, type RouteOutcome } from './Directions'
+import { CONNECTOR_MIN_M, walkMinutes, type Route } from '../core/route'
+import { computeRoute, D, forgetRoute, formatDistance, startBlockedReason, stepsList, type RouteOutcome } from './Directions'
 import type { Profile } from '../core/profile'
 import { guidanceFor, markerKind, type ArrowTarget } from '../core/target'
 import type { Building, Entrance } from '../core/types'
@@ -285,43 +285,96 @@ export function MapView(opts: {
   /** The place card currently (or last) open, so a place route can return to it. */
   let lastPlace: PlaceHit | null = null
 
-  function showRoutePreview(summary: string, label: string | null, out: RouteOutcome, retry: () => void, crowM: number) {
+  /** The Maps directions top card: back, the two stacked fields, swap, the mode chip. */
+  let dirTop: HTMLElement | null = null
+  function showDirTop(label: string | null, mins: number | null) {
+    dirTop?.remove()
+    const back = h('button', { class: 'dir-back', type: 'button', 'aria-label': D.back, onclick: () => clearRoute() }, icon('arrow_back'))
+    const field = (cls: string, ic: HTMLElement, text: string, sr: string) =>
+      h('div', { class: `dir-field ${cls}`, role: 'text', 'aria-label': sr }, ic, h('span', { class: 'dir-field-t', 'aria-hidden': 'true' }, text))
+    const dot = h('span', { class: 'dir-dot', 'aria-hidden': 'true' })
+    const pin = h('span', { class: 'dir-pin', 'aria-hidden': 'true' }, icon('location_on', true))
+    const dest = label ?? D.destination
+    const swap = h(
+      'button',
+      { class: 'dir-swap', type: 'button', 'aria-label': D.swap, 'aria-disabled': 'true', 'aria-describedby': 'dir-swap-why', title: D.swapWhy },
+      icon('swap_vert'),
+    )
+    const chip = h(
+      'button',
+      { class: 'dir-mode', type: 'button', 'aria-pressed': 'true' },
+      icon('directions_walk', true),
+      h('span', {}, mins !== null ? t.walkMin(mins) : D.walking),
+    )
+    chip.setAttribute('aria-label', mins !== null ? `${D.walking}, ${t.walkMin(mins)}` : D.walking)
+    dirTop = h(
+      'div',
+      { class: 'dir-top', role: 'region', 'aria-label': D.fromHere(dest) },
+      h(
+        'div',
+        { class: 'dir-top-row' },
+        back,
+        h('div', { class: 'dir-fields' }, field('dir-from', dot, D.myLocation, `${D.from}: ${D.myLocation}`), field('dir-to', pin, dest, `${D.destination}: ${dest}`)),
+        swap,
+      ),
+      h('span', { id: 'dir-swap-why', class: 'sr-only' }, D.swapWhy),
+      h('div', { class: 'dir-modes', role: 'group', 'aria-label': D.modes }, chip),
+    )
+    root.insertBefore(dirTop, sheet)
+    root.dataset.dir = 'on'
+  }
+
+  function showRoutePreview(summary: string, label: string | null, out: RouteOutcome, retry: () => void, crowM: number, mins: number | null = null) {
     routePreview = true
     morePill.hidden = true
     const e = routeTarget
     const g = e ? guidanceFor(e, opts.profile) : null
     const r = out.ok ? out.route : null
+    showDirTop(label, mins)
 
-    const action = (cls: string, ic: string, text: string, on: () => void) =>
-      h('button', { class: `gm-pill ${cls}`, type: 'button', onclick: on }, icon(ic, true), text)
     // Start always holds the first slot. When this door cannot carry guidance the
-    // button is disabled and says why — it does not disappear, because then the next
+    // button is disabled and says why; it does not disappear, because then the next
     // action shifts left into the place the thumb was already going.
     const blocked = g?.kind !== 'arrow'
     const why = blocked ? startBlockedReason(g?.kind === 'text' ? g.reason : null) : null
+    const describe = why ? { 'aria-describedby': 'route-start-why' } : {}
     const startBtn = h(
       'button',
       {
-        class: 'gm-pill gm-pill-primary',
+        class: 'gm-pill dir-start',
         type: 'button',
         disabled: blocked,
         'aria-disabled': String(blocked),
-        ...(why ? { 'aria-describedby': 'route-start-why' } : {}),
+        'aria-label': D.startNav,
+        ...describe,
         onclick: () => e && void beginGuidance(e),
       },
       icon(blocked ? 'block' : 'navigation', true),
       t.startGuidance,
     )
+    const liveBtn = h(
+      'button',
+      {
+        class: 'gm-pill dir-live',
+        type: 'button',
+        disabled: blocked,
+        'aria-disabled': String(blocked),
+        'aria-label': D.liveViewLabel,
+        ...describe,
+        onclick: () => e && void beginGuidance(e, true),
+      },
+      icon('view_in_ar'),
+      D.liveView,
+    )
 
-    // The turn-by-turn list is always in the sheet, as in Maps: pull the sheet up, or
-    // press "Schritte", and it is there. Without a route there is nothing to list, and
-    // the sheet says why instead of showing a straight line.
+    // The turn-by-turn list is in the sheet, as in Maps: pull the sheet up and it is
+    // there. Without a route the sheet says why, calmly, instead of drawing a line.
     const body = r
-      ? stepsList(r, label ?? D.destination)
+      ? h('div', { class: 'dir-steps' }, h('h3', { class: 'dir-steps-h' }, t.steps), stepsList(r, label ?? D.destination))
       : h(
           'div',
-          { class: 'dir-error', role: 'alert' },
-          icon('wrong_location', true),
+          { class: 'dir-error', role: 'status' },
+          icon('info', true),
           h('p', {}, out.ok ? '' : out.message, h('small', {}, D.crow(t.metresShort(crowM)))),
         )
 
@@ -329,23 +382,18 @@ export function MapView(opts: {
     sheetBody.replaceChildren(
       h(
         'div',
-        { class: 'gm-routehead' },
-        h('span', { class: 'gm-routehead-ic', 'aria-hidden': 'true' }, icon(r ? 'directions_walk' : 'wrong_location', true)),
-        h('h2', { id: 'sheet-title', class: 'gm-routehead-t', tabindex: '-1' }, summary),
-        h('span', { class: 'gm-routehead-sub' }, r ? routeSubline(label) : label ?? ''),
-        h('div', { class: 'gm-routehead-btns' },
-          e ? h('button', { class: 'gm-round-s', type: 'button', 'aria-label': t.share, onclick: () => void share(e) }, icon('ios_share')) : null,
-          h('button', { class: 'gm-round-s', type: 'button', 'aria-label': t.clearRoute, onclick: () => clearRoute() }, icon('close')),
-        ),
+        { class: 'dir-head' },
+        h('h2', { id: 'sheet-title', class: 'dir-sum', tabindex: '-1' }, summary),
+        h('p', { class: 'dir-sub' }, r ? D.fastest : label ?? ''),
       ),
+      h('div', { class: 'dir-actions' }, startBtn, liveBtn),
+      ...whyLine,
       h(
         'div',
-        { class: 'gm-actions gm-routeactions' },
-        startBtn,
-        r ? action('', 'list', t.steps, () => setSheet(sheet.dataset.state === 'full' ? 'route' : 'full')) : action('', 'refresh', D.retry, retry),
-        e ? action('', 'door_front', t.otherDoors, () => closeCard()) : null,
+        { class: 'dir-more' },
+        r ? null : h('button', { class: 'dir-textbtn', type: 'button', onclick: retry }, icon('refresh'), D.retry),
+        e ? h('button', { class: 'dir-textbtn', type: 'button', onclick: () => closeCard() }, icon('door_front'), t.otherDoors) : null,
       ),
-      ...whyLine,
       body,
     )
     setSheet('route')
@@ -354,7 +402,9 @@ export function MapView(opts: {
   /** The one gesture that unlocks compass, camera and sound. Must await first. */
   // A double tap on Start must open one Live View, not two stacked ones.
   let guiding = false
-  async function beginGuidance(e: Entrance) {
+  /** `camera`: the Live View button. It skips the map navigation and opens the camera
+   *  guidance to the same door, as the old View pill did. */
+  async function beginGuidance(e: Entrance, camera = false) {
     if (guiding) return
     const g = guidanceFor(e, opts.profile)
     if (g.kind !== 'arrow') return
@@ -366,6 +416,7 @@ export function MapView(opts: {
       guiding = false
       throw err
     }
+    if (camera) forgetRoute()
     teardown()
     opts.onGuide(g.target, name)
   }
@@ -941,6 +992,9 @@ export function MapView(opts: {
     routeCasing = null
     routeEnd = null
     routeBadge = null
+    dirTop?.remove()
+    dirTop = null
+    delete root.dataset.dir
     const back = routeReturn
     const wasPreview = routePreview
     routeReturn = null
@@ -1055,16 +1109,16 @@ export function MapView(opts: {
 
     const mins = walkMinutes(r)
     const metres = r.distanceM ?? 0
-    const summary = mins !== null ? `${t.walkMin(mins)} · ${formatDistance(metres)}` : formatDistance(metres)
+    const summary = mins !== null ? `${t.walkMin(mins)} (${formatDistance(metres)})` : formatDistance(metres)
     if (mins !== null) timeBadge(midpoint(coords), t.walkMin(mins))
 
-    showRoutePreview(summary, label ?? null, out, retry, metres)
-    const first = instructionLine(r.steps[0] ?? null) ?? ''
-    announce(`${mins !== null ? `${t.walkMin(mins)}, ` : ''}${t.metres(metres)}. ${label ?? ''}. ${first}`.trim())
+    showRoutePreview(summary, label ?? null, out, retry, metres, mins)
+    // Said once on entering directions, as Maps does: mode, time, distance.
+    announce(D.spoken(mins, metres))
 
-    // Maps fills the map area with the route. Padding clears the search bar above and
-    // the preview sheet below, and nothing more.
-    map.fitBounds(bounds, { top: 118, bottom: 268, left: 36, right: 36 })
+    // Maps fills the map area with the route. Padding clears the directions card above
+    // and the sheet below, and nothing more.
+    map.fitBounds(bounds, { top: 190, bottom: 300, left: 40, right: 40 })
     return r
   }
 
@@ -1152,16 +1206,12 @@ export function MapView(opts: {
     viewBtn.hidden = true
     viewBtn.onclick = () => void start()
 
-    // Like Maps' Directions/Start: one filled Google-blue action leads the row. For a
-    // door that can carry guidance it is View, and one tap opens the guidance itself.
-    const canGuide = g.kind === 'arrow'
+    // Like Maps' door and place cards: Route leads the row, filled Google blue. Start
+    // and Live View live on the directions screen it opens.
     const pills = h(
       'div',
       { class: 'gm-actions' },
-      canGuide
-        ? h('button', { class: 'gm-pill gm-pill-view', type: 'button', 'aria-label': 'Live View zum Eingang starten', style: 'background:#1a73e8;color:#fff;min-height:48px', onclick: () => void start() }, icon('view_in_ar', true), t.view)
-        : null,
-      h('button', { class: canGuide ? 'gm-pill' : 'gm-pill gm-pill-primary', type: 'button', onclick: () => drawRouteToEntrance(e) }, icon('assistant_direction', true), t.route),
+      h('button', { class: 'gm-pill dir-route-pill', type: 'button', onclick: () => drawRouteToEntrance(e) }, icon('directions', true), t.route),
       h('button', { class: 'gm-pill', type: 'button', onclick: () => void share(e) }, icon('ios_share'), t.share),
     )
 

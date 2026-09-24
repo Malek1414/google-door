@@ -147,7 +147,7 @@ try {
   await page.waitForTimeout(1200)
   await shot('01-door-card')
   await routePill.tap()
-  await page.locator('.gm-routehead').first().waitFor({ state: 'visible', timeout: 25000 })
+  await page.locator('.dir-head').first().waitFor({ state: 'visible', timeout: 25000 })
   // The route line: the longest polyline on the map.
   let path = []
   for (let i = 0; i < 40 && path.length < 2; i++) {
@@ -155,13 +155,13 @@ try {
       (window.__polys || []).filter((p) => p.getMap()).map((p) => p.getPath().getArray().map((q) => [q.lat(), q.lng()])).sort((a, b) => b.length - a.length)[0] || [])
     if (path.length < 2) await page.waitForTimeout(250)
   }
-  const head = await text('.gm-routehead-t')
+  const head = await text('.dir-sum')
   check('Route: a walking route is drawn (multi-point line)', path.length >= 3, `${path.length} points, "${head}"`)
   await shot('02-route')
   const steps = await page.locator('.gm-sheet .dir-list .dir-step').count()
   check('Route: steps are listed', steps >= 2, `${steps} rows`)
 
-  const start = page.locator('.gm-routeactions > :first-child').first()
+  const start = page.locator('.dir-actions > :first-child').first()
   check('Start is enabled', !(await start.isDisabled().catch(() => true)))
   await start.tap()
   // Start opens the map navigation (ui/NavMode.ts) when it exists, else the camera Live View.

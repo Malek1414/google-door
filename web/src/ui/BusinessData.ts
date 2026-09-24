@@ -4,6 +4,7 @@
 // Text goes through h(), never innerHTML.
 
 import './business-data.css'
+import { deleteAnswers } from '../core/accessAnswers'
 import { ACCESS_ATTRS, BUSINESS_DETAILS_KEY, DAYS, completeness, loadDetails, type BusinessDetails, type Tri } from '../core/businessDetails'
 import { haversineM } from '../core/geo'
 import {
@@ -152,6 +153,7 @@ export function deleteBusinessData(business: BusinessProfile): boolean {
       delete all[business.id]
       localStorage.setItem(BUSINESS_DETAILS_KEY, JSON.stringify(all))
     }
+    ok = deleteAnswers(business.id) && ok
     const listRaw = JSON.parse(localStorage.getItem(BUSINESSES_KEY) ?? '[]') as unknown
     const rest = Array.isArray(listRaw) ? listRaw.filter((x) => !(x && typeof x === 'object' && (x as { id?: unknown }).id === business.id)) : []
     localStorage.setItem(BUSINESSES_KEY, JSON.stringify(rest))

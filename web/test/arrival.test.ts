@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { APPROACH_PIN_M, ARRIVE_JITTER_M, isArrived, nearTriggerShown, type TimedFix } from '../src/ui/LiveView'
+import { APPROACH_PIN_M, ARRIVAL_EXIT_S, ARRIVE_JITTER_M, arrivalPlan, isArrived, nearTriggerShown, type TimedFix } from '../src/ui/LiveView'
+import { approachModeFor } from '../src/ui/approachPort'
 
 const door = { lat: 52.52, lon: 13.405 }
 const M_PER_DEG_LAT = 111_195
@@ -58,5 +59,20 @@ describe('nearTriggerShown: "Zum Eingang führen" in the Live View panel', () =>
     const src = readFileSync(resolve(__dirname, '../src/ui/LiveView.ts'), 'utf8')
     expect(src).toMatch(/nearBtn\?\.addEventListener\('click', startApproach\)/)
     expect(src).toMatch(/approachBtn\?\.addEventListener\('click', startApproach\)/)
+  })
+})
+
+describe('arrivalPlan: the arrival card does not bounce a blind user back to the map', () => {
+  const blind = approachModeFor({ stepFreeRequired: false, channels: ['speech'] })
+  it('speech profile: focus lands on .apr-trigger, no auto-exit, the button is named', () => {
+    expect(arrivalPlan(blind)).toEqual({ focus: 'approach', exitAfterS: null, nameTrigger: true })
+  })
+  it('wheelchair and no-trigger profiles keep "Hier bleiben" and the countdown', () => {
+    expect(arrivalPlan(approachModeFor({ stepFreeRequired: true, channels: ['visual'] }))).toEqual({ focus: 'stay', exitAfterS: ARRIVAL_EXIT_S, nameTrigger: false })
+    expect(arrivalPlan(null).focus).toBe('stay')
+  })
+  it('the card focuses the approach button when the plan says so', () => {
+    const src = readFileSync(resolve(__dirname, '../src/ui/LiveView.ts'), 'utf8')
+    expect(src).toMatch(/plan\.focus === 'approach' && approachBtn\) approachBtn\.focus/)
   })
 })

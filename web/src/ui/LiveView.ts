@@ -96,6 +96,18 @@ export function isArrived(history: readonly TimedFix[], target: { lat: number; l
   return moved / dt <= STILL_MPS
 }
 
+/**
+ * Pure. How the arrival card behaves for an approach mode. A speech (guide) user must
+ * not be bounced back to the map while still finding the door: focus lands on
+ * "Zum Eingang führen", there is no auto-exit, and the spoken line names the button.
+ * Everyone else keeps "Hier bleiben" focused and the countdown to the map.
+ */
+export function arrivalPlan(mode: ApproachMode | null): { focus: 'approach' | 'stay'; exitAfterS: number | null; nameTrigger: boolean } {
+  return mode === 'guide'
+    ? { focus: 'approach', exitAfterS: null, nameTrigger: true }
+    : { focus: 'stay', exitAfterS: ARRIVAL_EXIT_S, nameTrigger: false }
+}
+
 /** Arrival card strings; kept local so strings.ts stays untouched. */
 const ARR = {
   de: {
@@ -482,7 +494,8 @@ export function LiveView(opts: {
     const doorType = e.door ? t.door[e.door] ?? null : null
     const face = e.approachBearing !== null ? ARR.face(compassWord(e.approachBearing)) : null
     const warns = e.warnings.map((w) => t.warning[w] ?? w)
-    const secsEl = h('p', { class: 'arrival-count' }, ARR.backIn(ARRIVAL_EXIT_S))
+    const plan = arrivalPlan(approachMode)
+    const secsEl = h('p', { class: 'arrival-count', hidden: plan.exitAfterS === null }, plan.exitAfterS === null ? '' : ARR.backIn(plan.exitAfterS))
     const stayBtn = h('button', { class: 'gm-pill gm-pill-primary', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'pan_tool'), ARR.stay)
     const mapBtn = h('button', { class: 'gm-pill', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'map'), ARR.toMap)
     // The last 10 metres. An ordinary button: VoiceOver's own double-tap activates it,
@@ -514,24 +527,28 @@ export function LiveView(opts: {
     )
     root.classList.add('is-arrived') // camera and overlay leave the screen
     root.append(cardEl)
-    stayBtn.focus({ preventScroll: true })
+    if (plan.focus === 'approach' && approachBtn) approachBtn.focus({ preventScroll: true })
+    else stayBtn.focus({ preventScroll: true })
 
     lines.push(`${ARR.title}. ${name}.`)
     if (doorType) lines.push(`${doorType}.`)
     for (const w of warns) lines.push(`${t.warningPrefix}. ${w}`)
     if (face) lines.push(face)
+    if (plan.nameTrigger && approachBtn) lines.push(t.triggerSelected(APPROACH_TRIGGER))
     if (cfg.speak) speak(lines.join(' '))
-    announce(ARR.backIn(ARRIVAL_EXIT_S)) // once, not every second
-
-    let left = ARRIVAL_EXIT_S
-    countdown = window.setInterval(() => {
-      left--
-      secsEl.textContent = ARR.backIn(Math.max(0, left))
-      if (left <= 0) exit()
-    }, 1000)
+    if (plan.exitAfterS !== null) {
+      announce(ARR.backIn(plan.exitAfterS)) // once, not every second
+      let left = plan.exitAfterS
+      countdown = window.setInterval(() => {
+        left--
+        secsEl.textContent = ARR.backIn(Math.max(0, left))
+        if (left <= 0) exit()
+      }, 1000)
+    }
     stayBtn.addEventListener('click', () => {
       if (countdown) clearInterval(countdown)
       countdown = 0
+      secsEl.hidden = false
       secsEl.textContent = ARR.staying
       announce(ARR.staying)
       stayBtn.remove()

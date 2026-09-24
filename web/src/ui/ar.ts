@@ -81,8 +81,36 @@ export type ArPhase = 'scanning' | 'ready' | 'guiding' | 'approach' | 'arrived'
  */
 export const TURN_DEG = 22
 
-/** Chevron transform for a relative bearing. Fakes a Y-axis rotation with scaleX. */
-export function stackTransform(relDeg: number, w: number, h: number): string {
+/** Where the chevrons sit on the pavement: this far below the camera axis when upright. */
+export const GROUND_DEPRESSION_DEG = 22
+
+/**
+ * Pure. Projects the chevrons onto the ground at the phone's tilt.
+ * `betaDeg` is DeviceOrientationEvent.beta: 90 = phone upright, 0 = flat, looking down.
+ *
+ * squash: the ground is seen at (90 - beta) + GROUND_DEPRESSION_DEG below the horizon,
+ *   so a flat shape on it is foreshortened by the sine of that angle. Upright phone:
+ *   strongly flattened; pointing down at the pavement: seen face on.
+ * cyFrac: the same patch of pavement moves up the screen as the phone tilts down.
+ */
+export function groundPlane(betaDeg: number): { squash: number; cyFrac: number } {
+  const beta = Math.max(0, Math.min(110, betaDeg))
+  const incl = Math.max(14, Math.min(90, 90 - beta + GROUND_DEPRESSION_DEG))
+  const squash = Math.sin((incl * Math.PI) / 180)
+  // Vertical field of view about 60 degrees: tan(30) of half the height per unit.
+  const off = Math.tan(((GROUND_DEPRESSION_DEG - (90 - beta)) * Math.PI) / 180) / Math.tan(Math.PI / 6)
+  const cyFrac = Math.max(0.36, Math.min(0.64, 0.5 + 0.5 * off))
+  return { squash, cyFrac }
+}
+
+/**
+ * Chevron transform for a relative bearing. Fakes a Y-axis rotation with scaleX.
+ * With `betaDeg` (device pitch) the stack is laid on the ground plane: the in-plane
+ * rotation is squashed vertically by the ground's foreshortening and placed where
+ * that patch of pavement is on screen. Without it (no orientation events yet) the
+ * output is exactly the old fixed-screen placement.
+ */
+export function stackTransform(relDeg: number, w: number, h: number, betaDeg?: number | null): string {
   const clamped = Math.max(-180, Math.min(180, relDeg))
   // The chevron path points RIGHT, so -90 makes it point up-screen (away from the
   // viewer) when you are on bearing — which is how Google's read when walking straight.
@@ -92,10 +120,11 @@ export function stackTransform(relDeg: number, w: number, h: number): string {
   // chevrons point left while walking straight ahead.
   const sx = Math.max(0.45, Math.abs(Math.cos((clamped * Math.PI) / 360)))
   const cx = w * 0.5
-  const cy = h * 0.44
   const SIZE = 1.35 // measured against the recording: the stack spans ~45% of the width
-  return (
-    `translate(${cx} ${cy}) rotate(${rot.toFixed(1)}) ` +
-    `scale(${(sx * SIZE).toFixed(3)} ${SIZE}) translate(-128 -40)`
-  )
+  const tail = `rotate(${rot.toFixed(1)}) scale(${(sx * SIZE).toFixed(3)} ${SIZE}) translate(-128 -40)`
+  if (betaDeg === undefined || betaDeg === null || !Number.isFinite(betaDeg)) {
+    return `translate(${cx} ${h * 0.44}) ${tail}`
+  }
+  const g = groundPlane(betaDeg)
+  return `translate(${cx} ${(h * g.cyFrac).toFixed(1)}) scale(1 ${g.squash.toFixed(3)}) ${tail}`
 }

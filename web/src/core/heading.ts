@@ -40,7 +40,12 @@ export async function requestHeadingPermission(): Promise<boolean> {
   return true // Android / desktop: no permission gate
 }
 
-export function startHeading(cb: (h: Heading) => void): () => void {
+/**
+ * `gpsCourse: false` disables the GPS course fallback (the last 10 metres must never
+ * read GPS; see CONTRACT "Last 10 metres"). Default keeps today's behaviour.
+ */
+export function startHeading(cb: (h: Heading) => void, opts: { gpsCourse?: boolean } = {}): () => void {
+  const gpsCourse = opts.gpsCourse ?? true
   let gotCompass = false
   let geoWatch: number | null = null
 
@@ -65,7 +70,7 @@ export function startHeading(cb: (h: Heading) => void): () => void {
   const fallbackTimer = window.setTimeout(() => {
     if (gotCompass) return
     cb({ deg: 0, accuracy: null, source: 'none' }) // until the user starts walking
-    if (!('geolocation' in navigator)) return
+    if (!gpsCourse || !('geolocation' in navigator)) return
     geoWatch = navigator.geolocation.watchPosition(
       (pos) => {
         if (gotCompass) return
@@ -84,4 +89,18 @@ export function startHeading(cb: (h: Heading) => void): () => void {
     window.removeEventListener('deviceorientation', onIOS)
     if (geoWatch !== null) navigator.geolocation.clearWatch(geoWatch)
   }
+}
+
+/**
+ * Device pitch: DeviceOrientationEvent.beta in degrees (0 = flat face up, 90 = upright).
+ * Additive, for the AR ground plane. Same permission as the compass on iOS.
+ */
+export function startPitch(cb: (betaDeg: number) => void): () => void {
+  if (typeof window === 'undefined') return () => {}
+  const on = (ev: Event) => {
+    const b = (ev as DeviceOrientationEvent).beta
+    if (typeof b === 'number' && Number.isFinite(b)) cb(b)
+  }
+  window.addEventListener('deviceorientation', on)
+  return () => window.removeEventListener('deviceorientation', on)
 }

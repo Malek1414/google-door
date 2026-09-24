@@ -55,3 +55,5 @@
 .apr-rows dd { font-weight: 700; text-align: right; padding-left: 16px; }
 .apr-rows dt:first-of-type, .apr-rows dd:first-of-type { border-top: 0; }
 .apr-rows dd.is-unclear { color: #5f6368; font-style: italic; }
+/* The model's own short note under the rows, only when the verdict is confident. */
+.apr-note { margin: 0; padding: 12px 0 10px; border-top: 1px solid #c4c7c5; font-size: 20px; line-height: 1.3; color: #202124; }

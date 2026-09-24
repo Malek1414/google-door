@@ -22,11 +22,41 @@ export interface EntranceResult {
 const API_TIMEOUT_MS = 4000
 let staticData: Promise<Dataset> | null = null
 
+/**
+ * Every /api answer, good or bad, for whoever watches server health. The health check
+ * alone polled once a minute, so a backend that fell over mid-session stayed silent
+ * for up to 60 s while the screens quietly fell back.
+ */
+const apiWatchers = new Set<(ok: boolean) => void>()
+export function onApiResult(fn: (ok: boolean) => void): () => void {
+  apiWatchers.add(fn)
+  return () => apiWatchers.delete(fn)
+}
+/** Report one /api round trip. `ok` is false for a network error, a timeout or a 5xx. */
+export function reportApiResult(ok: boolean): void {
+  for (const fn of apiWatchers) {
+    try {
+      fn(ok)
+    } catch {
+      /* a watcher must not break a request */
+    }
+  }
+}
+
 async function fetchJson<T>(url: string, init?: RequestInit, timeoutMs = API_TIMEOUT_MS): Promise<T> {
   const ctl = new AbortController()
   const timer = setTimeout(() => ctl.abort(), timeoutMs)
+  const isApi = url.includes('/api/')
   try {
-    const r = await fetch(url, { ...init, signal: ctl.signal })
+    let r: Response
+    try {
+      r = await fetch(url, { ...init, signal: ctl.signal })
+    } catch (e) {
+      if (isApi) reportApiResult(false)
+      throw e
+    }
+    // A 4xx is an answer from a working server; only 5xx says the server is in trouble.
+    if (isApi) reportApiResult(r.status < 500)
     if (!r.ok) throw Object.assign(new Error(`HTTP ${r.status}`), { status: r.status })
     return (await r.json()) as T
   } finally {

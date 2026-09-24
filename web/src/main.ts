@@ -29,7 +29,13 @@ function softFail(err: unknown) {
   const el = document.getElementById('live')
   if (el) el.textContent = String((err as Error)?.message ?? err).slice(0, 140)
 }
-window.addEventListener('error', (ev) => softFail(ev.error ?? ev.message))
+window.addEventListener('error', (ev) => {
+  // Errors thrown inside Google's scripts (a lazy Maps module that cannot load while
+  // offline) are not ours to explain: announcing 'Could not load "poly"' through the
+  // live region told a screen-reader user nothing. Log them only.
+  if (ev.filename && !ev.filename.startsWith(location.origin)) return console.warn('[doorway] third-party error', ev.message)
+  softFail(ev.error ?? ev.message)
+})
 window.addEventListener('unhandledrejection', (ev) => softFail(ev.reason))
 
 // iOS home-screen mode with a translucent status bar: the window can end above the screen

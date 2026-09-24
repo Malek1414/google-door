@@ -197,7 +197,9 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
           approach.setAnchor(anchor)
         } else {
           failures += 1
-          if (failures >= FALLBACK_AFTER && !anchorFresh()) {
+          // Never at the threshold: losing the door there is expected (the user is AT
+          // it), and a map anchor would demote them to walking with a wrong direction.
+          if (failures >= FALLBACK_AFTER && !anchorFresh() && approach.currentPhase !== 'threshold') {
             const fb = fallbackAnchor()
             if (fb) {
               anchor = fb
@@ -221,6 +223,15 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
 
     const tick = () => {
       if (stopped || heading === null) return
+      // A map anchor that has aged out is simply re-minted: the surveyed bearing does
+      // not go stale, and letting it lapse drops the beacon every MAX_AGE_MS.
+      if (anchor?.source === 'osm-fallback' && !anchorFresh() && approach.currentPhase !== 'threshold') {
+        const fb = fallbackAnchor()
+        if (fb) {
+          anchor = fb
+          approach.setAnchor(fb)
+        }
+      }
       const st = approach.tick({ headingDeg: heading, steps, nowMs: deps.now() })
       const lines: string[] = []
 

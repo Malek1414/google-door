@@ -311,6 +311,67 @@ describe('through: proposed by vision or by stillness, taken back by "Noch drauÃ
   })
 })
 
+describe('vision lost at the door (rule 2: no map anchor, no dead reckoning)', () => {
+  /** Door 1.2 m straight ahead on the first reply, then vision never sees it again. */
+  const lostAtDoor = () => {
+    let n = 0
+    return () => (n++ === 0 ? atDoor()() : { found: false, confidence: 0.1 })
+  }
+
+  it('once at the threshold, losing vision never demotes to walking or falls back to the map', async () => {
+    const r = rig(lostAtDoor())
+    r.heading(100)
+    await r.tick()
+    await r.tick()
+    expect(r.views.at(-1)!.phase).toBe('threshold')
+    const from = r.views.length
+    // 30 s at the door, shuffling a step every 2 s so stillness never completes.
+    for (let i = 0; i < 300; i++) {
+      if (i % 20 === 0) r.step()
+      await r.tick()
+    }
+    const after = r.views.slice(from)
+    expect(after.every((v) => v.phase === 'threshold')).toBe(true)
+    expect(after.some((v) => v.source === 'osm-fallback')).toBe(false)
+    expect(r.spoken().some((x) => x.includes(fallbackLine('de')))).toBe(false)
+  })
+
+  it('standing still at the door proposes through even after the anchor went stale', async () => {
+    const r = rig(lostAtDoor())
+    r.heading(100)
+    await r.tick()
+    await r.tick()
+    // Shuffle at the door past MAX_AGE_MS, so the only anchor is stale.
+    for (let i = 0; i < 100; i++) {
+      if (i % 10 === 0) r.step()
+      await r.tick()
+    }
+    expect(r.views.at(-1)!.phase).toBe('threshold')
+    for (let ms = 0; ms <= STILL_MS + 500; ms += 100) await r.tick()
+    expect(r.views.at(-1)!.phase).toBe('through')
+  })
+
+  it('a map-bearing-only session never reaches threshold or through by walking or standing', async () => {
+    const r = rig(() => ({ found: false, confidence: 0.1 }))
+    r.heading(120) // facing the surveyed approachBearing
+    for (let i = 0; i < 16 * FALLBACK_AFTER; i++) await r.tick()
+    expect(r.views.at(-1)!.source).toBe('osm-fallback')
+    for (let i = 0; i < 30; i++) { r.step(); await r.tick() } // ~20 m of dead reckoning
+    for (let ms = 0; ms <= STILL_MS * 2; ms += 100) await r.tick()
+    expect(r.views.some((v) => v.phase === 'threshold' || v.phase === 'through')).toBe(false)
+  })
+
+  it('a map anchor is re-minted when it ages out: the beacon does not drop every 8 s', async () => {
+    const r = rig(() => ({ found: false, confidence: 0.1 }))
+    r.heading(100)
+    for (let i = 0; i < 16 * FALLBACK_AFTER; i++) await r.tick()
+    expect(r.views.at(-1)!.source).toBe('osm-fallback')
+    const from = r.views.length
+    for (let i = 0; i < 300; i++) await r.tick() // 30 s
+    expect(r.views.slice(from).every((v) => v.beaconPitch !== undefined)).toBe(true)
+  })
+})
+
 describe('parseDoorFix', () => {
   it('only a found, confident, numeric fix counts', () => {
     expect(parseDoorFix(null)).toBeNull()

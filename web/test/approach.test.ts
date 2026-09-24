@@ -218,3 +218,31 @@ describe('vision "inside" — the signal that ends the mode (Q6, Q7)', () => {
     expect(a.tick({ headingDeg: 100, steps: 1, nowMs: 1400 }).phase).toBe('through')
   })
 })
+
+describe('a map-bearing anchor drives no distance rule (rule 2)', () => {
+  it('does not block a real inside:true with its assumed distance', () => {
+    const a = new Approach()
+    a.setAnchor(anchor({ bearingDeg: 0, distanceM: 10, source: 'osm-fallback' }))
+    a.tick({ headingDeg: 100, steps: 0, nowMs: 1100 })
+    a.visionSaysInside()
+    expect(a.tick({ headingDeg: 100, steps: 0, nowMs: 1200 }).phase).toBe('through')
+  })
+
+  it('never demotes the threshold to walking', () => {
+    const a = new Approach()
+    a.setAnchor(anchor({ bearingDeg: 0, distanceM: 1.2 }))
+    expect(a.tick({ headingDeg: 100, steps: 0, nowMs: 1100 }).phase).toBe('threshold')
+    a.setAnchor(anchor({ bearingDeg: 0, distanceM: 10, ts: 1200, source: 'osm-fallback' }))
+    expect(a.tick({ headingDeg: 100, steps: 1, nowMs: 1300 }).phase).toBe('threshold')
+  })
+
+  it('stillness at the threshold proposes through with a stale anchor', () => {
+    const a = new Approach()
+    a.setAnchor(anchor({ bearingDeg: 0, distanceM: 1.2 }))
+    a.tick({ headingDeg: 100, steps: 0, nowMs: 1100 })
+    const t0 = 1000 + MAX_AGE_MS + 100
+    expect(a.tick({ headingDeg: 100, steps: 1, nowMs: t0 }).projection!.fresh).toBe(false)
+    a.tick({ headingDeg: 100, steps: 1, nowMs: t0 + 100 })
+    expect(a.tick({ headingDeg: 100, steps: 1, nowMs: t0 + 100 + STILL_MS }).phase).toBe('through')
+  })
+})

@@ -14,6 +14,9 @@ import { bandFor, shouldSpeakDistance, type Band } from './instruct'
 import { project, needsReanchor, type Anchor, type Projection } from './anchor'
 
 export type Phase = 'orienting' | 'walking' | 'threshold' | 'through'
+/** What proposed `through`: vision saw interior, or the user stood still at the door.
+ *  They warrant different words — standing still may just mean "at the handle". */
+export type ThroughBy = 'vision' | 'still'
 
 /** Bearing error that counts as aimed. Matches the "straight ahead" band. */
 export const AIMED_DEG = 8
@@ -49,6 +52,8 @@ export interface ApproachState {
   /** True the first tick after the anchor stopped being trustworthy. */
   lostFix: boolean
   needsFix: boolean
+  /** Why the phase is `through`; null in every other phase. */
+  throughBy: ThroughBy | null
 }
 
 export class Approach {
@@ -61,6 +66,7 @@ export class Approach {
   private stillSinceMs: number | null = null
   private insideVetoedAtSteps: number | null = null
   private lastDistanceM: number | null = null
+  private throughBy: ThroughBy | null = null
 
   /** Feed a fresh vision (or fallback) fix. */
   setAnchor(a: Anchor): void {
@@ -77,6 +83,7 @@ export class Approach {
   stillOutside(): void {
     this.confirmedThrough = false
     this.stillSinceMs = null
+    this.throughBy = null
     // The user has just told us the last claim was wrong. Do not make it again until
     // something has actually changed — that is, until they have walked further.
     this.insideVetoedAtSteps = this.lastSteps
@@ -106,10 +113,13 @@ export class Approach {
     // Honoured before the anchor checks below, because walking through a door is
     // exactly when vision loses the door: gating the one signal that ends the mode
     // behind a fresh anchor means it can arrive too late to be worth anything. (Q6)
-    if (this.confirmedThrough) this.phase = 'through'
+    if (this.confirmedThrough) {
+      this.phase = 'through'
+      this.throughBy = 'vision'
+    }
 
     if (!this.anchor) {
-      return { phase: this.phase, projection: null, band: 'straight', speakDistanceM: null, lostFix: false, needsFix: true }
+      return { phase: this.phase, projection: null, band: 'straight', speakDistanceM: null, lostFix: false, needsFix: true, throughBy: this.throughBy }
     }
 
     const p = project(this.anchor, s.headingDeg, s.steps, s.nowMs)
@@ -138,8 +148,11 @@ export class Approach {
       const lostFix = !this.wasStale
       this.wasStale = true
       // Stood still at the door long enough: propose through even without a fresh fix.
-      if (stoodStill) this.phase = 'through'
-      return { phase: this.phase, projection: p, band: 'straight', speakDistanceM: null, lostFix, needsFix: true }
+      if (stoodStill && this.phase !== 'through') {
+        this.phase = 'through'
+        this.throughBy = 'still'
+      }
+      return { phase: this.phase, projection: p, band: 'straight', speakDistanceM: null, lostFix, needsFix: true, throughBy: this.throughBy }
     }
     this.wasStale = false
     if (!mapOnly) this.lastDistanceM = p.distanceM
@@ -166,7 +179,10 @@ export class Approach {
         } else if (this.phase === 'threshold') {
           if (!mapOnly && p.distanceM > THRESHOLD_M * 2) this.phase = 'walking'
           // Stood still at the door long enough: propose that they are through.
-          else if (stoodStill) this.phase = 'through'
+          else if (stoodStill) {
+            this.phase = 'through'
+            this.throughBy = 'still'
+          }
         }
         if (this.phase === before) break
       }
@@ -187,6 +203,7 @@ export class Approach {
       speakDistanceM,
       lostFix: false,
       needsFix: needsReanchor(this.anchor, s.headingDeg, s.steps, s.nowMs),
+      throughBy: this.throughBy,
     }
   }
 
@@ -198,5 +215,6 @@ export class Approach {
     this.confirmedThrough = false
     this.lastSteps = -1
     this.stillSinceMs = null
+    this.throughBy = null
   }
 }

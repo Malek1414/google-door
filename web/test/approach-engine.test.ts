@@ -6,7 +6,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { STEP_M } from '../src/core/anchor'
 import { STILL_MS } from '../src/core/approach'
-import { bandText, fallbackLine, noCameraLine, noCompassLine, noDirectionLine, pitchFor, safetyLine, searchingLine, thresholdLine, throughLine, unsureLine } from '../src/core/instruct'
+import { atDoorLine, bandText, fallbackLine, noCameraLine, noCompassLine, noDirectionLine, pitchFor, safetyLine, searchingLine, thresholdLine, throughLine, unsureLine } from '../src/core/instruct'
 import { angleDelta } from '../src/core/stability'
 import type { Entrance } from '../src/core/types'
 import { createApproachEngine, FALLBACK_AFTER, TIMEOUT_MS, INSIDE_MIN_CONFIDENCE, parseDoorFix, saysInside } from '../src/ui/approachEngine'
@@ -231,7 +231,7 @@ const atDoor = (extra: Record<string, unknown> = {}) => () => ({
 })
 
 describe('through: proposed by vision or by stillness, taken back by "Noch drauÃŸen"', () => {
-  it('standing still STILL_MS at the threshold proposes through, said once', async () => {
+  it('standing still STILL_MS at the threshold proposes through as "at the door", never "inside", said once', async () => {
     const r = rig(atDoor())
     r.heading(100)
     await r.tick()
@@ -244,7 +244,8 @@ describe('through: proposed by vision or by stillness, taken back by "Noch drauÃ
     expect(r.views.at(-1)!.beaconPitch).toBeUndefined()
     expect(r.views.at(-1)!.relBearingDeg).toBeNull()
     expect(r.views.at(-1)!.distanceM).toBeNull()
-    expect(r.spoken().filter((x) => x.includes(throughLine('de')))).toHaveLength(1)
+    expect(r.spoken().filter((x) => x.includes(atDoorLine('de')))).toHaveLength(1)
+    expect(r.spoken().some((x) => x.includes(throughLine('de')))).toBe(false)
   })
 
   it('a step resets the stillness clock', async () => {

@@ -152,7 +152,13 @@ export function searchingLine(lang = 'de'): string {
   return lang.startsWith('de') ? 'Ich suche die Tür.' : "I'm looking for the door."
 }
 
-/** Spoken when the user should be inside. Vision proposes; the user can take it back. */
+/** Spoken when stillness at the threshold proposed `through`. Standing still is also
+ *  what someone does with a hand on the door, so this does not claim "inside". */
+export function atDoorLine(lang = 'de'): string {
+  return lang.startsWith('de') ? 'Du bist an der Tür.' : 'You are at the door.'
+}
+
+/** Spoken when vision sees the interior. Vision proposes; the user can take it back. */
 export function throughLine(lang = 'de'): string {
   return lang.startsWith('de') ? 'Du müsstest jetzt drin sein.' : 'You should be inside now.'
 }
@@ -185,7 +191,7 @@ export function metresLine(m: number, lang = 'de'): string {
 export type ApproachLine =
   | { kind: 'band'; band: Band }
   | { kind: 'metres'; m: number }
-  | { kind: 'safety' | 'fallback' | 'unsure' | 'threshold' | 'through' | 'noDirection' | 'noCompass' | 'noCamera' | 'searching' }
+  | { kind: 'safety' | 'fallback' | 'unsure' | 'threshold' | 'through' | 'noDirection' | 'noCompass' | 'noCamera' | 'searching' | 'atDoor' }
 
 export function clipKeyFor(line: ApproachLine): string | null {
   switch (line.kind) {
@@ -214,6 +220,7 @@ export function approachClipBank(lang = 'de'): { key: string; text: string }[] {
     { key: 'approach_noCompass', text: noCompassLine(lang) },
     { key: 'approach_noCamera', text: noCameraLine(lang) },
     { key: 'approach_searching', text: searchingLine(lang) },
+    { key: 'approach_atDoor', text: atDoorLine(lang) },
   ]
   for (let n = 1; n <= 10; n++) out.push({ key: `m_${n}`, text: metresLine(n, lang) })
   return out

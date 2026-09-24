@@ -246,3 +246,20 @@ describe('a map-bearing anchor drives no distance rule (rule 2)', () => {
     expect(a.tick({ headingDeg: 100, steps: 1, nowMs: t0 + 100 + STILL_MS }).phase).toBe('through')
   })
 })
+
+describe('throughBy: why through was proposed', () => {
+  it('is "still" for stillness at the threshold and "vision" for inside:true', () => {
+    const a = new Approach()
+    a.setAnchor(anchor({ bearingDeg: 0, distanceM: 1.2 }))
+    a.tick({ headingDeg: 100, steps: 0, nowMs: 1100 })
+    a.tick({ headingDeg: 100, steps: 0, nowMs: 1200 })
+    const st = a.tick({ headingDeg: 100, steps: 0, nowMs: 1200 + STILL_MS })
+    expect(st.phase).toBe('through')
+    expect(st.throughBy).toBe('still')
+
+    const b = new Approach()
+    b.setAnchor(anchor({ bearingDeg: 0, distanceM: 1.2 }))
+    b.visionSaysInside()
+    expect(b.tick({ headingDeg: 100, steps: 0, nowMs: 1100 }).throughBy).toBe('vision')
+  })
+})

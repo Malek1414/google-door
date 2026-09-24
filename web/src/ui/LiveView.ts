@@ -20,7 +20,7 @@ import type { ArrowTarget } from '../core/target'
 import type { Entrance } from '../core/types'
 import { BeaconAudio, playApproachChime } from '../audio'
 import { postLook } from '../data'
-import { announce, primeSpeech, session, speak, vibrate } from '../session'
+import { announce, keepScreenOn, primeSpeech, session, speak, vibrate } from '../session'
 import { preloadClips } from './clips'
 import { lang, t } from '../strings'
 import { h, mount, s } from './dom'
@@ -238,11 +238,15 @@ export function directionWord(rel: number): string {
   return t.behind
 }
 
-/** Clip key for a turn, on the same bands as turnGlyph and directionWord. */
-function turnKey(rel: number): string {
-  const a = Math.abs(rel)
-  if (a <= ON_BEARING_DEG) return 'straight'
-  return rel < 0 ? 'turn_left' : 'turn_right'
+/**
+ * Clip key for the word actually shown. The word is hysteresis-held (CalmWord); a key
+ * from the raw bearing could say "Links" while the screen says "Geradeaus".
+ */
+export function wordKey(word: string): string | undefined {
+  if (word === t.ahead) return 'straight'
+  if (word === t.turnLeft) return 'turn_left'
+  if (word === t.turnRight) return 'turn_right'
+  return undefined
 }
 
 /** Material Symbols turn glyph for the green instruction card, same bands as directionWord. */
@@ -445,6 +449,8 @@ export function LiveView(opts: {
 
   mount(root)
   root.dataset.phase = 'scanning'
+  // The phone must not auto-lock mid-walk (Approach already holds one of these).
+  const releaseScreen = keepScreenOn()
 
   // ---- state ----
   let fix: Fix | null = null
@@ -464,6 +470,13 @@ export function LiveView(opts: {
   // Know which approach clips exist before the tap, so a missing one is spoken at once.
   if (approachMode === 'guide') preloadClips(lang)
   let saidNear = false
+  /** "Zum Eingang führen" appeared: announced with whatever else this frame says. */
+  let pendingNear = ''
+  const takeNear = () => {
+    const x = pendingNear
+    pendingNear = ''
+    return x
+  }
   /** Backgrounded: no voice, no beacon, no countdown; coming back says the direction again. */
   let hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden'
   let saidNoCompass = false
@@ -602,7 +615,13 @@ export function LiveView(opts: {
     else delete root.dataset.near
     if (show && !saidNear) {
       saidNear = true
-      announce(t.nearTrigger(APPROACH_TRIGGER))
+      // Two announce() calls in one frame: the second replaces the first. Hold this one
+      // until the frame is done; the approach and arrival lines below take it along.
+      pendingNear = t.nearTrigger(APPROACH_TRIGGER)
+      queueMicrotask(() => {
+        const x = takeNear()
+        if (x) announce(x)
+      })
     }
   }
 
@@ -683,10 +702,10 @@ export function LiveView(opts: {
     // were already said by the early arrival line when that one ran.
     lines.push(`${ARR.sheetTitle}. ${name}.`)
     if (doorType) lines.push(`${doorType}.`)
-    if (!spokeArrival) {
-      for (const w of warns) lines.push(`${t.warningPrefix}. ${w}`)
-      if (face) lines.push(face)
-    }
+    // Warnings are always said again: the sheet interrupts, and that can cut the early
+    // arrival line that carried them ("Achtung: Drehtür" must never be lost).
+    for (const w of warns) lines.push(`${t.warningPrefix}. ${w}`)
+    if (!spokeArrival && face) lines.push(face)
     lines.push(question)
     if (!spokeSheet && voiceOn()) speak(lines.join(' '), { interrupt: true })
     spokeSheet = true
@@ -916,7 +935,7 @@ export function LiveView(opts: {
           const line = `${t.inMetres(ahead!.toManeuverM)}. ${aheadText}`
           if (voiceOn()) speak(line)
           else announce(line)
-        } else if (voiceOn()) speak(word, { key: turnKey(rel) })
+        } else if (voiceOn()) speak(word, { key: wordKey(word) })
         else announce(word)
       }
     }
@@ -935,7 +954,8 @@ export function LiveView(opts: {
       // No clip: the 'arrived' clip says "Sie haben den Eingang erreicht.", which is wrong
       // ~10 m out and in the wrong register; the device voice reads the real sentence.
       if (voiceOn()) speak(t.approaching, { interrupt: true })
-      announce(t.approaching)
+      const near = takeNear()
+      announce(near ? `${t.approaching} ${near}` : t.approaching)
     }
 
     // Spoken arrival line fires 2.5 m early to hide speech latency.
@@ -945,7 +965,8 @@ export function LiveView(opts: {
       if (e.approachBearing !== null) parts.push(t.faceToEnter(compassWord(e.approachBearing)))
       for (const w of e.warnings) parts.push(`${t.warningPrefix}. ${t.warning[w] ?? w}`)
       if (voiceOn()) speak(parts.join(' '), { interrupt: true })
-      announce(parts.join(' '))
+      const near = takeNear()
+      announce([...parts, near].filter(Boolean).join(' '))
     }
   }
 
@@ -1112,6 +1133,7 @@ export function LiveView(opts: {
   function teardown() {
     if (closed) return
     closed = true
+    releaseScreen()
     clearTimeout(noteTimer)
     document.removeEventListener('visibilitychange', onVisibility)
     clearInterval(gpsWatch)

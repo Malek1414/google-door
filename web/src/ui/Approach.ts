@@ -322,6 +322,9 @@ function GuideScreen(opts: ApproachOpts): () => void {
     // Hide at once so a double tap cannot fire twice; the engine's next view redraws.
     outsideBtn.hidden = true
     narrator.reset()
+    // Still outside: the demo's auto-exit after `through` must not fire anyway.
+    clearTimeout(throughTimer)
+    throughTimer = 0
     run.stillOutside()
   })
 
@@ -399,7 +402,7 @@ function DoorCheckScreen(opts: { door: Entrance; config: OutputConfig; onExit: (
   // voided the pending one, so the aim prompt was often never heard). Only a line from a
   // user's tap interrupts; the rest queue behind what is sounding.
   const say = (text: string, interrupt = false) => {
-    if (opts.config.speak) playLine(text, null, { interrupt, lang })
+    if (opts.config.speak && !isMuted()) playLine(text, null, { interrupt, lang })
     announce(text)
   }
 

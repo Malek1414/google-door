@@ -51,10 +51,12 @@ export async function acquireCamera(): Promise<MediaStream> {
   session.stream = null
   pending = navigator.mediaDevices
     .getUserMedia(CAMERA_CONSTRAINTS)
-    .catch(() =>
-      // Some WebViews reject the size hints outright: retry with the bare minimum.
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false }),
-    )
+    .catch((err: unknown) => {
+      // A refusal stays a refusal (no second prompt). Anything else may be a WebView
+      // rejecting the size hints outright: retry with the bare minimum.
+      if (cameraErrorKind(err) === 'denied') throw err
+      return navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
+    })
     .then((st) => {
       session.stream = st
       return st

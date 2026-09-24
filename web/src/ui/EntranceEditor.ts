@@ -355,6 +355,7 @@ export function openEntranceEditor(ctx: FeatureCtx, el: HTMLElement, opts: Entra
 
   el.replaceChildren(form)
   ctx.setSheet('half')
+  form.querySelector<HTMLElement>('#sheet-title')?.focus({ preventScroll: true })
 
   function cleanup(): void {
     if (closed) return

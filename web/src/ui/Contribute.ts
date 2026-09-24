@@ -186,10 +186,12 @@ export const contributePanel: Panel = (el, ctx) => {
         ctx.refresh()
         ctx.announce(L.thanks(pointsFor(entry)))
         render()
+        el.querySelector<HTMLElement>('#sheet-title')?.focus({ preventScroll: true })
       },
       onCancel: () => {
         closeEditor()
         render()
+        el.querySelector<HTMLElement>('#sheet-title')?.focus({ preventScroll: true })
       },
     })
     const focusSel = extra.focusPhoto ? '.ee-file' : extra.focusNote ? '.ee-textarea' : null
@@ -389,7 +391,7 @@ export const contributePanel: Panel = (el, ctx) => {
       h(
         'div',
         { class: 'ct' },
-        h('div', { class: 'gm-sheet-head' }, h('h2', { class: 'gm-sheet-title' }, L.title)),
+        h('div', { class: 'gm-sheet-head' }, h('h2', { id: 'sheet-title', class: 'gm-sheet-title', tabindex: '-1' }, L.title)),
         profileBlock(total, showMine),
         h(
           'ul',

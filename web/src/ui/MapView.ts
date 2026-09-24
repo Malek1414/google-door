@@ -584,7 +584,7 @@ export function MapView(opts: {
       if (want && !opened) {
         opened = true
         openEntrance(want)
-      } else if (!selected && !placeOpen && !routePreview) renderSheet()
+      } else backgroundRender()
     } catch {
       status.textContent = t.noDoors
     }
@@ -614,6 +614,18 @@ export function MapView(opts: {
       console.error('[doorway] panel failed', err)
       sheetBody.replaceChildren(h('p', { class: 'gm-p', role: 'alert' }, t.panelError))
     }
+  }
+
+  /**
+   * New data (a map load, a location fix) redraws the Erkunden sheet only. Für dich,
+   * Beitragen and Unternehmen own their screens: remounting them from a GPS tick threw
+   * the user out of an open editor ("Eingang hinzufügen" jumped back to the business
+   * home) and moved VoiceOver focus. They re-render themselves after their own saves.
+   */
+  function backgroundRender() {
+    if (selected || placeOpen || routePreview) return
+    if (tab !== 'explore') return
+    renderSheet()
   }
 
   function renderSheet() {
@@ -1389,7 +1401,7 @@ export function MapView(opts: {
           if (!opts.openDoor) map?.setCenter({ lat: me.lat, lng: me.lon })
           if (!map) void load(bboxAround(me.lat, me.lon, 500))
         }
-        if (!selected && !placeOpen && !routePreview) renderSheet()
+        backgroundRender()
       },
       () => {},
       { enableHighAccuracy: true, maximumAge: 5000 },

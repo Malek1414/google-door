@@ -34,7 +34,7 @@ const ZOOM = !args.includes('--no-zoom')
 const OUT = join(dirname(fileURLToPath(import.meta.url)), 'out')
 mkdirSync(OUT, { recursive: true })
 const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-const browser = await chromium.launch({ executablePath: CHROME, args: ['--ignore-certificate-errors', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] })
+const browser = await chromium.launch({ executablePath: CHROME, args: ['--mute-audio', '--ignore-certificate-errors', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] })
 
 async function newPage(path = '', { width = 402, height = 874 } = {}) {
   const ctx = await browser.newContext({

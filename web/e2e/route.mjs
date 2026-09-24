@@ -145,7 +145,7 @@ const routeLine = async (page) => (await liveLines(page)).filter((l) => l.blue).
 
 const browser = await chromium.launch({
   executablePath: CHROME,
-  args: ['--ignore-certificate-errors', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'],
+  args: ['--mute-audio', '--ignore-certificate-errors', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'],
 })
 const errors = []
 

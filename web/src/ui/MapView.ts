@@ -251,6 +251,21 @@ export function MapView(opts: {
 
     const action = (cls: string, ic: string, text: string, on: () => void) =>
       h('button', { class: `gm-pill ${cls}`, type: 'button', onclick: on }, icon(ic, true), text)
+    // Start always holds the first slot. When this door cannot carry guidance the
+    // button is disabled and says why — it does not disappear, because then the next
+    // action shifts left into the place the thumb was already going.
+    const startBtn = h(
+      'button',
+      {
+        class: 'gm-pill gm-pill-primary',
+        type: 'button',
+        disabled: g?.kind !== 'arrow',
+        'aria-disabled': String(g?.kind !== 'arrow'),
+        onclick: () => e && void beginGuidance(e),
+      },
+      icon('navigation', true),
+      t.startGuidance,
+    )
 
     const stepList = h('ol', { class: 'gm-steps', hidden: true }, ...steps.map((x) => h('li', {}, x)))
 
@@ -269,7 +284,7 @@ export function MapView(opts: {
       h(
         'div',
         { class: 'gm-actions gm-routeactions' },
-        g?.kind === 'arrow' ? action('gm-pill-primary', 'navigation', t.startGuidance, () => void beginGuidance(e!)) : null,
+        startBtn,
         steps.length ? action('', 'list', t.steps, () => {
           stepList.hidden = !stepList.hidden
           setSheet(stepList.hidden ? 'route' : 'half')
@@ -520,7 +535,7 @@ export function MapView(opts: {
       if (want && !opened) {
         opened = true
         openEntrance(want)
-      } else if (!selected && !placeOpen) renderSheet()
+      } else if (!selected && !placeOpen && !routePreview) renderSheet()
     } catch {
       status.textContent = t.noDoors
     }
@@ -818,8 +833,12 @@ export function MapView(opts: {
    * grey dots only as a fallback, and that case is announced as "roughly" so nobody
    * reads a crow-flight hint as a route.
    */
-  async function drawRoute(to: LatLon, label?: string): Promise<Route | null> {
+  async function drawRoute(to: LatLon, label?: string, target: Entrance | null = null): Promise<Route | null> {
     if (!map) return null
+    // Set here rather than at one call site: routing to a Google POI used to leave the
+    // previous door in routeTarget, and Start would then guide to a door the user had
+    // navigated away from.
+    routeTarget = target
     const from = origin()
     clearRoute()
 
@@ -883,8 +902,7 @@ export function MapView(opts: {
 
   /** Door cards still call this with an Entrance. */
   function drawRouteToEntrance(e: Entrance) {
-    routeTarget = e
-    void drawRoute({ lat: e.lat, lon: e.lon }, e.name ?? t.unnamedEntrance)
+    void drawRoute({ lat: e.lat, lon: e.lon }, e.name ?? t.unnamedEntrance, e)
   }
 
 
@@ -1338,7 +1356,7 @@ export function MapView(opts: {
           if (!opts.openDoor) map?.setCenter({ lat: me.lat, lng: me.lon })
           if (!map) void load(bboxAround(me.lat, me.lon, 500))
         }
-        if (!selected && !placeOpen) renderSheet()
+        if (!selected && !placeOpen && !routePreview) renderSheet()
       },
       () => {},
       { enableHighAccuracy: true, maximumAge: 5000 },

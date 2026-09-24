@@ -94,11 +94,10 @@ async def _ask(prompt: str, frame_b64: str) -> dict:
             "maxOutputTokens": 512,
         },
     }
-    async with httpx.AsyncClient(timeout=20) as c:
-        r = await c.post(f"{GEMINI_URL}/{MODEL_FIX}:generateContent",
-                         json=body, headers={"x-goog-api-key": GEMINI_KEY})
-    if r.status_code != 200:
-        raise HTTPException(502, f"gemini {r.status_code}")
+    from server.app import gemini_post
+    r = await gemini_post(MODEL_FIX, body)
+    if r is None or r.status_code != 200:
+        raise HTTPException(502, f"gemini {r.status_code if r else 'no response'}")
     try:
         return json.loads(r.json()["candidates"][0]["content"]["parts"][0]["text"])
     except Exception:

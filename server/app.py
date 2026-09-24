@@ -18,6 +18,32 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+def _load_dotenv() -> None:
+    """Read .env next to the repo root, without adding a dependency.
+
+    The server was once restarted without its environment and came back up answering
+    200 on every route while silently having no keys: routing fell through to "roughly
+    this way" and every Gemini call refused. Nothing in the logs said why. Loading the
+    file the keys already live in removes the whole class of mistake — however the
+    process is started, it finds them.
+
+    Real environment variables win, so a deliberate override still works.
+    """
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip("'\""))
+    except OSError:
+        pass
+
+
+_load_dotenv()
+
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 MAPS_KEY   = os.environ.get("MAPS_API_KEY", "")
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models"
@@ -52,6 +78,26 @@ def data():
         with open("data/berlin-mitte.json") as f:
             DATA = json.load(f)
     return DATA
+
+
+async def gemini_post(model: str, body: dict, *, timeout: float = 20, tries: int = 3):
+    """POST to Gemini, riding out the 429s this tier hands out on a busy minute.
+
+    Vision has no fallback: when /api/look or /api/door-fix gives up, a blind user
+    gets silence, and silence is indistinguishable from a crash to someone who cannot
+    see the screen. /api/speak has backed off since the start; these two never did,
+    and one transient 429 was enough to make the feature look broken.
+    """
+    r = None
+    for attempt in range(tries):
+        async with httpx.AsyncClient(timeout=timeout) as c:
+            r = await c.post(f"{GEMINI_URL}/{model}:generateContent",
+                             json=body, headers={"x-goog-api-key": GEMINI_KEY})
+        if r.status_code not in (429, 503):
+            return r
+        if attempt < tries - 1:
+            await asyncio.sleep(0.8 * (2 ** attempt))
+    return r
 
 
 @app.get("/api/health")
@@ -121,11 +167,9 @@ async def look(req: LookReq):
             "thinkingConfig": {"thinkingBudget": 0},
             "maxOutputTokens": 256,
         }}
-    async with httpx.AsyncClient(timeout=20) as c:
-        r = await c.post(f"{GEMINI_URL}/{MODEL_LOOK}:generateContent",
-                         json=body, headers={"x-goog-api-key": GEMINI_KEY})
-    if r.status_code != 200:
-        raise HTTPException(502, f"gemini {r.status_code}")
+    r = await gemini_post(MODEL_LOOK, body)
+    if r is None or r.status_code != 200:
+        raise HTTPException(502, f"gemini {r.status_code if r else 'no response'}")
     try:
         say = r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
     except (KeyError, IndexError):

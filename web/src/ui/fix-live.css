@@ -70,12 +70,23 @@
 /* a11y #36: a focus ring that survives any camera image */
 .ar-round:focus-visible, .ar-look:focus-visible { outline: 3px solid #fff; outline-offset: 2px; box-shadow: 0 0 0 6px #000; }
 
-/* The health snackbar (z 10000, full width at the top) covered Stop and Feedback in
-   Live View and the exit button of the approach: a finger aimed at "stop" hit the
-   snackbar. On these two screens it keeps clear of the round buttons. */
-body:has(section.ar) .health-banner {
-  left: 16px; right: 140px; width: auto; max-width: none; transform: none;
+/* The health snackbar (z 10000, full width at the top) covered Stop, Feedback and the
+   mute switch in Live View and the exit of the approach: a finger aimed at "stop" hit
+   the snackbar. These two screens say their own status (no route, map fallback), so
+   the snackbar stays off them. */
+body:has(section.ar) .health-banner,
+body:has(section.apr) .health-banner { display: none; }
+
+/* "Ton aus": a labelled pill, 56 px high, top left, one thumb. */
+.mute-btn {
+  position: absolute; top: max(14px, env(safe-area-inset-top)); z-index: 5;
+  min-height: 56px; min-width: 56px; padding: 0 18px 0 14px; border: 0; border-radius: 28px;
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgb(32 33 36 / 0.92); color: #fff; font: 600 17px/1 system-ui, -apple-system, 'Roboto', sans-serif;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.4);
 }
-body:has(section.apr) .health-banner {
-  left: 88px; right: 16px; width: auto; max-width: none; transform: none;
-}
+.mute-btn .ms { font-size: 26px; }
+.mute-btn[aria-pressed='true'] { background: #fff; color: #202124; }
+.mute-btn:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+.ar .mute-btn { left: 16px; }
+.apr .mute-btn { right: 16px; }

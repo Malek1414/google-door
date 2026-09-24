@@ -9,12 +9,9 @@ import { angleDelta } from '../src/core/stability'
 import type { Entrance } from '../src/core/types'
 import {
   createApproachEngine,
-  EXPLAINED_QUIET_MS,
   NO_COMPASS_MS,
   noCompassLine,
-  QUIET_MS,
   RATE_LIMIT_BACKOFF_MS,
-  searchingLine,
 } from '../src/ui/approachEngine'
 import { Narrator } from '../src/ui/Approach'
 import type { ApproachView, CompassReading } from '../src/ui/approachPort'
@@ -96,51 +93,43 @@ const door = (compassDeg: number, metres: number) => (req: { headingDeg: number 
   body: { found: true, bearingDeg: angleDelta(req.headingDeg, compassDeg), distanceM: metres - 0 * STEP_M, confidence: 0.9, source: 'gemini-frame' },
 })
 
-/** Longest stretch without a spoken line, from the start to now. */
-const longestGap = (said: { t: number }[], start: number, end: number) => {
-  const ts = [start, ...said.map((s) => s.t), end]
-  return Math.max(...ts.slice(1).map((x, i) => x - ts[i]))
-}
 
 describe('approach under stress: never silent without a reason', () => {
-  it('no compass at all: the safety line, then "no compass" within NO_COMPASS_MS, repeated only now and then', async () => {
+  it('no compass at all: the safety line, then "no compass" once within NO_COMPASS_MS, then silence', async () => {
     const r = rig(door(70, 8))
-    await r.run(40000)
+    await r.run(100000)
     expect(r.said[0].text).toBe(safetyLine('de'))
     const nc = r.said.filter((s) => s.text === noCompassLine('de'))
-    expect(nc.length).toBeGreaterThanOrEqual(2)
+    expect(nc).toHaveLength(1)
     expect(nc[0].t - 1000).toBeLessThanOrEqual(NO_COMPASS_MS + 100)
-    for (let i = 1; i < nc.length; i++) expect(nc[i].t - nc[i - 1].t).toBeGreaterThanOrEqual(EXPLAINED_QUIET_MS)
+    expect(r.said).toHaveLength(2)
     expect(r.calls).toHaveLength(0) // no heading, no frame worth sending
     expect(r.views.every((v) => v.relBearingDeg === null && v.beaconPitch === undefined)).toBe(true)
   })
 
-  it('standing still with a good fix: a reminder at least every QUIET_MS, never the safety line again', async () => {
+  it('60 s standing still with a jittery compass: nothing after the opening lines', async () => {
     const r = rig(door(70, 8))
+    let k = 0
     r.heading(100)
-    await r.run(30000)
-    expect(longestGap(r.said, 1000, r.t)).toBeLessThanOrEqual(QUIET_MS + 200)
+    await r.run(3000, () => r.heading(100 + 3 * Math.sin(k++)))
+    const opening = r.said.length
+    await r.run(60000, () => r.heading(100 + 3 * Math.sin(k++)))
+    expect(r.said.length - opening).toBe(0)
     expect(r.said.filter((s) => s.text === safetyLine('de'))).toHaveLength(1)
-    expect(r.said.at(-1)!.text).toMatch(/^Links \d+ Meter$/)
-    // Reminders are reminders, not chatter: never two within QUIET_MS.
-    for (let i = 2; i < r.said.length; i++) expect(r.said[i].t - r.said[i - 1].t).toBeGreaterThanOrEqual(QUIET_MS - 100)
   })
 
-  it('backend 500 on every door-fix: map fallback, and no gap over QUIET_MS', async () => {
+  it('backend 500 on every door-fix: the map fallback is said', async () => {
     const r = rig(() => ({ status: 500 }))
     r.heading(100)
     await r.run(20000)
     expect(r.said.some((s) => s.text.includes(fallbackLine('de')))).toBe(true)
-    expect(longestGap(r.said, 1000, r.t)).toBeLessThanOrEqual(QUIET_MS + 200)
   })
 
-  it('backend that never answers (timeout): the user still hears something every QUIET_MS', async () => {
+  it('backend that never answers (timeout): never more than one request in flight', async () => {
     const r = rig(() => new Promise<never>(() => {}))
     r.heading(100)
     await r.run(20000)
-    expect(r.calls).toHaveLength(1) // never more than one request in flight
-    expect(r.said.some((s) => s.text === searchingLine('de'))).toBe(true)
-    expect(longestGap(r.said, 1000, r.t)).toBeLessThanOrEqual(QUIET_MS + 200)
+    expect(r.calls).toHaveLength(1)
   })
 
   it('429 backs off for RATE_LIMIT_BACKOFF_MS instead of hammering the quota', async () => {

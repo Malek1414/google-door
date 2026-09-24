@@ -169,7 +169,7 @@ function initScript({ profileKey, profile }) {
 // ── harness ─────────────────────────────────────────────────────────────────
 const browser = await chromium.launch({
   executablePath: CHROME,
-  args: ['--ignore-certificate-errors', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'],
+  args: ['--mute-audio', '--ignore-certificate-errors', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'],
 })
 const results = []
 function check(name, ok, note = '') {

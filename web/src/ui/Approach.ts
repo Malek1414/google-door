@@ -22,6 +22,8 @@ import { checkDoor, runDoorCheckOnce, verdictNote, verdictRows } from './doorChe
 import { h, mount, s } from './dom'
 import { grabFrame } from './LiveView'
 import { SteadyAngle } from './arrowSteady'
+import { isTransient, splitInstruction } from './clips'
+import { isMuted, LineGate, muteButton } from './voiceCalm'
 import './approach.css'
 
 // Screen chrome only. Everything spoken during guidance comes from the engine
@@ -60,20 +62,28 @@ export class Narrator {
   private lastInstruction = ''
   private lastSeq: number | undefined = undefined
 
-  constructor(private readonly language: string = lang) {}
+  /** `gate` (the screen passes one) holds back direction-only lines inside the minimum
+   *  gap; they are said on a later view if still current. One-off lines pass. */
+  constructor(private readonly language: string = lang, private readonly gate: LineGate | null = null) {}
 
-  next(v: ApproachView): { text: string; interrupt: boolean } | null {
+  next(v: ApproachView, nowMs: number = Date.now()): { text: string; interrupt: boolean } | null {
     if (!v.instruction) return null
     if (v.instruction === this.lastInstruction && v.seq === this.lastSeq) return null
+    const interrupt = v.instruction.startsWith(safetyLine(this.language))
+    if (this.gate) {
+      const onlyDirections = splitInstruction(v.instruction, this.language).every((p) => isTransient(p, this.language))
+      if (!this.gate.allow(v.instruction, nowMs, { urgent: interrupt || !onlyDirections })) return null
+    }
     this.lastInstruction = v.instruction
     this.lastSeq = v.seq
-    return { text: v.instruction, interrupt: v.instruction.startsWith(safetyLine(this.language)) }
+    return { text: v.instruction, interrupt }
   }
 
   /** After "Noch draußen": the engine's next line is spoken even if it repeats an earlier one. */
   reset(): void {
     this.lastInstruction = ''
     this.lastSeq = undefined
+    this.gate?.forget()
   }
 }
 
@@ -166,7 +176,14 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
   root.append(h('div', { class: 'apr-panel' }, dirEl, distEl, instrEl, srcEl, outsideBtn, safetyEl))
   mount(root)
 
-  const narrator = new Narrator()
+  const narrator = new Narrator(lang, new LineGate())
+  const muteBtn = muteButton((m) => {
+    if (!m) return
+    beacon?.stop()
+    beaconOn = false
+    stopLines(lang)
+  })
+  root.append(muteBtn)
   reportMissingClips(lang)
   const beacon = opts.config.beacon && session.audio ? new BeaconAudio(session.audio) : null
   let beaconOn = false
@@ -206,17 +223,17 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
     if (enteringThrough) outsideBtn.focus()
 
     // Backgrounded: draw, but say nothing and keep the beacon off; resume re-says it.
-    const say = hidden ? null : narrator.next(v)
+    const say = hidden ? null : narrator.next(v, performance.now())
     if (say) {
       // Speech AND the live region, so VoiceOver gets it even with speech off.
       // Each part of the instruction plays its pre-synthesised clip; only a part with
       // no clip goes to /api/speak (Q9).
-      if (opts.config.speak) playInstruction(say.text, { interrupt: say.interrupt, lang })
+      if (opts.config.speak && !isMuted()) playInstruction(say.text, { interrupt: say.interrupt, lang })
       announce(say.text)
     }
 
     if (beacon) {
-      if (hidden || v.beaconPitch === undefined || v.relBearingDeg === null) {
+      if (hidden || isMuted() || v.beaconPitch === undefined || v.relBearingDeg === null) {
         if (beaconOn) beacon.stop()
         beaconOn = false
       } else {

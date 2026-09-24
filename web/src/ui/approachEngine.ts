@@ -46,10 +46,6 @@ export const TICK_MS = 100
 export const INSIDE_MIN_CONFIDENCE = 0.6
 /** No compass reading this long after the start: say so instead of going silent. */
 export const NO_COMPASS_MS = 3000
-/** Longest stretch without a spoken line while guidance runs (blind user: silence reads as a crash). */
-export const QUIET_MS = 5000
-/** Once the reason for silence has been said (no compass), repeat it only this often. */
-export const EXPLAINED_QUIET_MS = 15000
 /** No camera frame this long counts as one vision miss, so the map fallback still fires. */
 export const NO_FRAME_MISS_MS = 1500
 /** After a 429 from /api/door-fix, wait this long before the next request. */
@@ -167,9 +163,8 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     let pendingNoDirection = false
     let saidNoDirection = false
     const startedAt = deps.now()
-    /** When a line was last handed to the screen to be spoken. */
-    let lastSaidAt = startedAt
     let seq = 0
+    let saidNoCompass = false
 
     // The safety line is the first thing the session ever says, and it is said once.
     let view: ApproachView = {
@@ -185,7 +180,6 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     const emit = (v: ApproachView) => {
       const key = JSON.stringify(v)
       if (key === viewKey) return
-      if (v.instruction !== view.instruction || v.seq !== view.seq) lastSaidAt = deps.now()
       view = v
       viewKey = key
       subs.forEach((cb) => cb(v))
@@ -193,6 +187,7 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
 
     /** Say `text` again (or for the first time) even if it equals the current instruction. */
     const remind = (text: string, patch: Partial<ApproachView> = {}) => {
+      if (text === noCompassLine(L)) saidNoCompass = true
       seq += 1
       emit({ ...view, ...patch, instruction: text, seq })
     }
@@ -276,8 +271,8 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
       if (heading === null) {
         // No compass at all: nothing can be pointed at. Say why, and keep saying it now
         // and then, instead of leaving a blind user with the safety line and silence.
-        const quiet = view.instruction === noCompassLine(L) ? EXPLAINED_QUIET_MS : 0
-        if (now - startedAt >= NO_COMPASS_MS && now - lastSaidAt >= quiet) remind(noCompassLine(L), { relBearingDeg: null, distanceM: null, beaconPitch: undefined })
+        // Said once: it is an event (the compass never came), not a loop.
+        if (now - startedAt >= NO_COMPASS_MS && view.instruction !== noCompassLine(L) && !saidNoCompass) remind(noCompassLine(L), { relBearingDeg: null, distanceM: null, beaconPitch: undefined })
         return
       }
       const st = approach.tick({ headingDeg: heading, steps, nowMs: now })
@@ -334,13 +329,8 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
         ...(view.seq !== undefined ? { seq: view.seq } : {}),
       }
       emit(next)
-      // Nothing said for QUIET_MS: repeat where the door is, or say that it is still
-      // being looked for. Never in `through`: there the job is done and the button waits.
-      if (!lines.length && st.phase !== 'through' && now - lastSaidAt >= QUIET_MS) {
-        if (!aim) remind(searchingLine(L))
-        else if (st.phase === 'threshold' && aim.source !== 'osm-fallback') remind(thresholdLine(L))
-        else remind(aim.source === 'osm-fallback' ? bandText(st.band, L) : `${bandText(st.band, L)} ${metresLine(aim.distanceM, L)}`)
-      }
+      // No periodic repeats (Sami: "stop playing the voice when nothing happens"):
+      // the voice speaks on events only; the beacon carries the rest.
       maybeRequest(st)
     }
 

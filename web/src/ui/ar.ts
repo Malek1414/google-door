@@ -64,7 +64,7 @@ export const FOCAL = VIEW_H / 2 / Math.tan((VFOV_DEG / 2) * (Math.PI / 180))
 /** Assumed pitch before the first orientation event: phone held for walking. */
 export const DEFAULT_BETA = 75
 /** Chevron layout along the path (metres). */
-export const FIRST_M = 3.2
+export const FIRST_M = 4.0
 export const SPACING_M = 1.7
 export const CHEVRONS = 5
 /** Chevron size on the ground (metres): width, tip depth, arm thickness, slab height. */
@@ -75,7 +75,7 @@ export const CHEV_SLAB = 0.1
 /** Forward flow speed of the painted chevrons (metres per second). */
 export const FLOW_MPS = 1.1
 /** Largest bend the path shows: past this the target is "behind", shown as a hard turn. */
-export const MAX_TURN_DEG = 150
+export const MAX_TURN_DEG = 110
 
 const RAD = Math.PI / 180
 const NEAR_M = 0.6
@@ -119,8 +119,16 @@ const smooth = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t))
 
 /** Where the path starts bending and over how many metres: sharper turns bend sooner. */
 function bendFor(turnDeg: number): { start: number; len: number } {
-  const k = Math.min(1, Math.abs(turnDeg) / 120)
-  return { start: 2.6 - 1.0 * k, len: 3.2 - 1.0 * k }
+  // Gentle: a long curve from just ahead. Sharp: straight to a turn point ~4.5 m out,
+  // then a tight painted corner, so the turned chevrons are still inside the camera's
+  // narrow (about 32 degree) horizontal view instead of running off the screen edge.
+  const k = Math.min(1, Math.abs(turnDeg) / 90)
+  return { start: 2.6 + 1.6 * k, len: 3.2 - 2.2 * k }
+}
+
+/** Pure. Chevron spacing along the path: tighter round a sharp corner. */
+export function spacingFor(turnDeg: number): number {
+  return SPACING_M * (1 - 0.4 * Math.min(1, Math.abs(turnDeg) / 90))
 }
 
 export interface PathPose {
@@ -198,8 +206,9 @@ export function groundChevrons(relDeg: number, betaDeg: number | null | undefine
   const out: GroundChevron[] = []
   const f = Math.max(0, Math.min(1, flow))
   for (let i = 0; i <= CHEVRONS; i++) {
-    const sM = FIRST_M + (i - 1 + f) * SPACING_M
-    const alpha = i === 0 ? smooth(f) : i === CHEVRONS ? 1 - smooth(f) : 1
+    const sM = FIRST_M + (i - 1 + f) * spacingFor(turn)
+    // A new chevron appears quickly at the near end; the far one fades out.
+    const alpha = i === 0 ? smooth(f / 0.35) : i === CHEVRONS ? 1 - smooth(f) : 1
     if (alpha < 0.02) continue
     const pose = pathPoint(sM, turn)
     const th = pose.heading * RAD

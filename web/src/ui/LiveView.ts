@@ -253,6 +253,8 @@ export function grabFrame(el: HTMLVideoElement | HTMLImageElement | null): strin
 
 export function LiveView(opts: {
   target: ArrowTarget
+  /** Distinguishable door name from the map (doorName); never "Eingang ohne Namen". */
+  name?: string
   sensors: Sensors
   config: OutputConfig
   onExit: () => void
@@ -265,7 +267,7 @@ export function LiveView(opts: {
   const { target, config: cfg } = opts
   const e = target.entrance
   applyContrast(cfg.contrast)
-  const name = pathDoorName(e)
+  const name = opts.name ?? pathDoorName(e)
 
   // ---- DOM ----
   let mediaEl: HTMLVideoElement | HTMLImageElement | null = null
@@ -355,7 +357,29 @@ export function LiveView(opts: {
   const turnIcon = h('span', { class: 'sr-only' }, '')
   // Said on screen when guidance has no route: the arrow then aims straight at the
   // door, and pretending that is a route is how people get sent into a wall.
-  const noRouteEl = h('p', { class: 'ar-noroute', role: 'status', hidden: true }, '')
+  // The route note: a one-line strip under the top buttons. It folds into a 44 px info
+  // button after NOTE_FOLD_MS so it never sits over the arrow; a tap unfolds it again.
+  const noRouteEl = h('button', { class: 'ar-noroute', type: 'button', hidden: true }, '') as HTMLButtonElement
+  const NOTE_FOLD_MS = 8000
+  let noteTimer = 0
+  const unfoldNote = (fold: boolean) => {
+    clearTimeout(noteTimer)
+    noRouteEl.classList.remove('is-folded')
+    noRouteEl.removeAttribute('aria-label')
+    noRouteEl.setAttribute('aria-expanded', 'true')
+    if (fold)
+      noteTimer = window.setTimeout(() => {
+        if (closed || noRouteEl.hidden) return
+        noRouteEl.classList.add('is-folded')
+        noRouteEl.setAttribute('aria-label', lang === 'de' ? 'Hinweis zur Route anzeigen' : 'Show route note')
+        noRouteEl.setAttribute('aria-expanded', 'false')
+      }, NOTE_FOLD_MS)
+  }
+  noRouteEl.addEventListener('click', () => {
+    if (!noRouteEl.classList.contains('is-folded')) return
+    unfoldNote(!gpsLost)
+    announce(noRouteEl.textContent ?? '')
+  })
 
   const warnEl =
     e.warnings.length > 0
@@ -444,8 +468,10 @@ export function LiveView(opts: {
         noRouteEl.hidden = true
         lastWord = ''
       } else if (!route) {
-        noRouteEl.textContent = `${out.message} ${D.liveNoRoute}`
+        // Short, no technical reason (the key/quota detail helps nobody on the pavement).
+        noRouteEl.textContent = lang === 'de' ? 'Keine Route. Der Pfeil zeigt direkt zum Eingang.' : 'No route. The arrow points straight at the entrance.'
         noRouteEl.hidden = false
+        unfoldNote(true)
         announce(noRouteEl.textContent)
       }
       update()
@@ -695,7 +721,8 @@ export function LiveView(opts: {
     maybeSafety(now)
 
     distEl.textContent = t.metres(dist)
-    accEl.textContent = fix.accuracy !== null ? t.accuracy(fix.accuracy) : ''
+    // Good GPS needs no note; poor GPS is worth reading (fix-live.css: 16 px, 7:1).
+    accEl.textContent = fix.accuracy !== null && fix.accuracy > 10 ? t.accuracy(fix.accuracy) : ''
 
     if (arrived) {
       // Walked away again before leaving: cancel arrival and guide on.
@@ -883,6 +910,7 @@ export function LiveView(opts: {
       noRouteEl.dataset.prev = noRouteEl.hidden ? '' : (noRouteEl.textContent ?? '')
       noRouteEl.textContent = ARR.gpsLost
       noRouteEl.hidden = false
+      unfoldNote(false) // GPS lost stays open until the fix is back
       beacon?.stop()
       beaconOn = false
       sayWait(ARR.gpsLost, now)
@@ -904,6 +932,7 @@ export function LiveView(opts: {
         const prev = noRouteEl.dataset.prev ?? ''
         noRouteEl.textContent = prev
         noRouteEl.hidden = !prev
+        if (prev) unfoldNote(true)
         lastWord = '' // say the direction again right away
         gate.forget() // a deliberate re-say skips the gap and the no-repeat rule
         if (voiceOn()) speak(ARR.gpsBack)
@@ -998,6 +1027,7 @@ export function LiveView(opts: {
   function teardown() {
     if (closed) return
     closed = true
+    clearTimeout(noteTimer)
     document.removeEventListener('visibilitychange', onVisibility)
     clearInterval(gpsWatch)
     clearTimers()

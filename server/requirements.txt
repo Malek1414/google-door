@@ -1,0 +1,9 @@
+# Doorway backend. pip install -r server/requirements.txt
+fastapi
+uvicorn
+httpx
+# GET /api/arcore-token mints ARCore access tokens from a service account (server/arcore.py).
+google-auth
+requests
+# tests
+pytest

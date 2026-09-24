@@ -28,3 +28,36 @@
 .gm-tab-ic .ms { font-size: 26px; }                                /* measured glyph ~22px */
 .gm-tab[aria-current='page'] { color: #e6e1e5; }                   /* measured active label */
 .gm-tab[aria-current='page'] .gm-tab-ic { background: #063c40; color: #a9f8ff; } /* measured pill rgb(6,60,64), icon rgb(169,248,255) */
+
+/* Route preview sheet. Measured off a screen recording of Maps walking directions:
+   one summary line with small round buttons on the right, then a row of actions with
+   only the first one filled. The sheet stops at the height of those two rows. */
+.gm[data-sheet='route'] { --sheet-h: 178px; }
+
+.gm-routehead {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center;
+  column-gap: 12px; padding: 4px 4px 2px;
+}
+.gm-routehead-ic { grid-row: 1 / 3; }
+.gm-routehead-ic .ms { font-size: 28px; color: var(--fg); display: block; }
+.gm-routehead-t { grid-column: 2; margin: 0; font: 500 22px/1.2 'Google Sans Flex', Roboto, sans-serif; color: #fff; }
+.gm-routehead-sub {
+  grid-column: 2; font-size: 14px; color: var(--fg2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.gm-routehead-sub:empty { display: none; }
+.gm-routehead-btns { grid-column: 3; grid-row: 1 / 3; display: flex; gap: 8px; }
+.gm-round-s {
+  width: 40px; height: 40px; flex: none; border: 0; border-radius: 50%;
+  background: var(--round); color: var(--fg); display: grid; place-items: center;
+  cursor: pointer; position: relative;
+}
+.gm-round-s .ms { font-size: 20px; }
+/* 44px touch target without growing the button */
+.gm-round-s::after { content: ''; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); }
+
+.gm-routeactions { display: flex; gap: 10px; padding: 14px 4px 0; overflow-x: auto; scrollbar-width: none; }
+.gm-routeactions::-webkit-scrollbar { display: none; }
+
+.gm-steps { margin: 18px 0 0; padding: 0 0 0 22px; color: var(--fg); }
+.gm-steps li { margin: 0 0 14px; line-height: 1.35; }

@@ -11,7 +11,7 @@ DEST=/opt/doorway
 PORT=8350
 URL=https://doorway.5.45.109.195.sslip.io
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="${REPO:-$HERE/..}"   # checkout that holds server/ and data/ (main)
+REPO="${REPO:-$HERE/..}"   # repo root of this branch (server/ and data/, rebased on main)
 
 cd "$HERE"
 test -f config.js || { echo "missing web/config.js (copy config.example.js)"; exit 1; }

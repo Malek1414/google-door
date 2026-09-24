@@ -68,3 +68,14 @@
   background-size: 200% 100%; animation: pc-shimmer 1.15s linear infinite; }
 @keyframes pc-shimmer { to { background-position: -200% 0 } }
 @media (prefers-reduced-motion: reduce) { .pc-skel-line, .pc-skel-photo { animation: none } }
+
+/* Anrufen pill is a tel: link: no underline, pill colours instead of link colours. */
+.pc-card a.gm-pill { text-decoration: none; color: var(--tonal-ink, #cdeef0); }
+/* meta row: each bit keeps its leading dot, so a wrap never leaves a dot dangling at a line end */
+.pc-meta-bit { white-space: nowrap; }
+/* headings get focus programmatically (tabindex -1) for screen readers; no ring on a non-control */
+.pc-card h2[tabindex='-1']:focus, .pc-list h2[tabindex='-1']:focus { outline: none; }
+
+/* Filter chips above a result list (Google style). */
+.pc-filters { margin: 8px -22px 4px 0; }
+.pc-list .gm-sheet-sub { margin: 4px 0 0; }

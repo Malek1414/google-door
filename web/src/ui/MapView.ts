@@ -116,7 +116,7 @@ export function warningsBlock(e: Entrance): HTMLElement | null {
   return h('div', { class: 'warning', role: 'note' }, ...e.warnings.map((w) => h('p', {}, h('strong', {}, `${t.warningPrefix}: `), t.warning[w] ?? w)))
 }
 
-type SheetState = 'peek' | 'half' | 'full'
+type SheetState = 'peek' | 'route' | 'half' | 'full'
 type Filter = 'stepFree' | 'withSteps' | 'automatic' | 'noRevolving'
 type Tab = 'explore' | 'saved' | 'contribute' | 'business'
 
@@ -192,23 +192,6 @@ export function MapView(opts: {
   const avatar = h('button', { class: 'gm-avatar', type: 'button', 'aria-label': t.profileButton, onclick: opts.onSettings }, 'S')
   const search = h('div', { class: 'gm-search' }, pinLogo(), searchInput, micBtn, lensBtn, avatar)
 
-  const chipDefs: [Filter, string, string][] = [
-    ['stepFree', 'accessible', t.chipStepFree],
-    ['withSteps', 'stairs', t.chipWithSteps],
-    ['automatic', 'door_sliding', t.chipAutomatic],
-    ['noRevolving', 'block', t.chipNoRevolving],
-  ]
-  const accessChips = chipDefs.map(([key, ic, label]) => {
-      const b = h('button', { class: 'gm-chip', type: 'button', 'aria-pressed': String(filters.has(key)) }, icon(ic), label)
-      b.addEventListener('click', () => {
-        if (filters.has(key)) filters.delete(key)
-        else filters.add(key)
-        b.setAttribute('aria-pressed', String(filters.has(key)))
-        renderMarkers()
-        renderSheet()
-      })
-      return b
-    })
   const placeChips = NORMAL_CHIPS.map((c) => {
     const b = h('button', { class: 'gm-chip', type: 'button', 'aria-pressed': 'false', 'data-chip': c.id }, icon(c.icon), lang === 'de' ? c.labelDe : c.labelEn)
     b.addEventListener('click', () => void runCategory(c.id, lang === 'de' ? c.labelDe : c.labelEn))
@@ -224,28 +207,87 @@ export function MapView(opts: {
     renderSheet()
     announce(m === 'access' ? t.modeOn : t.modeOff)
   })
+  const chipDefs: [Filter, string, string][] = [
+    ['stepFree', 'accessible', t.chipStepFree],
+    ['withSteps', 'stairs', t.chipWithSteps],
+    ['automatic', 'door_sliding', t.chipAutomatic],
+    ['noRevolving', 'block', t.chipNoRevolving],
+  ]
+  const accessChips = chipDefs.map(([key, ic, label]) => {
+    const b = h('button', { class: 'gm-chip', type: 'button', 'aria-pressed': String(filters.has(key)) }, icon(ic), label)
+    b.addEventListener('click', () => {
+      if (filters.has(key)) filters.delete(key)
+      else filters.add(key)
+      b.setAttribute('aria-pressed', String(filters.has(key)))
+      renderMarkers()
+      renderSheet()
+    })
+    return b
+  })
   const chips = h('div', { class: 'gm-chips', role: 'group', 'aria-label': t.filterLabel })
   function renderChips() {
+    // Search categories up top like Google, but the accessibility mode chip leads.
+    // Sami's branch moved it into settings to match Maps exactly; kept here instead,
+    // because the toggle between plain Maps and accessibility mode IS the product, and
+    // a setting three taps deep cannot show that. His result-list filters are taken.
     chips.replaceChildren(modeChip, ...(mode === 'access' ? accessChips : placeChips))
     placeChips.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.chip === activePlaceChip)))
   }
   renderChips()
   const morePill = h('button', { class: 'gm-more', type: 'button', hidden: true, onclick: () => closeCard() }, t.moreDoors)
-  // ---- route summary, the strip Maps puts above the sheet once a route is drawn ----
-  const routeBarMain = h('span', { class: 'gm-routebar-main' })
-  const routeBarSub = h('span', { class: 'gm-routebar-sub' })
-  const routeBar = h(
-    'div',
-    { class: 'gm-routebar', hidden: true, role: 'status' },
-    h('span', { class: 'gm-routebar-ic', 'aria-hidden': 'true' }, icon('directions_walk', true)),
-    h('span', { class: 'gm-routebar-text' }, routeBarMain, routeBarSub),
-    h('button', { class: 'gm-routebar-x', type: 'button', 'aria-label': t.clearRoute, onclick: () => clearRoute() }, icon('close')),
-  )
-  function showRouteBar(main: string, sub?: string) {
-    routeBarMain.textContent = main
-    routeBarSub.textContent = sub ?? ''
-    routeBarSub.hidden = !sub
-    routeBar.hidden = false
+  // ---- route preview ----
+  // Measured off a screen recording of Maps walking directions: the summary lives in
+  // the sheet, not in a floating pill. One line of "4 min - 260 m" with round buttons
+  // on the right, then a row of actions, the first of them filled.
+  let routePreview = false
+  let routeTarget: Entrance | null = null
+
+  function showRoutePreview(summary: string, label: string | null, r: Route | null) {
+    routePreview = true
+    morePill.hidden = true
+    const e = routeTarget
+    const g = e ? guidanceFor(e, opts.profile) : null
+    const steps = (r?.steps ?? []).map((st) => st.text?.split('\n')[0]).filter((x): x is string => Boolean(x))
+
+    const action = (cls: string, ic: string, text: string, on: () => void) =>
+      h('button', { class: `gm-pill ${cls}`, type: 'button', onclick: on }, icon(ic, true), text)
+
+    const stepList = h('ol', { class: 'gm-steps', hidden: true }, ...steps.map((x) => h('li', {}, x)))
+
+    sheetBody.replaceChildren(
+      h(
+        'div',
+        { class: 'gm-routehead' },
+        h('span', { class: 'gm-routehead-ic', 'aria-hidden': 'true' }, icon('directions_walk', true)),
+        h('h2', { id: 'sheet-title', class: 'gm-routehead-t' }, summary),
+        h('span', { class: 'gm-routehead-sub' }, label ?? ''),
+        h('div', { class: 'gm-routehead-btns' },
+          h('button', { class: 'gm-round-s', type: 'button', 'aria-label': t.share, onclick: () => e && void share(e) }, icon('ios_share')),
+          h('button', { class: 'gm-round-s', type: 'button', 'aria-label': t.clearRoute, onclick: () => clearRoute() }, icon('close')),
+        ),
+      ),
+      h(
+        'div',
+        { class: 'gm-actions gm-routeactions' },
+        g?.kind === 'arrow' ? action('gm-pill-primary', 'navigation', t.startGuidance, () => void beginGuidance(e!)) : null,
+        steps.length ? action('', 'list', t.steps, () => {
+          stepList.hidden = !stepList.hidden
+          setSheet(stepList.hidden ? 'route' : 'half')
+        }) : null,
+        action('', 'door_front', t.otherDoors, () => closeCard()),
+      ),
+      stepList,
+    )
+    setSheet('route')
+  }
+
+  /** The one gesture that unlocks compass, camera and sound. Must await first. */
+  async function beginGuidance(e: Entrance) {
+    const g = guidanceFor(e, opts.profile)
+    if (g.kind !== 'arrow') return
+    await unlockAll({ camera: true })
+    teardown()
+    opts.onGuide(g.target)
   }
 
   const layersBtn = h('button', { class: 'gm-round gm-layers', type: 'button', 'aria-label': t.layers }, icon('layers'))
@@ -295,7 +337,6 @@ export function MapView(opts: {
     mapEl,
     h('div', { class: 'gm-top' }, search, results, chips, morePill, status),
     layersBtn,
-    routeBar,
     rightCol,
     sheet,
     nav,
@@ -524,7 +565,11 @@ export function MapView(opts: {
     if (tab === 'contribute') return mountPanel(contributePanel)
     if (tab === 'business') return mountPanel(businessPanel)
     if (placeHits.length) {
-      panelCleanup = renderPlaceList(sheetBody, featureCtx, placeHits, placeTitle, (p) => openPlace(p))
+      panelCleanup = renderPlaceList(sheetBody, featureCtx, placeHits, placeTitle, (p) => openPlace(p), (visibleHits) => {
+        // Keep the map pins in step with the list filters.
+        const keep = new Set(visibleHits.map((x) => x.placeId))
+        placeMarkers.forEach((m, i) => m.setVisible(keep.has(placeHits[i]?.placeId ?? '')))
+      })
       return
     }
     if (!showDoorMarkers(mode)) {
@@ -683,8 +728,10 @@ export function MapView(opts: {
     setSheet('peek')
   }
 
+  const ROUTE_BLUE = '#1a73e8'
   let routeCasing: google.maps.Polyline | null = null
   let routeEnd: google.maps.Marker | null = null
+  let routeBadge: google.maps.Marker | null = null
 
   /**
    * Maps draws a walking route as a run of blue dots, never a solid line — the solid
@@ -693,18 +740,20 @@ export function MapView(opts: {
    * the dots cross something bright.
    */
   function walkDots(rough: boolean): google.maps.IconSequence[] {
+    // Measured off a screen recording of Maps walking directions on this phone:
+    // flat blue circles about 6.3 CSS px across, 16 px centre to centre, no ring and
+    // no casing under them. The ring was mine and it read as a different product.
     return [{
       icon: {
         path: google.maps.SymbolPath.CIRCLE,
-        scale: rough ? 3.2 : 4.2,
-        fillColor: rough ? '#9aa0a6' : '#4285f4',
+        scale: rough ? 2.6 : 3.2,
+        fillColor: rough ? '#9aa0a6' : ROUTE_BLUE,
         fillOpacity: 1,
-        strokeColor: rough ? '#16181c' : '#ffffff',
-        strokeOpacity: rough ? 0.55 : 0.95,
-        strokeWeight: rough ? 1 : 1.4,
+        strokeOpacity: 0,
+        strokeWeight: 0,
       },
       offset: '0',
-      repeat: rough ? '13px' : '17px',
+      repeat: rough ? '13px' : '16px',
     }]
   }
 
@@ -712,30 +761,54 @@ export function MapView(opts: {
     routeLine?.setMap(null)
     routeCasing?.setMap(null)
     routeEnd?.setMap(null)
+    routeBadge?.setMap(null)
     routeLine = null
     routeCasing = null
     routeEnd = null
-    routeBar.hidden = true
+    routeBadge = null
+    if (routePreview) {
+      routePreview = false
+      renderSheet()
+      setSheet('peek')
+    }
   }
 
-  /**
-   * The dot the walk ends on, so the line terminates in something instead of stopping
-   * mid-air. Ringed, not filled: the filled blue disc is "you", and two identical discs
-   * at opposite ends of a route is the one thing worse than no marker at all.
-   */
+  /** The red Maps pin at the destination, drawn from the same teardrop Maps uses. */
   function endCap(to: LatLon) {
     routeEnd = new google.maps.Marker({
       map,
       position: { lat: to.lat, lng: to.lon },
-      zIndex: 6,
+      zIndex: 7,
       clickable: false,
       icon: {
-        path: google.maps.SymbolPath.CIRCLE,
-        scale: 6.5,
-        fillColor: '#ffffff',
+        path: 'M 0 0 c -3.1 -5.4 -10.5 -10.4 -10.5 -17.6 a 10.5 10.5 0 1 1 21 0 C 10.5 -10.4 3.1 -5.4 0 0 z',
+        fillColor: '#ea4335',
         fillOpacity: 1,
-        strokeColor: '#1a73e8',
-        strokeWeight: 4,
+        strokeColor: '#b31412',
+        strokeWeight: 0.8,
+        scale: 1.25,
+        anchor: new google.maps.Point(0, 0),
+      },
+    })
+  }
+
+  /** Maps parks the walking time on the line itself, in a blue tab. */
+  function timeBadge(at: LatLon, text: string) {
+    const w = 18 + text.length * 8
+    routeBadge = new google.maps.Marker({
+      map,
+      position: { lat: at.lat, lng: at.lon },
+      zIndex: 8,
+      clickable: false,
+      label: { text, color: '#ffffff', fontSize: '13px', fontWeight: '600', fontFamily: "'Google Sans Flex', Roboto, sans-serif" },
+      icon: {
+        path: `M ${-w / 2} -11 h ${w} a 5 5 0 0 1 5 5 v 12 a 5 5 0 0 1 -5 5 h ${-w} a 5 5 0 0 1 -5 -5 v -12 a 5 5 0 0 1 5 -5 z`,
+        fillColor: ROUTE_BLUE,
+        fillOpacity: 1,
+        strokeOpacity: 0,
+        scale: 1,
+        anchor: new google.maps.Point(0, 0),
+        labelOrigin: new google.maps.Point(0, 0),
       },
     })
   }
@@ -763,34 +836,54 @@ export function MapView(opts: {
       ? r!.path.map(([lat, lng]) => ({ lat, lng }))
       : [{ lat: from.lat, lng: from.lon }, { lat: to.lat, lng: to.lon }]
 
-    if (walked) {
-      routeCasing = new google.maps.Polyline({
-        map, path: coords, strokeColor: '#0a1f44', strokeOpacity: 0.3, strokeWeight: 10, zIndex: 3,
-      })
-    }
+    // Maps draws no casing under walking dots. Neither do we now.
     routeLine = new google.maps.Polyline({
       map, path: coords, strokeOpacity: 0, zIndex: 5, clickable: false, icons: walkDots(!walked),
     })
     endCap(to)
     coords.forEach((c) => bounds.extend(c))
 
+    const mins = walked ? Math.max(1, Math.round(Number(String(r!.duration ?? '0').replace('s', '')) / 60)) : null
+    const metres = walked ? (r!.distanceM ?? 0) : haversineM(from, to)
+    const summary = mins !== null ? `${t.walkMin(mins)} · ${t.metresShort(metres)}` : `${t.roughly} · ${t.metresShort(metres)}`
+    if (mins !== null) timeBadge(midpoint(coords), t.walkMin(mins))
+
+    showRoutePreview(summary, label ?? null, r)
     if (walked) {
-      const mins = Math.max(1, Math.round(Number(String(r!.duration ?? '0').replace('s', '')) / 60))
       const first = r!.steps[0]?.text?.split('\n')[0] ?? ''
-      showRouteBar(`${t.walkMin(mins)} · ${t.metresShort(r!.distanceM ?? 0)}`, label)
-      announce(`${t.metres(r!.distanceM ?? 0)}, ${mins} min. ${label ?? ''} ${first}`.trim())
+      announce(`${t.metres(metres)}, ${mins} min. ${label ?? ''} ${first}`.trim())
     } else {
-      showRouteBar(t.roughly, label ? `${label} · ${t.metresShort(haversineM(from, to))}` : t.metresShort(haversineM(from, to)))
-      announce(`${t.roughly}. ${t.metres(haversineM(from, to))}. ${label ?? ''}`.trim())
+      announce(`${t.roughly}. ${t.metres(metres)}. ${label ?? ''}`.trim())
     }
 
-    map.fitBounds(bounds, { top: 140, bottom: 300, left: 40, right: 40 })
-    setSheet('peek')
+    // Maps fills the map area with the route. Padding clears the search bar above and
+    // the preview sheet below, and nothing more.
+    map.fitBounds(bounds, { top: 118, bottom: 268, left: 36, right: 36 })
     return r
+  }
+
+  /** Halfway along the drawn path, by walked distance — not the midpoint of the bounds. */
+  function midpoint(coords: { lat: number; lng: number }[]): LatLon {
+    if (coords.length < 2) return { lat: coords[0].lat, lon: coords[0].lng }
+    const seg = coords.slice(1).map((c, i) => haversineM({ lat: coords[i].lat, lon: coords[i].lng }, { lat: c.lat, lon: c.lng }))
+    const half = seg.reduce((a, b) => a + b, 0) / 2
+    let run = 0
+    for (let i = 0; i < seg.length; i++) {
+      if (run + seg[i] >= half) {
+        const f = seg[i] === 0 ? 0 : (half - run) / seg[i]
+        return {
+          lat: coords[i].lat + (coords[i + 1].lat - coords[i].lat) * f,
+          lon: coords[i].lng + (coords[i + 1].lng - coords[i].lng) * f,
+        }
+      }
+      run += seg[i]
+    }
+    return { lat: coords[coords.length - 1].lat, lon: coords[coords.length - 1].lng }
   }
 
   /** Door cards still call this with an Entrance. */
   function drawRouteToEntrance(e: Entrance) {
+    routeTarget = e
     void drawRoute({ lat: e.lat, lon: e.lon }, e.name ?? t.unnamedEntrance)
   }
 
@@ -841,14 +934,7 @@ export function MapView(opts: {
     const unknownNearby = entrances.filter((x) => x.id !== e.id && x.tier === 0 && haversineM(x, e) <= NEARBY_UNKNOWN_M).length
     map?.panTo({ lat: e.lat, lng: e.lon })
 
-    const start = async () => {
-      if (g.kind !== 'arrow') return
-      // The Start pill is the one gesture that unlocks compass, camera and sound.
-      // unlockAll must be the first await so iOS still sees the tap.
-      await unlockAll({ camera: true })
-      teardown()
-      opts.onGuide(g.target)
-    }
+    const start = () => beginGuidance(e)
     viewBtn.hidden = g.kind !== 'arrow'
     viewBtn.onclick = () => void start()
 

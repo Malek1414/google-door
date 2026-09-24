@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Approach, AIMED_DEG, LOST_AIM_DEG, THRESHOLD_M, STILL_MS } from '../src/core/approach'
+import { Approach, AIMED_DEG, LOST_AIM_DEG, THRESHOLD_M, STILL_MS, INSIDE_MAX_M } from '../src/core/approach'
 import { MAX_AGE_MS, type Anchor } from '../src/core/anchor'
 
 const anchor = (over: Partial<Anchor> = {}): Anchor => ({
@@ -169,5 +169,52 @@ describe('reaching "through" — the gap PR #5 found', () => {
     a.tick({ headingDeg: 100, steps: 10, nowMs: 1100 })
     a.visionSaysInside()
     expect(a.tick({ headingDeg: 100, steps: 10, nowMs: 1200 }).phase).toBe('through')
+  })
+})
+
+describe('vision "inside" — the signal that ends the mode (Q6, Q7)', () => {
+  // Aimed at the door and 1 m from it: the fixture that reaches `threshold` at once.
+  const atDoor = (over: Partial<Anchor> = {}): Anchor =>
+    anchor({ bearingDeg: 0, headingDeg: 100, distanceM: 1, ts: 1000, ...over })
+
+  it('is refused while the door is still metres away — a lobby seen through glass', () => {
+    const a = new Approach()
+    a.setAnchor(atDoor({ distanceM: INSIDE_MAX_M + 5 }))
+    expect(a.tick({ headingDeg: 100, steps: 0, nowMs: 1000 }).phase).toBe('walking')
+    a.visionSaysInside()
+    expect(a.tick({ headingDeg: 100, steps: 0, nowMs: 1100 }).phase).toBe('walking')
+  })
+
+  it('is accepted on the very first fix, before any tick has run', () => {
+    const a = new Approach()
+    a.setAnchor(atDoor())
+    a.visionSaysInside()
+    expect(a.tick({ headingDeg: 100, steps: 0, nowMs: 1000 }).phase).toBe('through')
+  })
+
+  it('is honoured with no fresh anchor, because that is when vision loses the door', () => {
+    const a = new Approach()
+    a.setAnchor(atDoor())
+    expect(a.tick({ headingDeg: 100, steps: 0, nowMs: 1000 }).phase).toBe('threshold')
+    a.visionSaysInside()
+    // Well past MAX_AGE_MS: the anchor is stale, so tick would otherwise return early.
+    expect(a.tick({ headingDeg: 100, steps: 0, nowMs: 1000 + MAX_AGE_MS * 4 }).phase).toBe('through')
+  })
+
+  it('does not re-propose after "still outside" until the user has walked on', () => {
+    const a = new Approach()
+    a.setAnchor(atDoor())
+    a.tick({ headingDeg: 100, steps: 0, nowMs: 1000 })
+    a.visionSaysInside()
+    expect(a.tick({ headingDeg: 100, steps: 0, nowMs: 1100 }).phase).toBe('through')
+
+    a.stillOutside()
+    a.visionSaysInside() // vision insists one frame later
+    expect(a.tick({ headingDeg: 100, steps: 0, nowMs: 1200 }).phase).not.toBe('through')
+
+    a.setAnchor(atDoor({ ts: 1300, steps: 1 }))
+    a.tick({ headingDeg: 100, steps: 1, nowMs: 1300 }) // a step: something changed
+    a.visionSaysInside()
+    expect(a.tick({ headingDeg: 100, steps: 1, nowMs: 1400 }).phase).toBe('through')
   })
 })

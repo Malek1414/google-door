@@ -1,0 +1,68 @@
+WEBVTT
+Language: de
+
+NOTE
+Untertitel-Gerüst für das Backup-Video. Zeitachse = Drehliste (pitch/shotlist.md),
+Schnitt in Reihenfolge Shot 1 bis 9, Shot 5 mit angenommenen 15 s, Summe 145 s.
+Nach dem Schnitt die Zeiten an das echte Video anpassen.
+Alles in [ECKIGEN KLAMMERN MIT GROSSBUCHSTABEN] ist Platzhalter und muss ersetzt werden.
+Erdins Worte nur wörtlich aus der Aufnahme transkribieren, nie glätten oder erfinden.
+Geräusche in eckigen Klammern klein geschrieben sind echte Untertitel für gehörlose Zuschauer.
+
+shot-1
+00:00:00.000 --> 00:00:07.000
+[Straßengeräusche]
+
+shot-1b
+00:00:07.000 --> 00:00:15.000
+[ERDIN, FALLS ER SPRICHT: WORTLAUT AUS DER AUFNAHME]
+
+shot-2
+00:00:15.000 --> 00:00:25.000
+[Schritte, Erdin bleibt vor den Stufen stehen]
+
+shot-3
+00:00:25.000 --> 00:00:35.000
+[APP-ANSAGE, FALLS VORHANDEN: WORTLAUT AUS DER AUFNAHME]
+
+shot-4
+00:00:35.000 --> 00:00:45.000
+[Pfeil erscheint in der Kameraansicht]
+
+shot-4b
+00:00:45.000 --> 00:00:55.000
+[APP-ANSAGE ZUR RICHTUNG: WORTLAUT AUS DER AUFNAHME]
+
+shot-5
+00:00:55.000 --> 00:01:10.000
+[Pulston, wird schneller]
+
+shot-6
+00:01:10.000 --> 00:01:18.000
+[Pulston sehr schnell]
+
+shot-6b
+00:01:18.000 --> 00:01:25.000
+[ein langer Vibrationsimpuls]
+[APP-ANSAGE BEI ANKUNFT: WORTLAUT AUS DER AUFNAHME]
+
+shot-7
+00:01:25.000 --> 00:01:35.000
+[APP-WARNUNG DREHTÜR: WORTLAUT AUS DER AUFNAHME]
+
+shot-8a
+00:01:35.000 --> 00:01:40.000
+TEAM: Wie ist das für dich normalerweise?
+
+shot-8b
+00:01:40.000 --> 00:01:52.000
+ERDIN: [WORTLAUT AUS DER AUFNAHME]
+
+shot-8c
+00:01:52.000 --> 00:02:05.000
+ERDIN: [WORTLAUT AUS DER AUFNAHME]
+
+shot-9
+00:02:05.000 --> 00:02:25.000
+[Tippen, Tür wird in OpenStreetMap eingetragen]
+[TEAM, FALLS JEMAND SPRICHT: WORTLAUT]

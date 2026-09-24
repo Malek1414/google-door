@@ -82,10 +82,13 @@ const en: typeof de = {
 const L = lang === 'de' ? de : en
 
 const svgUrl = (svg: string) => `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
-// Big yellow step-free pin (same glyph as the map markers), pointed tip marks the door.
+// Step-free pin (same glyph as the map markers), pointed tip marks the door.
+// Blue, not yellow: style.css carries the reason — blue is ISO 7001's wheelchair
+// colour and Material 3's dark primary, and safety-yellow would say "warning"
+// about the one door in the set that is easiest to use.
 const EDIT_PIN = svgUrl(
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 64"><path d="M24 62C24 62 4 38 4 22A20 20 0 0 1 44 22C44 38 24 62 24 62Z" fill="#FFD60A" stroke="#000" stroke-width="3.5" stroke-linejoin="round"/>' +
-    '<g transform="translate(8 6)"><circle cx="15" cy="6.5" r="2.6" fill="#000"/><path d="M14.5 10.5V18H21L24 24.5" fill="none" stroke="#000" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M14.5 14H20" stroke="#000" stroke-width="2.2" stroke-linecap="round"/><path d="M11 14.5A6.5 6.5 0 1 0 20.5 22.5" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="round"/></g></svg>',
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 64"><path d="M24 62C24 62 4 38 4 22A20 20 0 0 1 44 22C44 38 24 62 24 62Z" fill="#1a73e8" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round"/>' +
+    '<g transform="translate(8 6)"><circle cx="15" cy="6.5" r="2.6" fill="#fff"/><path d="M14.5 10.5V18H21L24 24.5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M14.5 14H20" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M11 14.5A6.5 6.5 0 1 0 20.5 22.5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></g></svg>',
 )
 
 const MAX_PHOTO_PX = 800

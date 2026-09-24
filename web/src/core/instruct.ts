@@ -151,6 +151,52 @@ export function metresLine(m: number, lang = 'de'): string {
  * where precision matters, because the last few degrees produce almost no audible
  * change and people stop turning too early.
  */
+/**
+ * Every spoken line in the approach, as a stable clip key. (Q9)
+ *
+ * The screen plays a pre-synthesised clip when one exists and only falls through to
+ * /api/speak when it does not. That matters because the TTS tier allows 100 requests
+ * a day and a single approach speaks a dozen lines: without this the demo runs out of
+ * voice partway through the walk it is meant to show.
+ *
+ * Keys are the contract with the synthesis pipeline. Do not rename one without
+ * regenerating the bank; a missing clip is silent-but-safe (it falls back to the API),
+ * a renamed one is a clip that never plays again.
+ */
+export type ApproachLine =
+  | { kind: 'band'; band: Band }
+  | { kind: 'metres'; m: number }
+  | { kind: 'safety' | 'fallback' | 'unsure' | 'threshold' | 'through' | 'noDirection' }
+
+export function clipKeyFor(line: ApproachLine): string | null {
+  switch (line.kind) {
+    case 'band':
+      return bandClipKey(line.band)
+    case 'metres': {
+      const n = Math.max(0, Math.round(line.m))
+      // Only the bank that exists: 1..10 m. Anything further is spoken live, and by
+      // then the user is not yet in the part of the walk that has to be flawless.
+      return n >= 1 && n <= 10 ? `m_${n}` : null
+    }
+    default:
+      return `approach_${line.kind}`
+  }
+}
+
+/** The whole bank, for the synthesis pipeline to iterate. Keys and their German text. */
+export function approachClipBank(lang = 'de'): { key: string; text: string }[] {
+  const out: { key: string; text: string }[] = [
+    { key: 'approach_safety', text: safetyLine(lang) },
+    { key: 'approach_fallback', text: fallbackLine(lang) },
+    { key: 'approach_unsure', text: unsureLine(lang) },
+    { key: 'approach_threshold', text: thresholdLine(lang) },
+    { key: 'approach_through', text: throughLine(lang) },
+    { key: 'approach_noDirection', text: noDirectionLine(lang) },
+  ]
+  for (let n = 1; n <= 10; n++) out.push({ key: `m_${n}`, text: metresLine(n, lang) })
+  return out
+}
+
 export const PITCH_MIN_HZ = 330
 export const PITCH_MAX_HZ = 740
 

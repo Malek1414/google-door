@@ -40,3 +40,29 @@
 
 /* Arrival card uses the same guidance green. */
 .arrival-head { background: #137333; }
+
+/* Manoeuvre banner: the card Maps puts at the top of a navigation screen.
+   Sits under the round buttons, above everything the camera shows. */
+.ar-man {
+  /* --top belongs to .gm; the AR screen is its own root, so measure from the same
+     safe-area expression .ar-top uses and clear the two round buttons under it. */
+  position: absolute; left: 12px; right: 12px; z-index: 6;
+  top: calc(max(14px, env(safe-area-inset-top)) + 68px);
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 18px; border-radius: 22px;
+  background: rgb(26 28 31 / 0.94);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.45);
+  backdrop-filter: blur(12px);
+}
+.ar-man-ic { font-size: 40px; color: #8ab4f8; flex: none; }
+.ar-man-body { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.ar-man-d { font-size: 15px; font-weight: 500; color: #9aa0a6; }
+/* Two lines, then clip. A walking instruction is a street name and a direction and
+   truncating it to "Auf Heidestrasse nach Sueden Ric..." loses the half that matters. */
+.ar-man-t {
+  font-size: 24px; font-weight: 500; color: #fff;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+/* Large-visuals profile: the banner is the thing a partially-sighted user reads first. */
+.ar.dim .ar-man-t, html[data-contrast='high'] .ar-man-t { font-size: 28px; }

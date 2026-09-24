@@ -63,6 +63,22 @@ def health():
                        "tts": MODEL_TTS, "voice": TTS_VOICE}}
 
 
+@app.get("/api/live-url")
+def live_url():
+    """The public HTTPS address this machine is currently reachable on.
+
+    The tunnel hands out a new subdomain on every reconnect, which leaves the
+    installed iOS app pointing at a dead host. The app asks this over the LAN at
+    launch and follows whatever it says, so a reconnect costs nothing.
+    """
+    try:
+        with open("/tmp/tunnel-url.txt", encoding="utf-8") as fh:
+            url = fh.read().strip()
+    except OSError:
+        url = ""
+    return {"url": url or None}
+
+
 @app.get("/api/entrances")
 def entrances(south: float, west: float, north: float, east: float):
     d = data()

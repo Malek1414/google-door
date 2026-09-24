@@ -1,67 +1,101 @@
 /* The last 10 metres. Mostly listened to, not looked at: almost no chrome.
-   Everything that is shown is huge and high contrast, for low vision. */
+   Everything shown is huge, for low vision — but huge in the Maps shell's own
+   language, not a separate one. Sizes come from BRIEF-APPROACH; colour, type,
+   radius and elevation come from style.css so the screen reads as the same app.
 
-.apr { position: fixed; inset: 0; overflow: hidden; background: #000; color: #fff;
-  font-family: 'Google Sans Flex', Roboto, -apple-system, BlinkMacSystemFont, sans-serif; }
+   Colour rule (style.css): blue means accessibility data, teal is the UI accent.
+   So the direction arrow is blue and the buttons are Maps pills. Yellow is for
+   warnings only, and it appears here as an icon rather than a slab. */
+
+.apr {
+  position: fixed; inset: 0; overflow: hidden; background: #000; color: #e6e1e5;
+  font-family: 'Google Sans Flex', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
+  --apr-teal: #62c4cb; --apr-teal-ink: #00363a; --apr-blue: #4285f4;
+  --apr-surface: #1f2029; --apr-line: #2e2c30; --apr-fg2: #c9c5ca;
+}
 .apr-cam { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 
-.apr-exit { position: absolute; z-index: 5; top: max(14px, env(safe-area-inset-top)); left: 16px;
-  width: 56px; height: 56px; border-radius: 50%; border: 2px solid #fff; display: grid; place-items: center;
-  background: #000; color: #fff; cursor: pointer; }
-.apr-exit .ms { font-size: 30px; }
+/* Same round button as the map and Live View wear. */
+.apr-exit {
+  position: absolute; z-index: 5; top: max(14px, env(safe-area-inset-top)); left: 16px;
+  width: 56px; height: 56px; border-radius: 50%; border: 0; display: grid; place-items: center;
+  background: rgb(32 33 36 / 0.88); color: #e5e5e7; cursor: pointer;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.45);
+}
+.apr-exit .ms { font-size: 28px; }
 
 /* Bottom panel over a dark scrim so the text never sits on a bright facade. */
-.apr-panel { position: absolute; z-index: 4; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column;
-  align-items: stretch; gap: 10px; padding: 48px 16px max(20px, env(safe-area-inset-bottom));
-  background: linear-gradient(to bottom, rgb(0 0 0 / 0), rgb(0 0 0 / 0.82) 22%, #000 60%); }
+.apr-panel {
+  position: absolute; z-index: 4; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column;
+  align-items: stretch; gap: 12px; padding: 48px 16px max(20px, env(safe-area-inset-bottom));
+  background: linear-gradient(to bottom, rgb(0 0 0 / 0), rgb(0 0 0 / 0.82) 22%, #000 60%);
+}
 
-.apr-dir { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 140px; }
+.apr-dir { display: flex; align-items: center; justify-content: center; gap: 14px; min-height: 140px; }
 .apr-dir[hidden] { display: none; }
 .apr-arrow { width: 136px; height: 136px; transform-origin: 50% 50%; flex: none; }
-.apr-arrow path { fill: #ffd60a; stroke: #000; stroke-width: 5; }
-.apr-angle { font-family: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, monospace; font-variant-numeric: tabular-nums;
-  font-size: 56px; font-weight: 700; line-height: 1; min-width: 3ch; }
-.apr-dist { margin: 0; text-align: center; font-family: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, monospace;
-  font-variant-numeric: tabular-nums; font-size: 68px; font-weight: 700; line-height: 1; }
+/* Blue body, white edge — the same read as the Live View chevrons, and legible
+   against any facade the camera happens to be pointing at. */
+.apr-arrow path { fill: var(--apr-blue); stroke: #fff; stroke-width: 4; }
+
+/* Tabular figures without dropping to a monospace face: the numbers stay still
+   while they count down, and the screen keeps one typeface. */
+.apr-angle { font-variant-numeric: tabular-nums; font-size: 52px; font-weight: 500; line-height: 1;
+  min-width: 3ch; color: var(--apr-fg2); }
+.apr-dist { margin: 0; text-align: center; font-variant-numeric: tabular-nums;
+  font-size: 64px; font-weight: 500; line-height: 1; color: #fff; letter-spacing: -0.5px; }
 .apr-dist:empty, .apr-angle:empty { display: none; }
-.apr-instr { margin: 0; text-align: center; font-size: 34px; font-weight: 700; line-height: 1.15; overflow-wrap: anywhere; }
+.apr-instr { margin: 0; text-align: center; font-size: 30px; font-weight: 500; line-height: 1.2;
+  color: #fff; overflow-wrap: anywhere; }
 
 /* Stability guard tripped: the arrow is shown less boldly. Words come from the engine. */
 .apr-unsure .apr-arrow { opacity: 0.55; }
 
-/* Direction from the map, not the camera: always visible while it applies. */
-.apr-src { margin: 0; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 12px;
-  border-radius: 12px; background: #ffd60a; color: #000; font-size: 18px; font-weight: 700; text-align: center; }
+/* Direction from the map, not the camera. A caution chip, not a slab of yellow:
+   the warning colour carries the icon, the surface stays the app's. */
+.apr-src {
+  margin: 0; display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 12px 16px; border-radius: 22px; background: rgb(32 33 36 / 0.92);
+  color: #e8eaed; font-size: 17px; font-weight: 500; text-align: center;
+}
 .apr-src[hidden] { display: none; }
-.apr-src .ms { font-size: 24px; }
+.apr-src .ms { font-size: 22px; color: #fdd663; flex: none; }
 
-/* "Noch draußen" and the arrival-card trigger: ordinary buttons, huge and high contrast. */
-.apr-big, .apr-trigger { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
-  min-height: 72px; padding: 12px 16px; border-radius: 16px; border: 3px solid #000; cursor: pointer;
-  background: #ffd60a; color: #000; font: inherit; font-size: 24px; font-weight: 700; line-height: 1.15; }
+/* "Noch draußen" and the arrival-card trigger: ordinary buttons so VoiceOver's own
+   double-tap works. Maps' filled pill, at the size the brief asks for. */
+.apr-big, .apr-trigger {
+  display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%;
+  min-height: 72px; padding: 12px 20px; border-radius: 28px; border: 0; cursor: pointer;
+  background: var(--apr-teal); color: var(--apr-teal-ink); font: inherit;
+  font-size: 22px; font-weight: 500; line-height: 1.15;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.45);
+}
+.apr-big:active, .apr-trigger:active { background: #4fb0b7; }
 .apr-big[hidden] { display: none; }
-.apr-outside { min-height: 88px; font-size: 30px; }
+.apr-outside { min-height: 88px; font-size: 26px; }
+.apr-trigger .ms, .apr-big .ms { font-size: 28px; color: var(--apr-teal-ink); }
 
 /* The disclaimer stays on screen for the whole approach (read, not only heard). */
-.apr-safety { margin: 0; text-align: center; font-size: 16px; font-weight: 500; line-height: 1.3; color: #e8eaed; }
+.apr-safety { margin: 0; text-align: center; font-size: 15px; font-weight: 400; line-height: 1.35; color: var(--apr-fg2); }
 .apr-safety[hidden] { display: none; }
 
 /* No direction at all: no arrow, the engine's words carry the screen. */
-.apr-nodir .apr-instr { font-size: 30px; }
-.apr-big:focus-visible, .apr-trigger:focus-visible, .apr-exit:focus-visible { outline: 4px solid #fff; outline-offset: 3px; }
-.apr-trigger .ms { font-size: 30px; }
+.apr-nodir .apr-instr { font-size: 28px; }
+.apr-big:focus-visible, .apr-trigger:focus-visible, .apr-exit:focus-visible {
+  outline: 3px solid var(--apr-teal); outline-offset: 3px;
+}
 
-/* Wheelchair verdict: one card, three rows. */
-.apr-status { margin: 0; font-size: 22px; font-weight: 600; text-align: center; }
+/* Wheelchair verdict: one card, three rows. Dark, like every other sheet here. */
+.apr-status { margin: 0; font-size: 20px; font-weight: 500; text-align: center; color: var(--apr-fg2); }
 .apr-status[hidden] { display: none; }
-.apr-card { background: #fff; color: #000; border-radius: 20px; padding: 18px 18px 8px; }
+.apr-card { background: var(--apr-surface); color: #e6e1e5; border-radius: 24px; padding: 20px 20px 10px; }
 .apr-card[hidden] { display: none; }
-.apr-card-title { margin: 0 0 8px; font-size: 26px; }
+.apr-card-title { margin: 0 0 10px; font-size: 24px; font-weight: 500; color: #fff; }
 .apr-rows { margin: 0; display: grid; grid-template-columns: auto 1fr; }
-.apr-rows dt, .apr-rows dd { margin: 0; padding: 12px 0; border-top: 1px solid #c4c7c5; font-size: 26px; line-height: 1.2; }
-.apr-rows dt { font-weight: 500; }
-.apr-rows dd { font-weight: 700; text-align: right; padding-left: 16px; }
+.apr-rows dt, .apr-rows dd { margin: 0; padding: 14px 0; border-top: 1px solid var(--apr-line); font-size: 22px; line-height: 1.25; }
+.apr-rows dt { font-weight: 400; color: var(--apr-fg2); }
+.apr-rows dd { font-weight: 500; text-align: right; padding-left: 16px; color: #fff; }
 .apr-rows dt:first-of-type, .apr-rows dd:first-of-type { border-top: 0; }
-.apr-rows dd.is-unclear { color: #5f6368; font-style: italic; }
+.apr-rows dd.is-unclear { color: #9aa0a6; font-style: italic; font-weight: 400; }
 /* The model's own short note under the rows, only when the verdict is confident. */
-.apr-note { margin: 0; padding: 12px 0 10px; border-top: 1px solid #c4c7c5; font-size: 20px; line-height: 1.3; color: #202124; }
+.apr-note { margin: 0; padding: 14px 0 12px; border-top: 1px solid var(--apr-line); font-size: 17px; line-height: 1.35; color: var(--apr-fg2); }

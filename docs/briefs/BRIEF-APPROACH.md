@@ -35,7 +35,7 @@ design is wrong at that point.
 | `core/anchor.ts` | projects a vision fix forward with compass + steps |
 | `core/stability.ts` | the hallucination guard |
 | `core/instruct.ts` | state → the exact words |
-| `server/approach.py` | `/api/door-fix`, `/api/door-check`, `/api/live-token` |
+| `server/approach.py` | `/api/door-fix`, `/api/door-check` |
 
 **You own:**
 

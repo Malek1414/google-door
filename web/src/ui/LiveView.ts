@@ -7,7 +7,7 @@ import { arrowPulseHz, ARRIVE_M, beaconFor, cuePan, hapticFor, HAPTIC_ARRIVED, O
 import { bearingDeg, haversineM, relativeBearing } from '../core/geo'
 import { distanceKey } from '../core/speech'
 import { HeadingSmoother } from '../core/smooth'
-import { progressAlong, currentStep, type Route } from '../core/route'
+import { progressAlong, stepAhead, type Route } from '../core/route'
 import { fetchRoute } from '../data'
 import { chevronStack, destinationPin, stackTransform, type ArPhase } from './ar'
 import './ar.css'
@@ -163,6 +163,32 @@ function turnGlyph(rel: number): string {
   return 'u_turn_left'
 }
 
+/**
+ * Google's manoeuvre enum to a Material turn glyph. Used in preference to the raw
+ * relative bearing whenever we are on a route: the route knows a left turn is coming,
+ * the compass only knows the door is currently off to the left.
+ */
+function maneuverGlyph(m: string | null): string | null {
+  if (!m) return null
+  const map: Record<string, string> = {
+    DEPART: 'straight',
+    STRAIGHT: 'straight',
+    TURN_LEFT: 'turn_left',
+    TURN_RIGHT: 'turn_right',
+    TURN_SLIGHT_LEFT: 'turn_slight_left',
+    TURN_SLIGHT_RIGHT: 'turn_slight_right',
+    TURN_SHARP_LEFT: 'turn_sharp_left',
+    TURN_SHARP_RIGHT: 'turn_sharp_right',
+    TURN_U_TURN_LEFT: 'u_turn_left',
+    TURN_U_TURN_RIGHT: 'u_turn_right',
+    ROUNDABOUT_LEFT: 'roundabout_left',
+    ROUNDABOUT_RIGHT: 'roundabout_right',
+    FERRY: 'directions_boat',
+    NAME_CHANGE: 'straight',
+  }
+  return map[m] ?? null
+}
+
 function compassWord(deg: number): string {
   return t.compass[Math.round(deg / 45) % 8]
 }
@@ -255,6 +281,20 @@ export function LiveView(opts: {
     h('p', { class: 'ar-safe-s' }, t.arSafeSub ?? 'Achte beim Gehen auf deine Umgebung.'),
   )
 
+  // Manoeuvre banner. Maps puts the next turn at the top of the screen and this app
+  // built it sr-only, so the one element everybody recognises from navigation was
+  // never drawn. aria-hidden: dirEl below is still the element screen readers read,
+  // so adding pixels here changes nothing that is spoken.
+  const manGlyph = h('span', { class: 'ms ar-man-ic', 'aria-hidden': 'true' }, 'straight')
+  const manDist = h('span', { class: 'ar-man-d' }, '')
+  const manText = h('span', { class: 'ar-man-t' }, '')
+  const manBanner = h(
+    'div',
+    { class: 'ar-man', hidden: true, 'aria-hidden': 'true' },
+    manGlyph,
+    h('span', { class: 'ar-man-body' }, manDist, manText),
+  )
+
   const accEl = h('p', { class: 'ar-meta' }, '')
   const lookOut = h('p', { class: 'ar-look-out', 'aria-live': 'polite' }, '')
   const lookBtn = h('button', { class: 'ar-look', type: 'button' }, ms('visibility'), t.look)
@@ -275,6 +315,7 @@ export function LiveView(opts: {
     mediaEl,
     svg,
     h('div', { class: 'ar-top' }, fbBtn, stopBtn),
+    manBanner,
     scanText, scanArt, pill, follow,
     opts.sensors.banner ? h('p', { class: 'banner' }, opts.sensors.banner) : null,
     warnEl,
@@ -374,6 +415,7 @@ export function LiveView(opts: {
     beaconOn = false
     dirEl.textContent = t.arrived
     turnIcon.textContent = 'where_to_vote'
+    manBanner.hidden = true
     stackG.setAttribute('visibility', 'hidden')
     coneG.replaceChildren()
     pinG.setAttribute('visibility', 'hidden')
@@ -514,18 +556,32 @@ export function LiveView(opts: {
 
     if (!hasHeading) {
       dirEl.textContent = t.noCompass
+      manBanner.hidden = true
       stackG.setAttribute('visibility', 'hidden')
       coneG.replaceChildren()
       beacon?.update(beaconFor(dist, 0))
     } else {
-      const step = onRoute && route ? currentStep(dist, route) : null
+      const ahead = onRoute && route ? stepAhead(dist, route) : null
+      const step = ahead?.step ?? null
       const word = step?.text
         ? step.text.split('\n')[0]
         : cone
           ? `${t.roughly}. ${directionWord(rel)}`
           : directionWord(rel)
       dirEl.textContent = word
-      turnIcon.textContent = turnGlyph(rel)
+      const glyph = maneuverGlyph(step?.maneuver ?? null) ?? turnGlyph(rel)
+      turnIcon.textContent = glyph
+      // The banner only claims a manoeuvre while we are actually following a route.
+      // Off route it would be inventing turns, and inventing turns is the one thing
+      // a blind user cannot check.
+      if (ahead && arPhase !== 'approach') {
+        manGlyph.textContent = glyph
+        manDist.textContent = t.inMetres(ahead.toManeuverM)
+        manText.textContent = word
+        manBanner.hidden = false
+      } else {
+        manBanner.hidden = true
+      }
       // Chevrons foreshorten as they swing away, the way an extruded plate would.
       // Attribute rather than CSS transform: the group lives in the SVG user space.
       stackG.setAttribute('transform', stackTransform(rel, 393, 760, pitch))

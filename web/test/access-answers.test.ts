@@ -10,6 +10,7 @@ import {
   normalizeAnswers,
   parseNumber,
   progress,
+  pruneAnswers,
   saveAnswers,
   validate,
   type AccessAnswers,
@@ -173,5 +174,15 @@ describe('store', () => {
     vi.stubGlobal('localStorage', { getItem: () => { throw new Error('blocked') }, setItem: () => { throw new Error('blocked') } })
     expect(loadAnswers('biz/1')).toBeNull()
     expect(saveAnswers('biz/1', 'place', ans())).toBe(false)
+  })
+})
+
+describe('pruneAnswers', () => {
+  it('clears answers that no longer apply, so a hidden step count cannot block "stufenlos Ja"', () => {
+    const a = pruneAnswers(ans({ stepFree: true, stepCount: 3, stepHeightCm: 15, bell: false, bellHeightCm: 100 }))
+    expect(a.stepCount).toBeNull()
+    expect(a.stepHeightCm).toBeNull()
+    expect(a.bellHeightCm).toBeNull()
+    expect(deriveStepFree(a)).toBe(true)
   })
 })

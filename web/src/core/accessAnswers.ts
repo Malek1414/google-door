@@ -217,6 +217,13 @@ function answered(q: Question, a: AccessAnswers): boolean {
   return q.kind === 'text' ? typeof v === 'string' && v.trim() !== '' : v !== null
 }
 
+/** Pure. Answers to questions that no longer apply (e.g. step count after "stufenlos Ja") become empty. */
+export function pruneAnswers(a: AccessAnswers): AccessAnswers {
+  const out = { ...a } as Record<AnswerKey, unknown>
+  for (const q of ALL_QUESTIONS) if (!isApplicable(q, a)) out[q.key] = q.kind === 'text' ? '' : null
+  return out as unknown as AccessAnswers
+}
+
 /** "12 von 30 Angaben": answered questions among those that apply. Pure. */
 export function progress(a: AccessAnswers, questions: Question[] = ALL_QUESTIONS): { done: number; total: number } {
   const live = questions.filter((q) => isApplicable(q, a))

@@ -22,6 +22,8 @@ const dir = (deg: number, m: number, extra: Partial<ApproachView> = {}): Approac
   instruction: `${bandText(bandFor(deg), L)} ${metresLine(m, L)}`,
   source: 'gemini-live',
   unsure: false,
+  // A recognised door, as the real engine reports it (the ground arrows gate on it).
+  confidence: 0.9,
   beaconPitch: pitchFor(deg),
   ...extra,
 })
@@ -37,7 +39,7 @@ export const DEMO_SCRIPT: readonly ApproachView[] = [
   dir(-4, 6),
   dir(3, 4),
   dir(1, 2),
-  { phase: 'threshold', relBearingDeg: 1, distanceM: 1.2, instruction: thresholdLine(L), source: 'gemini-frame', unsure: false },
+  { phase: 'threshold', relBearingDeg: 1, distanceM: 1.2, instruction: thresholdLine(L), source: 'gemini-frame', unsure: false, confidence: 0.9 },
   { phase: 'through', relBearingDeg: null, distanceM: null, instruction: throughLine(L), source: 'gemini-frame', unsure: false },
 ]
 

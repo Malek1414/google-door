@@ -11,6 +11,9 @@ import { CalmWord, isMuted, LineGate, muteButton } from './voiceCalm'
 import { connected, tailLength, instructionLine, maneuverGlyph, nextManeuver, progressAlong, type Route } from '../core/route'
 import { cachedRoute, computeRoute, D } from './Directions'
 import { destinationPin, stackTransform, type ArPhase } from './ar'
+import { GROUND_TEXT, groundOverlay } from './groundArrows'
+import { DoorSpotter, spotsDoor } from './doorSpotter'
+import { apiBase } from '../config'
 import { arrow3d, calibCard, CALIB_TIMEOUT_MS, doorLabel, doorLabelX, etaParts, LV, MINI_H, MINI_W, miniMap, shortDistance, shortName, sketchPath, tiltedDown, turnAroundShown, turnPrompt } from './liveGoogle'
 import './ar.css'
 import { startHeading, startPitch, type Heading } from '../core/heading'
@@ -514,6 +517,42 @@ export function LiveView(opts: {
 
   mount(root)
 
+  // Ground arrows (groundArrows.ts): within SPOT_WITHIN_M of a surveyed demo door the
+  // camera looks for THAT door (/api/door-fix), and once it is recognised blue chevrons
+  // on the pavement lead to it. Before that the 3D arrow guides, with "Suche den Eingang …".
+  const spotter = e.id.startsWith('demo/') && mediaEl ? new DoorSpotter({ fetch: (i, init) => fetch(i, init), now: () => performance.now(), apiBase: apiBase(), doorId: e.id }) : null
+  const ground = groundOverlay({
+    bottom: () => destStrip.getBoundingClientRect().top,
+    onRecognised: () => {
+      vibrate([60])
+      if (voiceOn() && !hidden) speak(GROUND_TEXT.recognised)
+      announce(GROUND_TEXT.recognised)
+    },
+    onState: (st) => {
+      root.dataset.ground = st
+    },
+  })
+  root.insertBefore(ground.el, arrow.el)
+  statusEl.append(ground.chip)
+  /** Feed the ground layer from the spotter; off outside the spotting range. */
+  const pushGround = () => {
+    if (!spotter) return
+    const inRange = !arrived && heading !== null && heading.source !== 'none' && spotsDoor(e, dist)
+    if (inRange && mediaEl && !hidden) spotter.tick(() => grabFrame(mediaEl), heading!.deg)
+    const seen = inRange ? spotter.current(heading!.deg) : null
+    ground.push({
+      // Out of range the layer is off (no chip, no arrows); in range the door's own tier.
+      tier: inRange ? e.tier : null,
+      source: seen?.source ?? null,
+      relBearingDeg: seen?.relBearingDeg ?? null,
+      distanceM: seen?.distanceM ?? null,
+      confidence: seen?.confidence,
+    })
+  }
+  const groundTimer = spotter ? window.setInterval(pushGround, 500) : 0
+  /** Chevrons on the ground carry the direction: the centre arrow and the pin step aside. */
+  const groundOn = () => ground.drawing
+
   // ---- state ----
   let fix: Fix | null = null
   let heading: Heading | null = null
@@ -871,6 +910,7 @@ export function LiveView(opts: {
     if (arPhase === 'guiding' && dist <= APPROACH_PIN_M) setPhase('approach')
     else if (arPhase === 'approach' && dist > APPROACH_PIN_M * 1.3) setPhase('guiding')
     maybeSafety(now)
+    pushGround()
 
     const eta = etaParts(dist, new Date())
     if (distEl.textContent !== eta.sub) distEl.textContent = eta.sub
@@ -959,8 +999,8 @@ export function LiveView(opts: {
       // Never both: the centre shows one thing. The way behind: "Dreh dich um".
       pinShown = centreMark(dist, pinShown) === 'pin'
       turnShown = !pinShown && turnAroundShown(rel, turnShown)
-      setMark(pinShown ? 'pin' : turnShown ? 'turn' : 'arrow')
-      door.set(`${doorLabelName} · ${shortDistance(dist)}`, pinShown ? null : labelX)
+      setMark(groundOn() ? 'none' : pinShown ? 'pin' : turnShown ? 'turn' : 'arrow')
+      door.set(`${doorLabelName} · ${shortDistance(dist)}`, pinShown || groundOn() ? null : labelX)
 
       if (beacon && !gpsLost && !isMuted()) {
         if (!beaconOn) {
@@ -1181,6 +1221,9 @@ export function LiveView(opts: {
     clearTimeout(noteTimer)
     document.removeEventListener('visibilitychange', onVisibility)
     clearInterval(gpsWatch)
+    clearInterval(groundTimer)
+    spotter?.stop()
+    ground.stop()
     clearTimeout(calibTimer)
     clearTimers()
     stopSensors()

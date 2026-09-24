@@ -162,6 +162,8 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     const smoother = new HeadingSmoother({ tau: 0.2, deadbandDeg: 1.5 })
     let steps = 0
     let anchor: Anchor | null = null
+    /** Confidence of the vision fix behind `anchor` (none for a map anchor). */
+    let anchorConfidence: number | undefined
     let inFlight = false
     let lastRequestAt = -Infinity
     /** 429 backoff: no request before this. */
@@ -284,6 +286,7 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
           failures = 0
           saidSearching = false
           anchor = { bearingDeg: fix.bearingDeg, distanceM: fix.distanceM, headingDeg: at.heading, steps: at.steps, ts: at.ts, source: fix.source }
+          anchorConfidence = fix.confidence
           approach.setAnchor(anchor)
         } else {
           miss()
@@ -409,6 +412,7 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
         source: source ?? view.source,
         unsure: guard.hasFallenBack,
         beaconPitch: aim ? pitchFor(aim.relBearingDeg) : undefined,
+        ...(aim && aim.source !== 'osm-fallback' && anchorConfidence !== undefined ? { confidence: anchorConfidence } : {}),
         ...(view.seq !== undefined ? { seq: view.seq } : {}),
       }
       emit(next)

@@ -14,7 +14,7 @@ import { startHeading } from '../core/heading'
 import { metresLine, safetyLine } from '../core/instruct'
 import type { OutputConfig } from '../core/profile'
 import type { Entrance } from '../core/types'
-import { announce, keepScreenOn, session } from '../session'
+import { announce, keepScreenOn, session, vibrate } from '../session'
 import { lang } from '../strings'
 import { engine, engineName, type ApproachMode, type ApproachView, type StartApproach } from './approachPort'
 import { playInstruction, playLine, preloadClips, reportMissingClips, stopLines } from './clips'
@@ -28,6 +28,7 @@ import { isTransient, splitInstruction } from './clips'
 import { isMuted, LineGate, muteButton } from './voiceCalm'
 import './approach.css'
 import { pathDoorName } from './doorName'
+import { GROUND_TEXT, groundOverlay } from './groundArrows'
 
 // Screen chrome only. Everything spoken during guidance comes from the engine
 // (core/instruct.ts); the verdict rows come from doorCheck.verdictRows.
@@ -255,7 +256,26 @@ function GuideScreen(opts: ApproachOpts): () => void {
   const safetyEl = h('p', { class: 'apr-safety', hidden: true }, safetyLine(lang))
   const gpsEl = h('p', { class: 'apr-src apr-gps', hidden: true }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'my_location'), h('span', {}, ''))
   const dirEl = h('div', { class: 'apr-dir' }, arrow, angleEl)
-  root.append(h('div', { class: 'apr-panel' }, dirEl, distEl, instrEl, srcEl, gpsEl, outsideBtn, safetyEl))
+  const panel = h('div', { class: 'apr-panel' })
+  // Ground arrows: blue chevrons on the pavement once the camera has recognised the
+  // door (groundArrows.ts). Before that the big arrow guides and the chip says it looks.
+  const ground = groundOverlay({
+    bottom: () => panel.getBoundingClientRect().top,
+    onRecognised: () => {
+      vibrate([60])
+      if (opts.config.speak && !isMuted() && !hidden) playLine(GROUND_TEXT.recognised, null, { lang })
+      announce(GROUND_TEXT.recognised)
+    },
+    onState: (st, drawing) => {
+      root.dataset.ground = st
+      // On the pavement the chevrons carry the direction; the big arrow steps aside.
+      // A recognised door out of frame draws nothing, so the big arrow stays then.
+      root.classList.toggle('apr-ground-live', drawing)
+    },
+  })
+  panel.append(ground.chip, dirEl, distEl, instrEl, srcEl, gpsEl, outsideBtn, safetyEl)
+  root.insertBefore(ground.el, root.querySelector('.apr-exit'))
+  root.append(panel)
   mount(root)
 
   const narrator = new Narrator(lang, new LineGate())
@@ -278,6 +298,14 @@ function GuideScreen(opts: ApproachOpts): () => void {
   let hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden'
   const render = (v: ApproachView) => {
     current = v
+    ground.push({
+      tier: opts.door.tier,
+      source: v.source,
+      relBearingDeg: v.relBearingDeg,
+      distanceM: v.distanceM,
+      confidence: v.confidence,
+      done: v.phase === 'through',
+    })
     const lay = guideLayout(v)
     const enteringThrough = lay.outsideButton && outsideBtn.hidden
     root.dataset.phase = v.phase
@@ -412,6 +440,7 @@ function GuideScreen(opts: ApproachOpts): () => void {
     clearTimeout(throughTimer)
     unsubscribe()
     run.stop()
+    ground.stop()
     stopFixes()
     stopHeading.forEach((f) => f())
     beacon?.stop()

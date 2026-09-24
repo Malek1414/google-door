@@ -51,6 +51,9 @@ export interface ApproachView {
   unsure: boolean
   /** Beacon pitch in Hz. undefined: beacon silent. The engine owns the curve. */
   beaconPitch?: number
+  /** Confidence of the vision fix behind relBearingDeg (the ground arrows gate on it).
+   *  undefined: no vision fix (none yet, or the direction is the map's). */
+  confidence?: number
   /** Bumped when the same instruction must be said again (a reminder after silence).
    *  undefined until the first reminder. */
   seq?: number

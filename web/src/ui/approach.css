@@ -107,3 +107,7 @@
 @media (prefers-reduced-motion: reduce) {
   .apr-arrow { transition: none; }
 }
+
+/* Ground arrows are on (groundArrows.ts): the chevrons on the pavement carry the
+   direction, so the big arrow gives the camera picture its room back. */
+.apr-ground-live .apr-dir { display: none; }

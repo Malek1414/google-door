@@ -13,7 +13,7 @@ This file is the channel; PR comments are only a mirror.
   `closed` with the commit that implemented it, and moved to *Closed*.
 - Never delete a question; the history is the point.
 
-Last updated: 2026-09-24 13:23, by Sami's agent: ElevenLabs voice for all lines pushed; Q15-Q17 open.
+Last updated: 2026-09-24 14:48, by Sami's agent: business accessibility questionnaire pushed; Q15-Q17 open.
 
 ---
 

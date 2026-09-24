@@ -3,6 +3,7 @@
 // stream (core/position.ts watchFixes, injectable); progress maths is core/navProgress.ts.
 
 import { mapsKey } from '../config'
+import { loadMaps } from './MapView'
 import { instructionLine, maneuverGlyph, type Route } from '../core/route'
 import { progress, splitPath, type NavFix, type NavState } from '../core/navProgress'
 import { watchFixes } from '../core/position'
@@ -39,34 +40,11 @@ const T = {
   toward: 'Richtung',
 }
 
-/** Reuse the page's Maps script (MapView loads it); only load it if nothing did. */
+/** Reuse the page's one Maps script load (MapView.loadMaps); it only loads if nothing did. */
 function mapsReady(): Promise<void> {
   if (window.google?.maps?.Map) return Promise.resolve()
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>('script[src*="maps.googleapis.com/maps/api/js"]')
-    if (!existing) {
-      const key = mapsKey()
-      if (!key) return reject(new Error('no maps key'))
-      const cb = '__doorwayNavMapsReady'
-      ;(window as unknown as Record<string, () => void>)[cb] = () => resolve()
-      const sc = document.createElement('script')
-      sc.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&language=de&callback=${cb}`
-      sc.async = true
-      sc.onerror = () => reject(new Error('maps failed to load'))
-      document.head.append(sc)
-      return
-    }
-    const t0 = Date.now()
-    const poll = setInterval(() => {
-      if (window.google?.maps?.Map) {
-        clearInterval(poll)
-        resolve()
-      } else if (Date.now() - t0 > 15000) {
-        clearInterval(poll)
-        reject(new Error('maps timeout'))
-      }
-    }, 100)
-  })
+  const key = mapsKey()
+  return key ? loadMaps(key) : Promise.reject(new Error('no maps key'))
 }
 
 export function formatNavDistance(m: number): string {

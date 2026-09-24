@@ -93,7 +93,8 @@ let mapsLoading: Promise<void> | null = null
  * here and handed to the next MapView; teardown removes everything a view put on it.
  */
 let sharedMap: { el: HTMLElement; map: google.maps.Map } | null = null
-function loadMaps(key: string): Promise<void> {
+/** The one Maps script load for the page; NavMode reuses it. */
+export function loadMaps(key: string): Promise<void> {
   if (window.google?.maps) return Promise.resolve()
   mapsLoading ??= new Promise<void>((resolve, reject) => {
     const cb = '__doorwayMapsReady'

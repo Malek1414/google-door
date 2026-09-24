@@ -137,6 +137,12 @@ function showLive(target: ArrowTarget, p: Profile, name?: string) {
         closed = true
         closeSheet?.()
         closeNav()
+        // A step sentence still being said must not run on into the next screen.
+        try {
+          window.speechSynthesis?.cancel()
+        } catch {
+          /* no speech engine */
+        }
       }
       const open = (route: Route) => {
         closeNav = openNav({

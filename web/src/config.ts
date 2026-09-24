@@ -8,6 +8,8 @@
 export interface RuntimeConfig {
   apiBase?: string
   mapsKey?: string
+  /** A vector Map ID from Google Cloud (Map Management). Rotation and tilt need one. */
+  mapId?: string
 }
 
 declare global {
@@ -24,6 +26,12 @@ export function apiBase(): string {
 export function mapsKey(): string | null {
   const k = window.DOORWAY_CONFIG?.mapsKey
   return typeof k === 'string' && k.trim() ? k.trim() : null
+}
+
+/** Vector map ID. Falls back to Google's DEMO_MAP_ID, which is vector and needs no setup. */
+export function mapId(): string {
+  const k = window.DOORWAY_CONFIG?.mapId
+  return typeof k === 'string' && k.trim() ? k.trim() : 'DEMO_MAP_ID'
 }
 
 export interface Params {

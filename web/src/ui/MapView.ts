@@ -17,7 +17,7 @@ import { computeRoute, D, formatDistance, routeSubline, startBlockedReason, step
 import { outputFor, type Profile } from '../core/profile'
 import { guidanceFor, markerKind, type ArrowTarget } from '../core/target'
 import type { Building, Entrance } from '../core/types'
-import { mapsKey } from '../config'
+import { mapId, mapsKey } from '../config'
 import { bboxAround, fetchEntrances, fetchLived, findEntrance, type BBox } from '../data'
 import { announce, primeSpeech, speak } from '../session'
 import { unlockAll } from './Start'
@@ -1800,7 +1800,19 @@ export function MapView(opts: {
           disableDefaultUI: true,
           keyboardShortcuts: true,
           mapTypeId: 'hybrid',
+          // Two-finger twist rotates, two-finger vertical drag tilts, pinch zooms smoothly, as
+          // in Google Maps. A raster map can do none of that; a vector map (it needs a map ID)
+          // can, and the current API draws hybrid/satellite imagery on it too.
+          mapId: mapId(),
+          renderingType: google.maps.RenderingType.VECTOR,
+          headingInteractionEnabled: true,
+          tiltInteractionEnabled: true,
+          isFractionalZoomEnabled: true,
         })
+        // iOS WebKit turns two fingers into its own page zoom (kept for low vision
+        // elsewhere); on the map the two fingers belong to the map. Once per element.
+        for (const ev of ['gesturestart', 'gesturechange', 'gestureend'])
+          mapEl.addEventListener(ev, (e) => e.preventDefault(), { passive: false })
         sharedMap = { el: mapEl, map }
         drawMe()
         resumeNav()

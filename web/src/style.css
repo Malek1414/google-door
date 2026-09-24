@@ -153,7 +153,7 @@ blockquote footer { color: var(--muted); font-size: 1rem; }
 /* The sheet heading is tabindex=-1: it only ever gets focus from script, to move the
    screen reader. Focus it silently — a ring around a title nobody tabbed to is noise. */
 .gm h2:focus, .gm h2:focus-visible { outline: none; }
-.gm-map { position: absolute; inset: 0; }
+.gm-map { position: absolute; inset: 0; touch-action: none; } /* two fingers rotate/tilt the map, not zoom the page */
 .gm-map > .hint { position: absolute; top: 40%; left: 16px; right: 16px; text-align: center; color: var(--fg2); }
 
 /* search bar: 50 high, 14 from the edges, radius 25 */

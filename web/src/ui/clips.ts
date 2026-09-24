@@ -15,7 +15,8 @@
 
 import { approachClipBank, bandClipKey, bandText, clipKeyFor, type Band } from '../core/instruct'
 import { session } from '../session'
-import { stopSpeech } from '../core/speech'
+import { isServerVoiceFirst, stopSpeech } from '../core/speech'
+import { apiBase } from '../config'
 
 export interface SpokenPart {
   text: string
@@ -236,9 +237,45 @@ export function speakOnDevice(text: string, lang: string): Promise<void> {
   })
 }
 
+/** The server's premium voice (ElevenLabs via /api/speak); the device voice if it fails. */
+async function speakViaServer(text: string, lang: string): Promise<void> {
+  const ctx = session.audio
+  if (!ctx || ctx.state !== 'running') return speakOnDevice(text, lang)
+  const abort = new AbortController()
+  const t = setTimeout(() => abort.abort(), 4000)
+  try {
+    const r = await fetch(`${apiBase()}/api/speak`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, lang: langKey(lang) }),
+      signal: abort.signal,
+    })
+    if (!r.ok) return speakOnDevice(text, lang)
+    const buf = await ctx.decodeAudioData(await r.arrayBuffer())
+    const src = ctx.createBufferSource()
+    src.buffer = buf
+    src.connect(ctx.destination)
+    sounding.add(src)
+    await new Promise<void>((done) => {
+      const cap = setTimeout(done, buf.duration * 1000 + 500)
+      src.onended = () => {
+        clearTimeout(cap)
+        done()
+      }
+      src.start()
+    })
+    sounding.delete(src)
+  } catch {
+    return speakOnDevice(text, lang)
+  } finally {
+    clearTimeout(t)
+  }
+}
+
 function browserDeps(lang: string): ClipDeps {
   return {
     hasClip(key) {
+      if (isServerVoiceFirst()) return false // one voice: the server's
       const m = loaded.get(langKey(lang))
       if (m === undefined) return undefined
       return !!m?.clips[key] && !!session.audio
@@ -283,7 +320,7 @@ function browserDeps(lang: string): ClipDeps {
     // Every part without a clip is spoken on the device, never via /api/speak: that is
     // slow (the server retries 429 for up to a minute), capped at 100 a day and silent
     // without signal. (Q9 follow-up)
-    speakLive: (text) => speakOnDevice(text, lang),
+    speakLive: (text) => (isServerVoiceFirst() ? speakViaServer(text, lang) : speakOnDevice(text, lang)),
     stop() {
       for (const src of sounding) {
         try {

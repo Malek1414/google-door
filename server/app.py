@@ -129,7 +129,8 @@ def health():
             "maps": deps["routes"]["ok"] and deps["maps"]["key"],
             "deps": deps,
             "models": {"look": MODEL_LOOK, "lived": MODEL_LIVED,
-                       "tts": MODEL_TTS, "voice": TTS_VOICE}}
+                       "tts": MODEL_TTS, "voice": TTS_VOICE,
+                       "speakProvider": "elevenlabs" if ELEVEN_KEY else "gemini"}}
 
 
 @app.get("/api/live-url")

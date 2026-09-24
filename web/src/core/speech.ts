@@ -106,6 +106,19 @@ export function distanceKey(m: number): ClipKey | null {
   return Math.abs(step - m) <= 12 ? `dist_${step}` : null
 }
 
+/**
+ * When the server has a premium voice (ElevenLabs), every line goes to /api/speak first
+ * so the app speaks with ONE voice; cached clips and the device voice stay as fallbacks.
+ */
+let serverVoiceFirst = false
+export function setServerVoiceFirst(on: boolean): void {
+  serverVoiceFirst = on
+  if (on) apiDownUntil = 0
+}
+export function isServerVoiceFirst(): boolean {
+  return serverVoiceFirst
+}
+
 export type SpeechTier = 'clip' | 'api' | 'synth' | 'failed'
 
 /**
@@ -115,7 +128,7 @@ export type SpeechTier = 'clip' | 'api' | 'synth' | 'failed'
  */
 export async function say(key: ClipKey | null, text: string, apiBase = '', opts: { apiTimeoutMs?: number } = {}): Promise<SpeechTier> {
   const gen = ++sayGen
-  if (key) {
+  if (key && !serverVoiceFirst) {
     try {
       const buf = await load(key)
       if (buf) {
@@ -128,7 +141,7 @@ export async function say(key: ClipKey | null, text: string, apiBase = '', opts:
   }
   const apiDown = Date.now() < apiDownUntil
   const abort = apiDown || typeof AbortController === 'undefined' ? null : new AbortController()
-  const timer = abort ? setTimeout(() => abort.abort(), opts.apiTimeoutMs ?? API_SPEAK_TIMEOUT_MS) : null
+  const timer = abort ? setTimeout(() => abort.abort(), opts.apiTimeoutMs ?? (serverVoiceFirst ? 4000 : API_SPEAK_TIMEOUT_MS)) : null
   if (!apiDown) try {
     const r = await fetch(`${apiBase}/api/speak`, {
       method: 'POST',
@@ -143,7 +156,7 @@ export async function say(key: ClipKey | null, text: string, apiBase = '', opts:
       play(buf)
       return 'api'
     }
-    if (!r.ok) apiDownUntil = Date.now() + API_SPEAK_BACKOFF_MS
+    if (!r.ok) apiDownUntil = Date.now() + (serverVoiceFirst ? 30_000 : API_SPEAK_BACKOFF_MS)
   } catch {
     /* timeout, offline, quota: fall through */
     apiDownUntil = Date.now() + API_SPEAK_BACKOFF_MS

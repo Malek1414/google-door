@@ -1,7 +1,14 @@
 import './style.css'
 import { outputFor, type Profile } from './core/profile'
 import { arrowTargetFor, type ArrowTarget } from './core/target'
-import { readParams } from './config'
+import { apiBase, readParams } from './config'
+import { setServerVoiceFirst } from './core/speech'
+
+// One voice everywhere: if the server has ElevenLabs, every spoken line uses it.
+void fetch(`${apiBase()}/api/health`)
+  .then((r) => (r.ok ? r.json() : null))
+  .then((j: { models?: { speakProvider?: string } } | null) => setServerVoiceFirst(j?.models?.speakProvider === 'elevenlabs'))
+  .catch(() => {})
 import { findEntrance } from './data'
 import { announce, loadProfile, output, session, speak } from './session'
 import { demoWalkTrack, loadTrack, Recorder, replaySensors, type TrackPoint } from './sim/replay'

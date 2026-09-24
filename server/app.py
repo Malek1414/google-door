@@ -8,7 +8,8 @@ bundle. Everything else the app needs is a static file.
     pip install fastapi uvicorn httpx
     GEMINI_API_KEY=... MAPS_API_KEY=... uvicorn server.app:app --port 8080
 """
-import json, os, re
+import json, logging, os, re
+import httpx
 from collections import OrderedDict
 from typing import Optional
 from fastapi import FastAPI, HTTPException
@@ -60,6 +61,11 @@ MODEL_LIVED = os.environ.get("GEMINI_MODEL_LIVED", "gemini-3.8-flash")
 #           is only for text that could not be known in advance.
 MODEL_TTS   = os.environ.get("GEMINI_MODEL_TTS",   "gemini-3.1-flash-tts-preview")
 TTS_VOICE   = os.environ.get("GEMINI_TTS_VOICE",   "Kore")
+# Optional ElevenLabs voice for /api/speak (key only from env, never logged).
+ELEVEN_KEY   = os.environ.get("ELEVENLABS_API_KEY", "")
+ELEVEN_VOICE = os.environ.get("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
+ELEVEN_MODEL = os.environ.get("ELEVENLABS_MODEL", "eleven_flash_v2_5")
+log = logging.getLogger("doorway")
 
 app = FastAPI(title="Doorway")
 from server import upstream
@@ -316,10 +322,36 @@ async def speak(req: SpeakReq):
     the client MUST fall back to browser speechSynthesis — a blind user is never left
     in silence because a request timed out.
     """
-    upstream.require("gemini")
     if len(req.text) > 400:
         raise HTTPException(413, "text too long for the walking loop")
 
+    # ElevenLabs first when a key is configured: better German voice, no 100/day cap.
+    # Any failure falls through to Gemini TTS below.
+    if ELEVEN_KEY:
+        ekey = f"eleven|{ELEVEN_VOICE}|{req.lang}|{req.text}"
+        hit = _SPEAK_CACHE.get(ekey)
+        if hit is not None:
+            _SPEAK_CACHE.move_to_end(ekey)
+            return Response(content=hit, media_type="audio/mpeg",
+                            headers={"Cache-Control": "public, max-age=86400"})
+        try:
+            async with httpx.AsyncClient(timeout=15) as c:
+                er = await c.post(
+                    f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVEN_VOICE}",
+                    headers={"xi-api-key": ELEVEN_KEY, "Accept": "audio/mpeg"},
+                    json={"text": req.text, "model_id": ELEVEN_MODEL,
+                          "language_code": "de" if req.lang.startswith("de") else "en"})
+            if er.status_code == 200 and er.content:
+                _SPEAK_CACHE[ekey] = er.content
+                if len(_SPEAK_CACHE) > _SPEAK_CACHE_MAX:
+                    _SPEAK_CACHE.popitem(last=False)
+                return Response(content=er.content, media_type="audio/mpeg",
+                                headers={"Cache-Control": "public, max-age=86400"})
+            log.warning("elevenlabs tts %s, falling back to gemini", er.status_code)
+        except httpx.HTTPError as ex:
+            log.warning("elevenlabs tts failed (%s), falling back to gemini", type(ex).__name__)
+
+    upstream.require("gemini")
     body = {"contents": [{"parts": [{"text": req.text}]}],
             "generationConfig": {
                 "responseModalities": ["AUDIO"],

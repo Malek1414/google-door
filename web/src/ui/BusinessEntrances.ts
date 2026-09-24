@@ -16,6 +16,7 @@ import type { DoorType } from '../core/types'
 import { lang } from '../strings'
 import type { FeatureCtx } from './ctx'
 import { h } from './dom'
+import { doorName } from './doorName'
 import { openEntranceEditor } from './EntranceEditor'
 
 const de = {
@@ -23,7 +24,6 @@ const de = {
   back: 'Zurück',
   empty: 'Noch keine Eingänge eingetragen.',
   add: 'Eingang hinzufügen',
-  unnamed: 'Eingang ohne Namen',
   main: 'Haupteingang',
   stepFree: 'Stufenlos',
   steps: 'Mit Stufen',
@@ -53,7 +53,6 @@ const en: typeof de = {
   back: 'Back',
   empty: 'No entrances added yet.',
   add: 'Add entrance',
-  unnamed: 'Unnamed entrance',
   main: 'Main entrance',
   stepFree: 'Step-free',
   steps: 'Has steps',
@@ -225,7 +224,7 @@ export function openEntrancesManager(el: HTMLElement, ctx: FeatureCtx, businessI
         h(
           'div',
           { class: 'bem-text' },
-          h('h3', { class: 'bem-title', id: titleId }, e.name ?? L.unnamed, isMain ? h('span', { class: 'bem-main' }, L.main) : null),
+          h('h3', { class: 'bem-title', id: titleId }, doorName(e, ctx.origin(), ctx.buildings()), isMain ? h('span', { class: 'bem-main' }, L.main) : null),
           h('p', { class: 'bem-meta' }, h('span', { class: `bem-verdict ${vClass}` }, verdict), h('span', {}, door)),
         ),
       ),
@@ -238,8 +237,9 @@ export function openEntrancesManager(el: HTMLElement, ctx: FeatureCtx, businessI
     const list = entrancesOf(businessId)
     const headId = 'sheet-title'
     const root = h(
-      'section',
-      { class: 'bem', 'aria-labelledby': headId },
+      // No own region name: the sheet region is already named by #sheet-title (axe landmark-unique).
+      'div',
+      { class: 'bem' },
       h(
         'div',
         { class: 'bem-top' },

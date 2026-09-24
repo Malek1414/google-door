@@ -1,7 +1,7 @@
 /* "Gesammelte Daten" in the "Unternehmen" tab. Reuses gm-* tokens (sheet, teal, tonal, nav). */
 .bd { display: flex; flex-direction: column; padding-bottom: 28px; }
 .bd-top { display: flex; align-items: center; gap: 8px; min-height: 56px; }
-.bd-back { width: 44px; height: 44px; flex: none; }
+.bd .bd-back { width: 44px; height: 44px; min-width: 44px; flex: none; }
 .bd-title { flex: 1; min-width: 0; margin: 0; font: 400 21px/1.25 'Google Sans Flex', Roboto, sans-serif; color: var(--fg); }
 .bd-title:focus { outline: none; }
 .bd-intro { margin: 4px 0 0; font-size: 15px; line-height: 1.45; color: var(--fg2); }

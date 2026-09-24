@@ -118,6 +118,11 @@ export const en = {
 
   // Detail sheet
   unnamedEntrance: 'Unnamed entrance',
+  // Names for doors without a name: kind plus where it is, so rows can be told apart.
+  doorKind: { main: 'Main entrance', secondary: 'Side entrance', emergency: 'Emergency exit', exit: 'Exit', any: 'Entrance' },
+  doorSide: ['north side', 'north-east side', 'east side', 'south-east side', 'south side', 'south-west side', 'west side', 'north-west side'],
+  doorAtBuilding: (kind: string, side: string, building: string) => `${kind}, ${side}, ${building}`,
+  doorToward: (kind: string, dir: string) => `${kind} to the ${dir}`,
   stepFreeYes: 'Step-free',
   stepFreeNo: 'Not step-free',
   stepFreeUnknown: 'Step-free access unknown',
@@ -323,6 +328,10 @@ export const de: Strings = {
   ],
 
   unnamedEntrance: 'Eingang ohne Namen',
+  doorKind: { main: 'Haupteingang', secondary: 'Nebeneingang', emergency: 'Notausgang', exit: 'Ausgang', any: 'Eingang' },
+  doorSide: ['Nordseite', 'Nordostseite', 'Ostseite', 'Südostseite', 'Südseite', 'Südwestseite', 'Westseite', 'Nordwestseite'],
+  doorAtBuilding: (kind: string, side: string, building: string) => `${kind} ${building}, ${side}`,
+  doorToward: (kind: string, dir: string) => `${kind} Richtung ${dir}`,
   stepFreeYes: 'Stufenlos',
   stepFreeNo: 'Nicht stufenlos',
   stepFreeUnknown: 'Stufenlos unbekannt',

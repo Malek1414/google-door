@@ -19,6 +19,7 @@ import {
 import type { DoorType, Entrance } from '../core/types'
 import type { FeatureCtx } from './ctx'
 import { h } from './dom'
+import { doorName } from './doorName'
 
 /** Same key as the device business list in Business.ts. */
 const BUSINESSES_KEY = 'doorway.businesses'
@@ -48,11 +49,10 @@ const L = {
   access: 'Barrierefreiheit',
   entrances: 'Eingänge',
   entrancesEmpty: 'Noch keine Eingänge eingetragen.',
-  unnamed: 'Eingang ohne Namen',
   byYou: 'Von dir eingetragen',
   e: {
     position: 'Position', stepFree: 'Stufenlos', door: 'Türart', automatic: 'Öffnet automatisch', bell: 'Klingel',
-    width: 'Türbreite', distance: 'Entfernung', tactile: 'Taktile Hinweise', ramp: 'Rampe', note: 'Notiz', created: 'Eingetragen am',
+    width: 'Türbreite', distance: 'Entfernung', tactile: 'Tastbare Hinweise', ramp: 'Rampe', note: 'Notiz', created: 'Eingetragen am',
   },
   door: { no: 'Keine Tür', hinged: 'Flügeltür', sliding: 'Schiebetür', revolving: 'Karusselltür', yes: 'Tür' } as Record<DoorType, string>,
   photoAlt: (n: string) => `Foto: ${n}`,
@@ -246,7 +246,7 @@ export function openBusinessData(el: HTMLElement, ctx: FeatureCtx, businessId: s
 
   function entranceCard(e: SurveyEntrance): HTMLElement {
     const x = e as SurveyEntrance & Extra
-    const name = e.name ?? L.unnamed
+    const name = doorName(e, ctx.origin(), ctx.buildings())
     const note = e.note ?? e.description ?? ''
     return h('li', { class: 'bd-card' },
       h('div', { class: 'bd-card-head' },
@@ -278,7 +278,7 @@ export function openBusinessData(el: HTMLElement, ctx: FeatureCtx, businessId: s
     const items = [
       ...d.community.map((c) => h('li', { class: 'bd-card' },
         h('div', { class: 'bd-card-text' },
-          h('h4', { class: 'bd-card-title' }, c.entry.name ?? L.unnamed),
+          h('h4', { class: 'bd-card-title' }, doorName(c.entry, ctx.origin(), ctx.buildings())),
           h('p', { class: 'bd-src' }, `${L.fromCommunity}, ${L.unconfirmed}`),
         ),
         h('dl', { class: 'bd-dl' },
@@ -290,7 +290,7 @@ export function openBusinessData(el: HTMLElement, ctx: FeatureCtx, businessId: s
       )),
       ...d.nearby.map((n) => h('li', { class: 'bd-card' },
         h('div', { class: 'bd-card-text' },
-          h('h4', { class: 'bd-card-title' }, n.entrance.name ?? L.unnamed),
+          h('h4', { class: 'bd-card-title' }, doorName(n.entrance, ctx.origin(), ctx.buildings())),
           h('p', { class: 'bd-src' }, n.entrance.source === 'places' ? L.fromPlaces : L.fromOsm),
         ),
         h('dl', { class: 'bd-dl' },
@@ -340,7 +340,8 @@ export function openBusinessData(el: HTMLElement, ctx: FeatureCtx, businessId: s
           h('button', { class: 'gm-pill bd-wide bd-del', id: `${id}-del`, type: 'button', onclick: () => { confirming = true; render(`${id}-yes`) } }, icon('delete'), L.del),
         )
 
-    const root = h('section', { class: 'bd', 'aria-labelledby': headId },
+    // No own region name: the sheet region is already named by #sheet-title (axe landmark-unique).
+    const root = h('div', { class: 'bd' },
       h('div', { class: 'bd-top' },
         h('button', { class: 'gm-circle bd-back', type: 'button', 'aria-label': L.back, onclick: leave }, icon('arrow_back')),
         h('h2', { class: 'bd-title', id: headId, tabindex: '-1' }, L.title),

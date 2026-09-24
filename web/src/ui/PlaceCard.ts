@@ -282,7 +282,6 @@ export function renderPlaceCard(el: HTMLElement, ctx: FeatureCtx, p: PlaceHit, o
   const metaBits: (Node | string)[] = []
   const rr = ratingRow(p)
   if (rr) metaBits.push(rr)
-  if (p.category) metaBits.push(h('span', {}, p.category))
   metaBits.push(h('span', { 'aria-label': L.walkLabel(walk) }, h('span', { class: 'ms pc-walk', 'aria-hidden': 'true' }, 'directions_walk'), L.walkMin(walk)))
   const meta = h('p', { class: 'gm-sheet-sub pc-meta' })
   metaBits.forEach((b, i) => {
@@ -476,7 +475,9 @@ export function renderPlaceCard(el: HTMLElement, ctx: FeatureCtx, p: PlaceHit, o
     }),
   )
 
-  const root = h('div', { class: 'pc-card' }, head, meta, hours, pills, photo, tabs, ...panels)
+  // Maps gives the category its own grey line under the rating, not a slot in it.
+  const category = p.category ? h('p', { class: 'pc-cat' }, p.category) : null
+  const root = h('div', { class: 'pc-card' }, head, meta, category, hours, pills, photo, tabs, ...panels)
   el.replaceChildren(root)
   el.scrollTop = 0
   head.querySelector<HTMLElement>('h2')?.focus({ preventScroll: true })

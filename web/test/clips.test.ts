@@ -232,3 +232,48 @@ describe('door check voice (wheelchair): device voice at once, never /api/speak'
     expect(check).toMatch(/function teardown\(\) \{[\s\S]*?stopLines\(lang\)/)
   })
 })
+
+describe('playClip on a suspended AudioContext (iOS after a call or Siri)', () => {
+  it('falls back to the device voice and resumes the context instead of starting a silent clip', async () => {
+    const { vi } = await import('vitest')
+    const { bandClipKey } = await import('../src/core/instruct')
+    const { session } = await import('../src/session')
+    const g = globalThis as Record<string, unknown>
+    const saved = { window: g.window, speechSynthesis: g.speechSynthesis, SpeechSynthesisUtterance: g.SpeechSynthesisUtterance, fetch: g.fetch }
+    const savedAudio = session.audio
+    const spoken: string[] = []
+    const started = vi.fn()
+    const synth = { speaking: false, pending: false, speak: vi.fn((u: { text: string }) => spoken.push(u.text)), cancel: vi.fn() }
+    const key = bandClipKey('left')
+    const text = bandText('left', 'de')
+    g.speechSynthesis = synth
+    g.window = { setTimeout: () => 0 }
+    g.SpeechSynthesisUtterance = class { lang = ''; rate = 1; onend: unknown; onerror: unknown; constructor(public text: string) {} }
+    g.fetch = vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () => ({ clips: { [key]: { file: 'audio/de/left.wav', text } } }),
+      arrayBuffer: async () => new ArrayBuffer(8),
+      url,
+    }))
+    const ctx = {
+      state: 'suspended',
+      resume: vi.fn(() => Promise.resolve()),
+      destination: {},
+      decodeAudioData: async () => ({ duration: 0.05 }),
+      createBufferSource: () => ({ connect() {}, stop() {}, start: started, onended: null as null | (() => void), buffer: null }),
+    }
+    session.audio = ctx as unknown as AudioContext
+    try {
+      const { playLine, stopLines } = await import('../src/ui/clips')
+      playLine(text, key, { lang: 'de-AT' })
+      for (let i = 0; i < 20; i++) await Promise.resolve()
+      expect(started).not.toHaveBeenCalled()
+      expect(spoken).toEqual([text])
+      expect(ctx.resume).toHaveBeenCalled()
+      stopLines('de-AT')
+    } finally {
+      session.audio = savedAudio
+      Object.assign(g, saved)
+    }
+  })
+})

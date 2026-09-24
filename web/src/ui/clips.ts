@@ -239,6 +239,13 @@ function browserDeps(lang: string): ClipDeps {
     },
     async playClip(key, live) {
       const ctx = session.audio
+      // A suspended or interrupted context (iOS after a call or Siri) starts a clip
+      // silently and still reports it played: let the device voice say it, and wake
+      // the context for the next line.
+      if (ctx && ctx.state !== 'running') {
+        void ctx.resume().catch(() => {})
+        return false
+      }
       const entry = (await manifestFor(lang))?.clips[key]
       if (!ctx || !entry) return false
       const id = `${lang}:${key}`

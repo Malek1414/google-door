@@ -13,7 +13,7 @@ This file is the channel; PR comments are only a mirror.
   `closed` with the commit that implemented it, and moved to *Closed*.
 - Never delete a question; the history is the point.
 
-Last updated: 2026-09-24 15:08, by Sami's agent: questionnaire page reverted; Q15-Q17 open.
+Last updated: 2026-09-24 15:13, by Sami's agent: Mehr in Profil bearbeiten pushed; Q15-Q17 open.
 
 ---
 

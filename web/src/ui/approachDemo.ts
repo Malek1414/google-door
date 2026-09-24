@@ -10,7 +10,7 @@
 //
 // Words and pitch come from core/instruct.ts, as they do in the real engine.
 
-import { bandFor, bandText, fallbackLine, metresLine, noDirectionLine, pitchFor, safetyLine, thresholdLine, throughLine, unsureLine } from '../core/instruct'
+import { atDoorLine, bandFor, bandText, metresLine, pitchFor, safetyLine, thresholdLine, throughLine } from '../core/instruct'
 import { lang } from '../strings'
 import type { ApproachSession, ApproachView, Phase, StartApproach } from './approachPort'
 
@@ -26,17 +26,23 @@ const dir = (deg: number, m: number, extra: Partial<ApproachView> = {}): Approac
   ...extra,
 })
 
+// The stage run: turn to the door, walk, stop at it, go through. Failure lines (no
+// direction, map fallback, unsure) are real engine behaviour and covered by tests, but
+// on stage they read as the app not working, so the script shows the happy path.
+// Wording matches the engine after tonight: no metres at the threshold; `through` by
+// vision says "drin", `through` by standing still (after "Noch draußen") says "an der Tür".
 export const DEMO_SCRIPT: readonly ApproachView[] = [
-  // No direction yet: vision has nothing and the door has no surveyed bearing. No arrow.
-  { phase: 'orienting', relBearingDeg: null, distanceM: null, instruction: noDirectionLine(L), source: null, unsure: false },
   dir(-64, 7, { phase: 'orienting', instruction: bandText(bandFor(-64), L) }),
   dir(-22, 7, { phase: 'orienting', instruction: bandText(bandFor(-22), L) }),
   dir(-4, 6),
-  dir(3, 4, { source: 'osm-fallback', instruction: `${fallbackLine(L)} ${bandText(bandFor(3), L)}` }),
-  dir(12, 3, { source: 'gemini-frame', unsure: true, instruction: unsureLine(L) }),
-  { phase: 'threshold', relBearingDeg: 1, distanceM: 1.2, instruction: thresholdLine(L), source: 'gemini-frame', unsure: true },
-  { phase: 'through', relBearingDeg: null, distanceM: null, instruction: throughLine(L), source: 'gemini-frame', unsure: true },
+  dir(3, 4),
+  dir(1, 2),
+  { phase: 'threshold', relBearingDeg: 1, distanceM: 1.2, instruction: thresholdLine(L), source: 'gemini-frame', unsure: false },
+  { phase: 'through', relBearingDeg: null, distanceM: null, instruction: throughLine(L), source: 'gemini-frame', unsure: false },
 ]
+
+/** What the engine says when `through` comes from standing still, not from vision. */
+const THROUGH_STILL: ApproachView = { phase: 'through', relBearingDeg: null, distanceM: null, instruction: atDoorLine(L), source: 'gemini-frame', unsure: false }
 
 const STEP_MS = 2500
 /** Mirrors the engine's stillness rule: standing at the threshold this long proposes `through`. */
@@ -77,7 +83,7 @@ export const startDemoApproach: StartApproach = () => {
       if (still) clearTimeout(still)
       i = DEMO_SCRIPT.findIndex((v) => v.phase === 'threshold')
       emit(DEMO_SCRIPT[i])
-      if (holdAt < 0) still = setTimeout(() => emit(DEMO_SCRIPT[(i = DEMO_SCRIPT.length - 1)]), STILL_MS)
+      if (holdAt < 0) still = setTimeout(() => emit(THROUGH_STILL), STILL_MS)
     },
     stop() {
       if (timer) clearInterval(timer)

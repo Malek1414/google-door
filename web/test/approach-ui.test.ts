@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fallbackLine, noDirectionLine, safetyLine, thresholdLine, throughLine } from '../src/core/instruct'
+import { atDoorLine, fallbackLine, noDirectionLine, safetyLine, thresholdLine, throughLine, unsureLine } from '../src/core/instruct'
 import { guideLayout, Narrator } from '../src/ui/Approach'
 import { approachModeFor, type ApproachView } from '../src/ui/approachPort'
 import { DEMO_SCRIPT, startDemoApproach } from '../src/ui/approachDemo'
@@ -167,8 +167,10 @@ describe('guide screen: through, no direction, safety line', () => {
 describe('demo adapter: through, stillOutside, no direction', () => {
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => vi.useRealTimers())
-  it('script has a no-direction moment and ends in through', () => {
-    expect(DEMO_SCRIPT.some((v) => v.relBearingDeg === null && v.source === null && v.instruction === noDirectionLine(lang))).toBe(true)
+  it('the stage script is the happy path: no failure lines, no metres at the door, ends in through', () => {
+    const failures = [noDirectionLine(lang), fallbackLine(lang), unsureLine(lang)]
+    expect(DEMO_SCRIPT.some((v) => failures.some((f) => v.instruction.includes(f)))).toBe(false)
+    expect(DEMO_SCRIPT.find((v) => v.phase === 'threshold')?.instruction).toBe(thresholdLine(lang))
     expect(DEMO_SCRIPT.at(-1)?.phase).toBe('through')
   })
   it('stillOutside returns to threshold, then through is proposed again', () => {
@@ -181,6 +183,8 @@ describe('demo adapter: through, stillOutside, no direction', () => {
     expect(seen.at(-1)?.phase).toBe('threshold')
     vi.advanceTimersByTime(4000)
     expect(seen.at(-1)?.phase).toBe('through')
+    // Proposed by standing still, as in the engine: "an der Tür", not "drin".
+    expect(seen.at(-1)?.instruction).toBe(atDoorLine(lang))
     run.stop()
   })
 })

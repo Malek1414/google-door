@@ -56,3 +56,17 @@ export function roundNavM(m: number): number {
   if (m < 10) return Math.max(0, Math.round(m))
   return m < 300 ? Math.round(m / 10) * 10 : Math.round(m / 50) * 50
 }
+
+/** The "Dann" chip: glyph of the manoeuvre after the next one, or null when there is none. */
+export function thenGlyph(route: Route, walking: number): string | null {
+  const after = route.steps[walking + 2]
+  if (!after) return null
+  return maneuverGlyph(after.maneuver) ?? null
+}
+
+/** Nav sheet lines, as in Maps: big "3 Min.", small "210 m · 09:25". */
+export function navSheetLines(seconds: number, remainingM: number, now: Date, de = true): { big: string; small: string } {
+  const mins = Math.max(1, Math.round(seconds / 60))
+  const m = remainingM < 1000 ? `${Math.round(remainingM / 10) * 10} m` : `${(remainingM / 1000).toFixed(1).replace('.', de ? ',' : '.')} km`
+  return { big: de ? `${mins} Min.` : `${mins} min`, small: `${m} · ${arrivalClock(now, seconds)}` }
+}

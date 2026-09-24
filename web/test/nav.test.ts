@@ -59,3 +59,17 @@ describe('arrival helpers', () => {
     expect(roundNavM(412)).toBe(400)
   })
 })
+
+import { navSheetLines, thenGlyph } from '../src/core/nav'
+describe('Dann chip and sheet lines', () => {
+  const three: Route = { ...route, steps: [...route.steps, { distanceM: 20, maneuver: 'TURN_LEFT', text: 'Links', endLat: null, endLon: null }] }
+  it('shows the manoeuvre after the next one', () => {
+    expect(thenGlyph(three, 0)).toBe('turn_left')
+    expect(thenGlyph(three, 1)).toBeNull()
+    expect(thenGlyph(route, 0)).toBeNull()
+  })
+  it('formats the Maps nav sheet', () => {
+    expect(navSheetLines(180, 213, new Date(2026, 8, 24, 9, 22, 0))).toEqual({ big: '3 Min.', small: '210 m · 09:25' })
+    expect(navSheetLines(20, 1234, new Date(2026, 8, 24, 9, 22, 0)).small).toBe('1,2 km · 09:22')
+  })
+})

@@ -311,8 +311,10 @@ html.ios-gap .gm-nav { padding-bottom: 0; }
 /* Until the sheet is fully open its content does not scroll: vertical swipes move the sheet
    (MapView touch handlers), horizontal ones still scroll carousels and chips. */
 .gm:not([data-sheet='full']) .gm-sheet-body { overflow-y: hidden; }
-.gm-sheet { touch-action: pan-x; }
-.gm[data-sheet='full'] .gm-sheet-body { touch-action: pan-y; }
+.gm-sheet { touch-action: pan-x pinch-zoom; }
+.gm[data-sheet='full'] .gm-sheet-body { touch-action: pan-y pinch-zoom; }
+/* Pinch zoom stays on (WCAG 1.4.4); only double-tap zoom is suppressed. */
+html { touch-action: manipulation; }
 .gm-handle { height: 28px; }
 
 /* ══════════════════════════════════════════════════════════════════════

@@ -455,6 +455,14 @@ export function MapView(opts: {
     'touchmove',
     (ev) => {
       if (dragY0 === null) return
+      // Two fingers are a pinch: page zoom for low-vision users, never a sheet drag.
+      if (ev.touches.length > 1) {
+        dragY0 = null
+        dragging = false
+        sheet.style.transition = ''
+        setSheet(sheet.dataset.state as SheetState)
+        return
+      }
       const tt = ev.touches[0]
       const dy = tt.clientY - dragY0
       const dx = tt.clientX - dragX0

@@ -80,7 +80,7 @@ export async function unlockAll(opts: { camera: boolean }): Promise<UnlockResult
 }
 
 export function Start(opts: { sim: boolean; onDone: (r: UnlockResult) => void }): void {
-  const status = h('ul', { class: 'sensor-list', 'aria-label': 'Sensor status' })
+  const status = h('ul', { class: 'sensor-list', 'aria-label': t.sensorStatus })
   const extra = h('div', { class: 'start-extra' })
   let busy = false
 

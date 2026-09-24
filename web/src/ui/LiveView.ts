@@ -273,7 +273,7 @@ export function LiveView(opts: {
   const lookOut = h('p', { class: 'ar-look-out', 'aria-live': 'polite' }, '')
   const lookBtn = h('button', { class: 'ar-look', type: 'button' }, ms('visibility'), t.look)
   const stopBtn = h('button', { class: 'ar-round', type: 'button', 'aria-label': t.stop }, ms('close'))
-  const fbBtn = h('button', { class: 'ar-round', type: 'button', 'aria-label': 'Feedback' }, ms('feedback'))
+  const fbBtn = h('button', { class: 'ar-round', type: 'button', 'aria-label': t.feedback }, ms('feedback'))
   const endRow = h('div', { class: 'ar-endrow' })
   const turnIcon = h('span', { class: 'sr-only' }, '')
   // Said on screen when guidance has no route: the arrow then aims straight at the

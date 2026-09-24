@@ -22,6 +22,9 @@ GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 # dependency -> env variables that can satisfy it, in order of preference.
 KEYS: dict[str, tuple[str, ...]] = {
     "gemini": ("GEMINI_API_KEY",),
+    # Same key, separate health: TTS has its own 100/day quota, and running it dry must
+    # not mark vision (door-fix, door-check, look) as down.
+    "tts":    ("GEMINI_API_KEY",),
     "maps":   ("MAPS_API_KEY",),
     # route.py prefers a Routes-enabled key and falls back to the Maps one.
     "routes": ("ROUTES_API_KEY", "MAPS_API_KEY"),
@@ -102,10 +105,11 @@ async def request(dep: str, method: str, url: str, *, headers: Optional[dict] = 
     return r
 
 
-async def gemini(model: str, body: dict, **kw) -> httpx.Response:
-    """POST generateContent. 503 when GEMINI_API_KEY is missing."""
-    k = require("gemini")
-    return await request("gemini", "POST", f"{GEMINI_URL}/{model}:generateContent",
+async def gemini(model: str, body: dict, *, dep: str = "gemini", **kw) -> httpx.Response:
+    """POST generateContent. 503 when GEMINI_API_KEY is missing. `dep` is where the
+    outcome is recorded ("tts" for speech, so its quota never reads as vision down)."""
+    k = require(dep)
+    return await request(dep, "POST", f"{GEMINI_URL}/{model}:generateContent",
                          headers={"x-goog-api-key": k}, json=body, **kw)
 
 

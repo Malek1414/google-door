@@ -1,5 +1,7 @@
-/* Thin Google-style snackbar at the top: inverse of the page colours, so it follows
-   the contrast mode from the profile and always stands out from the map. */
+/* Thin Google-style snackbar near the top: inverse of the page colours, so it follows
+   the contrast mode from the profile and always stands out from the map. It sits BELOW
+   the top controls (map search bar and chips; the close/exit buttons of Live View and
+   the approach screen), never on them: a blind user must always reach the exit. */
 :root {
   --health-banner-bg: var(--fg, #fff);
   --health-banner-fg: var(--bg, #000);
@@ -8,14 +10,14 @@
 
 .health-banner {
   position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  top: calc(env(safe-area-inset-top, 0px) + 112px);
   left: 50%;
   transform: translateX(-50%);
   z-index: 10000;
   box-sizing: border-box;
   width: calc(100% - 32px);
   max-width: 560px;
-  min-height: 40px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -34,7 +36,7 @@
 
 .health-banner-close {
   flex: none;
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 12px;
   border: 0;
   border-radius: 4px;

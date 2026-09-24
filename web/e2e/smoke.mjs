@@ -70,6 +70,9 @@ async function step(name, page, fn) {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${tag}${note ? `  (${note})` : ''}`)
 }
 
+// Never spend the live backend's Gemini quota (TTS is 100/day, vision is rate-limited):
+// the app falls back to the device voice on a failed /api/speak, which is what we test.
+await ctx.route(/\/api\/(speak|look|door-fix|door-check)/, (route) => route.fulfill({ status: 503, body: '' }))
 const page = await ctx.newPage()
 watch(page)
 

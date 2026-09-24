@@ -332,7 +332,7 @@ async def speak(req: SpeakReq):
 
     # 429 is routine on this tier and is not a failure; back off rather than give up,
     # because the client falling through to speechSynthesis is a worse voice.
-    r = await upstream.gemini(MODEL_TTS, body, backoff=1.5)
+    r = await upstream.gemini(MODEL_TTS, body, dep="tts", backoff=1.5)
     if r.status_code != 200:
         raise HTTPException(502, f"tts {r.status_code}")
     try:

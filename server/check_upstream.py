@@ -53,6 +53,13 @@ def reset(replies=()):
     _calls.clear()
 
 
+# 0. TTS quota running dry must not read as vision down (same key, own health).
+reset([429, 429, 429])
+r = client.post("/api/speak", json={"text": "Hallo", "lang": "de"})
+h = client.get("/api/health").json()
+check("speak 429s leave health gemini true", r.status_code == 502 and h["gemini"] is True
+      and h["deps"]["tts"]["ok"] is False and h["deps"]["tts"]["lastError"] == "upstream 429", (r.status_code, h["deps"]))
+
 # 1. 429 twice, then success: retried, 200, health ok with a fresh success.
 reset([429, 429, 200])
 r = client.post("/api/look", json=LOOK)

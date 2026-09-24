@@ -35,7 +35,7 @@ describe('approachModeFor: who sees the trigger', () => {
 
 describe('Narrator: when the screen speaks', () => {
   const said = (n: Narrator, vs: ApproachView[]) => vs.map((v) => n.next(v)).filter((x) => x !== null)
-  it('the engine opens with the safety line; it is spoken once, and only it interrupts', () => {
+  it('the engine opens with the safety line; it is spoken once and interrupts nothing (iOS drops a line spoken right after cancel)', () => {
     const n = new Narrator('de')
     const out = said(n, [
       view({ instruction: safetyLine('de'), relBearingDeg: null, source: null }),
@@ -45,8 +45,8 @@ describe('Narrator: when the screen speaks', () => {
       view({ instruction: 'Die Tür ist direkt vor dir.', phase: 'threshold' }),
     ])
     expect(out.filter((x) => x.text.includes(safetyLine('de')))).toHaveLength(1)
-    expect(out[0]).toEqual({ text: safetyLine('de'), interrupt: true })
-    expect(out.slice(1).every((x) => !x.interrupt)).toBe(true)
+    expect(out[0]).toEqual({ text: safetyLine('de'), interrupt: false })
+    expect(out.every((x) => !x.interrupt)).toBe(true)
   })
   it('adds nothing of its own: the fallback line comes from the engine, verbatim', () => {
     const n = new Narrator('de')

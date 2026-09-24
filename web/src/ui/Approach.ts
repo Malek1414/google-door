@@ -55,14 +55,15 @@ export const AP = {
 /**
  * Pure. Decides WHEN to speak, never what: the engine's instruction is spoken verbatim
  * each time it changes. The engine already opens with the safety line and names the
- * map fallback (core/instruct.ts), so nothing is added here. Only the safety line may
- * cut off what was playing (the arrival card); the parts of a joined "Links 5 Meter"
+ * map fallback (core/instruct.ts), so nothing is added here. Nothing interrupts the
+ * first line (see next()); only a later safety line may cut off what was playing; the parts of a joined "Links 5 Meter"
  * play in order, and a newer line replaces a stale one that has not started (ui/clips.ts).
  */
 export class Narrator {
   private lastInstruction = ''
   private hadAim = false
   private lostAim = false
+  private spoke = false
 
   constructor(private readonly language: string = lang) {}
 
@@ -76,7 +77,13 @@ export class Narrator {
     this.hadAim = aim
     if (!v.instruction || v.instruction === this.lastInstruction) return null
     this.lastInstruction = v.instruction
-    return { text: v.instruction, interrupt: v.instruction.startsWith(safetyLine(this.language)) }
+    // The first line never interrupts: there is nothing of the approach to cut off, and
+    // on iOS the cancel() it would trigger swallows the utterance spoken right after it
+    // (the tap's speech primer is still pending then). The arrival card is stopped by
+    // Live View's teardown instead.
+    const first = !this.spoke
+    this.spoke = true
+    return { text: v.instruction, interrupt: !first && v.instruction.startsWith(safetyLine(this.language)) }
   }
 
   /** After "Noch draußen": the engine's next line is spoken even if it repeats an earlier one. */

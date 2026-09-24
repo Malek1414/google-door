@@ -464,7 +464,7 @@ export function LiveView(opts: {
   /** Both triggers (panel and arrival card) open the approach the same way. */
   function startApproach() {
     if (!approachMode || !opts.onApproach) return
-    teardown() // cancels speechSynthesis, so the unlock comes after it
+    teardown() // stops the arrival card's speech, so the unlock comes after it
     // Still synchronous inside the tap: iOS only unlocks speech and audio here.
     primeSpeech()
     opts.onApproach(approachMode)
@@ -835,7 +835,9 @@ export function LiveView(opts: {
     stopPitch()
     beacon?.stop()
     try {
-      speechSynthesis?.cancel()
+      // Only when something is queued: WebKit drops an utterance spoken right after a
+      // needless cancel(), and the approach's speech primer comes straight after this.
+      if (speechSynthesis && (speechSynthesis.speaking || speechSynthesis.pending)) speechSynthesis.cancel()
     } catch {
       /* ignored */
     }

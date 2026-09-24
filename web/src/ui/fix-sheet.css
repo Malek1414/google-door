@@ -62,3 +62,15 @@
 .gm-steps { margin: 18px 0 0; padding: 0 0 0 22px; color: var(--fg); }
 .gm-steps li { margin: 0 0 14px; line-height: 1.35; }
 .gm-sheet-body { scroll-padding-bottom: 96px; } /* a11y #20: a focused row never sits under the nav bar */
+
+/* Start that cannot guide (a place without a mapped entrance, a door with steps for a
+   step-free profile): it keeps slot 1 but must not look like the live teal action.
+   Outlined grey instead of filled teal, and the reason in a line under the row.
+   Text stays at 7:1 on the sheet so the label is still readable. */
+.gm-pill-primary:disabled, .gm-pill-primary[aria-disabled='true'] {
+  background: transparent; color: #c4c7c5; box-shadow: inset 0 0 0 1px #5f6368; cursor: not-allowed;
+}
+.gm-pill-primary:disabled .ms, .gm-pill-primary[aria-disabled='true'] .ms { color: #9aa0a6; }
+.gm-route-why { display: flex; gap: 8px; align-items: flex-start; margin: 12px 4px 0; font-size: 14px; line-height: 1.35; color: #c4c7c5; }
+.gm-route-why .ms { font-size: 18px; flex: none; margin-top: 1px; color: #9aa0a6; }
+.gm[data-sheet='route']:has(.gm-route-why) { --sheet-h: 232px; }

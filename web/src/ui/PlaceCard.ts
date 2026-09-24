@@ -309,7 +309,7 @@ export function renderPlaceCard(el: HTMLElement, ctx: FeatureCtx, p: PlaceHit, o
           btn.disabled = true
           btn.setAttribute('aria-busy', 'true')
           try {
-            await ctx.showRoute({ lat: p.lat, lon: p.lon })
+            await ctx.showRoute({ lat: p.lat, lon: p.lon }, p.name || undefined)
           } finally {
             btn.disabled = false
             btn.removeAttribute('aria-busy')

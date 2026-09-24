@@ -203,7 +203,9 @@ export async function searchText(map: google.maps.Map, query: string): Promise<P
  *  can be shown. Same field set as search, so the card renders identically. */
 export async function fetchPlaceById(placeId: string): Promise<PlaceHit | null> {
   const { Place } = (await google.maps.importLibrary('places')) as google.maps.PlacesLibrary
-  const place = new Place({ id: placeId })
+  // Without requestedLanguage a POI tap answers in the browser default, and German
+  // users got "Art museum" on the card while search said "Kunstmuseum".
+  const place = new Place({ id: placeId, requestedLanguage: lang(), requestedRegion: 'de' })
   await place.fetchFields({
     fields: [
       'id', 'displayName', 'location', 'rating', 'userRatingCount',

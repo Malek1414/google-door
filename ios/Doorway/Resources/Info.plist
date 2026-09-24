@@ -10,7 +10,8 @@
   <key>CFBundleShortVersionString</key><string>1.0</string>
   <key>CFBundleVersion</key><string>1</string>
   <key>LSRequiresIPhoneOS</key><true/>
-  <key>UILaunchScreen</key><dict><key>UIColorName</key><string></string></dict>
+  <!-- Same #131314 as the webview background, so launch -> page has no white flash. -->
+  <key>UILaunchScreen</key><dict><key>UIColorName</key><string>LaunchBackground</string></dict>
   <key>UISupportedInterfaceOrientations</key>
   <array><string>UIInterfaceOrientationPortrait</string></array>
   <key>UIStatusBarStyle</key><string>UIStatusBarStyleLightContent</string>
@@ -24,7 +25,8 @@
   <string>Doorway nutzt den Kompass, um den Pfeil in die richtige Richtung zu drehen.</string>
   <key>NSMicrophoneUsageDescription</key>
   <string>Nur für Sprachsuche.</string>
-  <!-- The dev server is plain HTTP on the LAN. -->
+  <!-- Plain HTTP only to local addresses (the LAN dev server, localhost). Everything on the
+       internet, including the serveo tunnel, must be HTTPS. -->
   <key>NSAppTransportSecurity</key>
-  <dict><key>NSAllowsArbitraryLoads</key><true/></dict>
+  <dict><key>NSAllowsLocalNetworking</key><true/></dict>
 </dict></plist>

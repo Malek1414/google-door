@@ -71,12 +71,37 @@ def live_url():
     installed iOS app pointing at a dead host. The app asks this over the LAN at
     launch and follows whatever it says, so a reconnect costs nothing.
     """
+    url = ""
+    for path in _TUNNEL_URL_FILES:
+        try:
+            with open(path, encoding="utf-8") as fh:
+                url = fh.read().strip()
+            break
+        except OSError:
+            continue
+    return {"url": url if _is_tunnel_url(url) else None}
+
+
+# ops/tunnel.sh writes here with umask 077. /tmp/tunnel-url.txt is only a migration
+# fallback for an old tunnel.sh still running: /tmp is world-writable, which is why
+# whatever comes out of either file is validated before the app is told to load it.
+_TUNNEL_URL_FILES = (
+    os.path.expanduser("~/Library/Application Support/doorway/tunnel-url"),
+    "/tmp/tunnel-url.txt",
+)
+_TUNNEL_SUFFIX = ".serveousercontent.com"
+
+
+def _is_tunnel_url(url: str) -> bool:
+    """Only an https serveo address, no userinfo/port tricks."""
+    from urllib.parse import urlsplit
     try:
-        with open("/tmp/tunnel-url.txt", encoding="utf-8") as fh:
-            url = fh.read().strip()
-    except OSError:
-        url = ""
-    return {"url": url or None}
+        u = urlsplit(url)
+        host = (u.hostname or "").lower().rstrip(".")
+        return (u.scheme == "https" and not u.username and not u.password
+                and u.port in (None, 443) and host.endswith(_TUNNEL_SUFFIX))
+    except ValueError:
+        return False
 
 
 @app.get("/api/entrances")

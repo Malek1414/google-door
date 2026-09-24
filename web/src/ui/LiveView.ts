@@ -17,7 +17,8 @@ import type { OutputConfig, Profile } from '../core/profile'
 import type { ArrowTarget } from '../core/target'
 import { BeaconAudio, playApproachChime } from '../audio'
 import { postLook } from '../data'
-import { announce, session, speak, vibrate } from '../session'
+import { announce, primeSpeech, session, speak, vibrate } from '../session'
+import { preloadClips } from './clips'
 import { lang, t } from '../strings'
 import { h, mount, s } from './dom'
 import './arrival.css'
@@ -53,6 +54,19 @@ export const STILL_MPS = 0.5
 /** Walking this far away again while the arrival card shows resumes guidance. */
 export const LEAVE_M = 8
 export const ARRIVAL_CARD_DELAY_MS = 1500
+/** The red Maps pin takes over from the chevrons this close in, as Google's does. */
+export const APPROACH_PIN_M = 25
+
+/**
+ * Pure. Is "Zum Eingang führen" offered in the Live View panel? From APPROACH_PIN_M in,
+ * with the same 1.3x hysteresis as the pin, so a jittering fix does not flash it.
+ * Real GPS next to a building is off by 5 to 30 m, so waiting for the 3 m arrival card
+ * alone can mean the button never appears at all.
+ */
+export function nearTriggerShown(distM: number, shown: boolean): boolean {
+  if (!Number.isFinite(distM)) return shown
+  return distM <= (shown ? APPROACH_PIN_M * 1.3 : APPROACH_PIN_M)
+}
 export const ARRIVAL_EXIT_S = 20
 
 export interface TimedFix {
@@ -80,6 +94,18 @@ export function isArrived(history: readonly TimedFix[], target: { lat: number; l
   const dt = (b.t - a.t) / 1000
   if (!(dt > 0)) return moved === 0
   return moved / dt <= STILL_MPS
+}
+
+/**
+ * Pure. How the arrival card behaves for an approach mode. A speech (guide) user must
+ * not be bounced back to the map while still finding the door: focus lands on
+ * "Zum Eingang führen", there is no auto-exit, and the spoken line names the button.
+ * Everyone else keeps "Hier bleiben" focused and the countdown to the map.
+ */
+export function arrivalPlan(mode: ApproachMode | null): { focus: 'approach' | 'stay'; exitAfterS: number | null; nameTrigger: boolean } {
+  return mode === 'guide'
+    ? { focus: 'approach', exitAfterS: null, nameTrigger: true }
+    : { focus: 'stay', exitAfterS: ARRIVAL_EXIT_S, nameTrigger: false }
 }
 
 /** Arrival card strings; kept local so strings.ts stays untouched. */
@@ -272,6 +298,12 @@ export function LiveView(opts: {
   const accEl = h('p', { class: 'ar-meta' }, '')
   const lookOut = h('p', { class: 'ar-look-out', 'aria-live': 'polite' }, '')
   const lookBtn = h('button', { class: 'ar-look', type: 'button' }, ms('visibility'), t.look)
+  // The last 10 metres, offered as soon as the door is close, not only after GPS says
+  // "arrived". An ordinary button: VoiceOver's own double-tap activates it.
+  const approachMode = opts.onApproach ? approachModeFor(opts.profile) : null
+  const nearBtn = approachMode
+    ? h('button', { class: 'apr-trigger ar-near', type: 'button', hidden: true }, ms('door_front'), APPROACH_TRIGGER)
+    : null
   const stopBtn = h('button', { class: 'ar-round', type: 'button', 'aria-label': t.stop }, ms('close'))
   const fbBtn = h('button', { class: 'ar-round', type: 'button', 'aria-label': 'Feedback' }, ms('feedback'))
   const endRow = h('div', { class: 'ar-endrow' })
@@ -297,7 +329,7 @@ export function LiveView(opts: {
     scanText, scanArt, pill, follow,
     opts.sensors.banner ? h('p', { class: 'banner' }, opts.sensors.banner) : null,
     warnEl,
-    accEl, lookOut, lookBtn, endRow,
+    accEl, lookOut, lookBtn, nearBtn, endRow,
     destStrip, safeEl, dirEl,
   )
 
@@ -316,11 +348,13 @@ export function LiveView(opts: {
   let lastWord = ''
   let calloutIdx = 0
   let lookBusy = false
+  let nearShown = false
+  // Know which approach clips exist before the tap, so a missing one is spoken at once.
+  if (approachMode === 'guide') preloadClips(lang)
+  let saidNear = false
   // A magnetometer jitters several degrees at rest and fires ~60 Hz, so the raw
   // heading is fed through a circular low-pass with a deadband. Without it the
   // arrow renders sensor noise and visibly vibrates.
-  // The red Maps pin takes over from the chevrons this close in, as Google's does.
-  const APPROACH_PIN_M = 25
   // Google re-shows a safety reminder periodically while you walk.
   const SAFE_EVERY_MS = 45000
   const SAFE_SHOW_MS = 4000
@@ -414,8 +448,31 @@ export function LiveView(opts: {
     }, SAFE_SHOW_MS))
   }
 
+  /** Show or hide the panel trigger; announced once per Live View, never focus-stealing. */
+  function setNear(show: boolean) {
+    if (!nearBtn || show === nearShown) return
+    nearShown = show
+    nearBtn.hidden = !show
+    if (show) root.dataset.near = '1'
+    else delete root.dataset.near
+    if (show && !saidNear) {
+      saidNear = true
+      announce(t.nearTrigger(APPROACH_TRIGGER))
+    }
+  }
+
+  /** Both triggers (panel and arrival card) open the approach the same way. */
+  function startApproach() {
+    if (!approachMode || !opts.onApproach) return
+    teardown() // cancels speechSynthesis, so the unlock comes after it
+    // Still synchronous inside the tap: iOS only unlocks speech and audio here.
+    primeSpeech()
+    opts.onApproach(approachMode)
+  }
+
   function arrive() {
     arrived = true
+    setNear(false)
     if (cfg.haptics || cfg.beacon) vibrate(HAPTIC_ARRIVED) // one long cue; iOS gets the sound
     beacon?.stop()
     beaconOn = false
@@ -437,12 +494,13 @@ export function LiveView(opts: {
     const doorType = e.door ? t.door[e.door] ?? null : null
     const face = e.approachBearing !== null ? ARR.face(compassWord(e.approachBearing)) : null
     const warns = e.warnings.map((w) => t.warning[w] ?? w)
-    const secsEl = h('p', { class: 'arrival-count' }, ARR.backIn(ARRIVAL_EXIT_S))
+    const plan = arrivalPlan(approachMode)
+    const secsEl = h('p', { class: 'arrival-count', hidden: plan.exitAfterS === null }, plan.exitAfterS === null ? '' : ARR.backIn(plan.exitAfterS))
     const stayBtn = h('button', { class: 'gm-pill gm-pill-primary', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'pan_tool'), ARR.stay)
     const mapBtn = h('button', { class: 'gm-pill', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'map'), ARR.toMap)
     // The last 10 metres. An ordinary button: VoiceOver's own double-tap activates it,
     // a custom double-tap handler would be swallowed by VoiceOver.
-    const mode = opts.onApproach ? approachModeFor(opts.profile) : null
+    const mode = approachMode
     const approachBtn = mode
       ? h('button', { class: 'apr-trigger', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'door_front'), APPROACH_TRIGGER)
       : null
@@ -469,33 +527,34 @@ export function LiveView(opts: {
     )
     root.classList.add('is-arrived') // camera and overlay leave the screen
     root.append(cardEl)
-    stayBtn.focus({ preventScroll: true })
+    if (plan.focus === 'approach' && approachBtn) approachBtn.focus({ preventScroll: true })
+    else stayBtn.focus({ preventScroll: true })
 
     lines.push(`${ARR.title}. ${name}.`)
     if (doorType) lines.push(`${doorType}.`)
     for (const w of warns) lines.push(`${t.warningPrefix}. ${w}`)
     if (face) lines.push(face)
+    if (plan.nameTrigger && approachBtn) lines.push(t.triggerSelected(APPROACH_TRIGGER))
     if (cfg.speak) speak(lines.join(' '))
-    announce(ARR.backIn(ARRIVAL_EXIT_S)) // once, not every second
-
-    let left = ARRIVAL_EXIT_S
-    countdown = window.setInterval(() => {
-      left--
-      secsEl.textContent = ARR.backIn(Math.max(0, left))
-      if (left <= 0) exit()
-    }, 1000)
+    if (plan.exitAfterS !== null) {
+      announce(ARR.backIn(plan.exitAfterS)) // once, not every second
+      let left = plan.exitAfterS
+      countdown = window.setInterval(() => {
+        left--
+        secsEl.textContent = ARR.backIn(Math.max(0, left))
+        if (left <= 0) exit()
+      }, 1000)
+    }
     stayBtn.addEventListener('click', () => {
       if (countdown) clearInterval(countdown)
       countdown = 0
+      secsEl.hidden = false
       secsEl.textContent = ARR.staying
       announce(ARR.staying)
       stayBtn.remove()
     })
     mapBtn.addEventListener('click', exit)
-    approachBtn?.addEventListener('click', () => {
-      teardown()
-      opts.onApproach!(mode!)
-    })
+    approachBtn?.addEventListener('click', startApproach)
   }
 
   function cancelArrival() {
@@ -574,6 +633,7 @@ export function LiveView(opts: {
       if (dist > LEAVE_M) cancelArrival()
       else return
     }
+    setNear(nearTriggerShown(dist, nearShown))
     if (isArrived(history, target)) {
       arrive()
       return
@@ -753,7 +813,8 @@ export function LiveView(opts: {
     try {
       const say = await postLook({ frame: frame64, heading: heading?.deg ?? 0, distanceM: Number.isFinite(dist) ? dist : 0, target: lookTargetText(target) })
       lookOut.textContent = say
-      if (cfg.speak) speak(say, { interrupt: true })
+      // Unpredictable text: worth waiting a little longer for the network voice.
+      if (cfg.speak) speak(say, { interrupt: true, apiTimeoutMs: 8000 })
     } catch (err) {
       lookOut.textContent = (err as { status?: number }).status === 503 ? t.lookNotConfigured : t.lookError
     } finally {
@@ -780,5 +841,6 @@ export function LiveView(opts: {
     }
   }
   stopBtn.addEventListener('click', exit)
+  nearBtn?.addEventListener('click', startApproach)
   return teardown
 }

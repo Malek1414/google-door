@@ -66,14 +66,15 @@
 .apr-big, .apr-trigger {
   display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%;
   min-height: 72px; padding: 12px 20px; border-radius: 28px; border: 0; cursor: pointer;
-  background: var(--apr-teal); color: var(--apr-teal-ink); font: inherit;
+  background: var(--apr-teal, #62c4cb); color: var(--apr-teal-ink, #00363a); font: inherit;
   font-size: 22px; font-weight: 500; line-height: 1.15;
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.45);
 }
 .apr-big:active, .apr-trigger:active { background: #4fb0b7; }
-.apr-big[hidden] { display: none; }
+.apr-big[hidden], .apr-trigger[hidden] { display: none; }
 .apr-outside { min-height: 88px; font-size: 26px; }
-.apr-trigger .ms, .apr-big .ms { font-size: 28px; color: var(--apr-teal-ink); }
+.apr-big:disabled { opacity: 0.6; cursor: default; }
+.apr-trigger .ms, .apr-big .ms { font-size: 28px; color: var(--apr-teal-ink, #00363a); }
 
 /* The disclaimer stays on screen for the whole approach (read, not only heard). */
 .apr-safety { margin: 0; text-align: center; font-size: 15px; font-weight: 400; line-height: 1.35; color: var(--apr-fg2); }
@@ -82,7 +83,7 @@
 /* No direction at all: no arrow, the engine's words carry the screen. */
 .apr-nodir .apr-instr { font-size: 28px; }
 .apr-big:focus-visible, .apr-trigger:focus-visible, .apr-exit:focus-visible {
-  outline: 3px solid var(--apr-teal); outline-offset: 3px;
+  outline: 3px solid var(--apr-teal, #62c4cb); outline-offset: 3px;
 }
 
 /* Wheelchair verdict: one card, three rows. Dark, like every other sheet here. */

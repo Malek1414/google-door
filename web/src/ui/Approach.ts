@@ -14,10 +14,10 @@ import { startHeading } from '../core/heading'
 import { metresLine, safetyLine } from '../core/instruct'
 import type { OutputConfig } from '../core/profile'
 import type { Entrance } from '../core/types'
-import { announce, session, speak } from '../session'
+import { announce, keepScreenOn, session, speak } from '../session'
 import { lang, t } from '../strings'
 import { engine, type ApproachMode, type ApproachView } from './approachPort'
-import { playInstruction, reportMissingClips, stopLines } from './clips'
+import { playInstruction, preloadClips, reportMissingClips, stopLines } from './clips'
 import { checkDoor, runDoorCheckOnce, verdictNote, verdictRows } from './doorCheck'
 import { h, mount, s } from './dom'
 import { grabFrame } from './LiveView'
@@ -32,6 +32,8 @@ export const AP = {
     fromMap: 'Richtung aus der Karte, nicht aus der Kamera.',
     stillOutside: 'Noch draußen',
     checking: 'Ich prüfe die Tür.',
+    aim: 'Kamera auf die Tür halten.',
+    recheck: 'Nochmal prüfen',
     checkTitle: 'Die Tür',
     offline: 'Die Prüfung ist gerade nicht erreichbar.',
     noCamera: 'Kein Kamerabild.',
@@ -42,6 +44,8 @@ export const AP = {
     fromMap: 'Direction from the map, not the camera.',
     stillOutside: 'Still outside',
     checking: 'Checking the door.',
+    aim: 'Hold the camera on the door.',
+    recheck: 'Check again',
     checkTitle: 'The door',
     offline: 'The check is not available right now.',
     noCamera: 'No camera picture.',
@@ -52,15 +56,24 @@ export const AP = {
  * Pure. Decides WHEN to speak, never what: the engine's instruction is spoken verbatim
  * each time it changes. The engine already opens with the safety line and names the
  * map fallback (core/instruct.ts), so nothing is added here. Only the safety line may
- * cut off what was playing (the arrival card); every later line queues behind the
- * previous one so a joined "Links 5 Meter" is never clipped by the next view.
+ * cut off what was playing (the arrival card); the parts of a joined "Links 5 Meter"
+ * play in order, and a newer line replaces a stale one that has not started (ui/clips.ts).
  */
 export class Narrator {
   private lastInstruction = ''
+  private hadAim = false
+  private lostAim = false
 
   constructor(private readonly language: string = lang) {}
 
   next(v: ApproachView): { text: string; interrupt: boolean } | null {
+    // Lost fix: the engine keeps the old words on screen and says the band again once a
+    // fix is back, often the very same "Links". Dedupe on text would swallow it, so the
+    // first view with a direction after a stretch without one always speaks.
+    const aim = v.relBearingDeg !== null
+    if (aim && this.lostAim) this.lastInstruction = ''
+    this.lostAim = aim ? false : this.lostAim || this.hadAim
+    this.hadAim = aim
     if (!v.instruction || v.instruction === this.lastInstruction) return null
     this.lastInstruction = v.instruction
     return { text: v.instruction, interrupt: v.instruction.startsWith(safetyLine(this.language)) }
@@ -69,6 +82,7 @@ export class Narrator {
   /** After "Noch draußen": the engine's next line is spoken even if it repeats an earlier one. */
   reset(): void {
     this.lastInstruction = ''
+    this.lostAim = false
   }
 }
 
@@ -133,7 +147,23 @@ function bigArrow(): SVGSVGElement {
 }
 
 export function Approach(opts: { door: Entrance; mode: ApproachMode; config: OutputConfig; onExit: () => void }): () => void {
-  return opts.mode === 'check' ? DoorCheckScreen(opts) : GuideScreen(opts)
+  // The phone is held up for the whole approach: the screen must not lock under it.
+  const releaseScreen = keepScreenOn()
+  let released = false
+  const release = () => {
+    if (released) return
+    released = true
+    releaseScreen()
+  }
+  const onExit = () => {
+    release()
+    opts.onExit()
+  }
+  const teardown = opts.mode === 'check' ? DoorCheckScreen({ ...opts, onExit }) : GuideScreen({ ...opts, onExit })
+  return () => {
+    release()
+    teardown()
+  }
 }
 
 function shell(title: string, onExit: () => void) {
@@ -161,6 +191,7 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
   mount(root)
 
   const narrator = new Narrator()
+  preloadClips(lang)
   reportMissingClips(lang)
   const beacon = opts.config.beacon && session.audio ? new BeaconAudio(session.audio) : null
   let beaconOn = false
@@ -190,8 +221,8 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
     const say = narrator.next(v)
     if (say) {
       // Speech AND the live region, so VoiceOver gets it even with speech off.
-      // Each part of the instruction plays its pre-synthesised clip; only a part with
-      // no clip goes to /api/speak (Q9).
+      // Each part of the instruction plays its pre-synthesised clip; a part with no
+      // clip is spoken by the device voice, never /api/speak (Q9).
       if (opts.config.speak) playInstruction(say.text, { interrupt: say.interrupt, lang })
       announce(say.text)
     }
@@ -255,42 +286,80 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
   return teardown
 }
 
+/** Time to lift the phone from the button to the door before the frame is taken. */
+export const AIM_DELAY_MS = 1500
+
 function DoorCheckScreen(opts: { door: Entrance; config: OutputConfig; onExit: () => void }): () => void {
   const name = opts.door.name ?? t.unnamedEntrance
   const { root, cam } = shell(`${AP.checkTitle}: ${name}`, () => exit())
   root.classList.add('apr-check')
-  const status = h('p', { class: 'apr-status', role: 'status' }, AP.checking)
+  const status = h('p', { class: 'apr-status', role: 'status' }, AP.aim)
   const card = h('div', { class: 'apr-card', hidden: true })
-  root.append(h('div', { class: 'apr-panel' }, status, card))
+  const again = h('button', { class: 'apr-big apr-recheck', type: 'button', hidden: true }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'refresh'), AP.recheck)
+  root.append(h('div', { class: 'apr-panel' }, status, card, again))
   mount(root)
-  announce(AP.checking)
 
   let closed = false
-  // Exactly one request per screen. No retry loop, no beacon, no turn-by-turn.
-  let frame: string | null = null
-  void runDoorCheckOnce(
-    frameWhenReady(cam).then((f) => (frame = f)),
-    checkDoor,
-  ).then((result) => {
-    if (closed) return
-    const rows = verdictRows(result, lang)
-    const modelNote = verdictNote(result)
-    card.replaceChildren(
-      h('h2', { class: 'apr-card-title' }, AP.checkTitle),
-      h('dl', { class: 'apr-rows' }, ...rows.flatMap((r) => [h('dt', {}, r.label), h('dd', { class: r.unclear ? 'is-unclear' : '' }, r.value)])),
-      ...(modelNote ? [h('p', { class: 'apr-note' }, modelNote)] : []),
-    )
-    card.hidden = false
-    const note = !frame ? AP.noCamera : !result.reachable ? AP.offline : ''
-    status.textContent = note
-    status.hidden = !note
-    const spoken = [...rows.map((r) => `${r.label}: ${r.value}.`), modelNote, note].filter(Boolean).join(' ')
-    if (opts.config.speak) speak(spoken, { interrupt: true })
-    announce(spoken)
+  let timer = 0
+  let run = 0
+
+  const say = (text: string, interrupt = true) => {
+    if (opts.config.speak) speak(text, { interrupt })
+    announce(text)
+  }
+
+  // One request per tap: on open (after the aim pause) and on "Nochmal prüfen".
+  // No retry loop, no beacon, no turn-by-turn.
+  const check = () => {
+    const mine = ++run
+    status.textContent = AP.checking
+    status.hidden = false
+    say(AP.checking)
+    let frame: string | null = null
+    void runDoorCheckOnce(
+      frameWhenReady(cam).then((f) => (frame = f)),
+      checkDoor,
+    ).then((result) => {
+      if (closed || mine !== run) return
+      const rows = verdictRows(result, lang)
+      const modelNote = verdictNote(result)
+      card.replaceChildren(
+        h('h2', { class: 'apr-card-title' }, AP.checkTitle),
+        h('dl', { class: 'apr-rows' }, ...rows.flatMap((r) => [h('dt', {}, r.label), h('dd', { class: r.unclear ? 'is-unclear' : '' }, r.value)])),
+        ...(modelNote ? [h('p', { class: 'apr-note' }, modelNote)] : []),
+      )
+      card.hidden = false
+      const note = !frame ? AP.noCamera : !result.reachable ? AP.offline : ''
+      status.textContent = note
+      status.hidden = !note
+      again.hidden = false
+      again.disabled = false
+      say([...rows.map((r) => `${r.label}: ${r.value}.`), modelNote, note].filter(Boolean).join(' '))
+    })
+  }
+
+  // The phone is still pointed at the button that opened this screen: ask the user to
+  // aim first, and take the frame only after a pause.
+  const aimThenCheck = () => {
+    status.textContent = AP.aim
+    status.hidden = false
+    say(AP.aim)
+    window.clearTimeout(timer)
+    timer = window.setTimeout(() => {
+      if (!closed) check()
+    }, AIM_DELAY_MS)
+  }
+  again.addEventListener('click', () => {
+    // Disabled, not hidden: VoiceOver focus stays on the button for the next tap.
+    if (again.disabled) return
+    again.disabled = true
+    aimThenCheck()
   })
+  aimThenCheck()
 
   function teardown() {
     closed = true
+    window.clearTimeout(timer)
     try {
       speechSynthesis?.cancel()
     } catch {

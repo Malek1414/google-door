@@ -1,5 +1,6 @@
 import UIKit
 import WebKit
+import AVFoundation
 import CoreLocation
 import os
 
@@ -109,6 +110,32 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
         if location.authorizationStatus == .notDetermined { location.requestWhenInUseAuthorization() }
 
         load(from: 0)
+    }
+
+    // MARK: - Screen and sound stay on while Doorway is in front
+
+    /// The phone is held up and walked with; auto-lock mid-approach would cut the camera,
+    /// the compass and the voice. Only while this screen is visible (iOS itself ignores
+    /// the flag in the background).
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        UIApplication.shared.isIdleTimerDisabled = true
+        Self.playThroughSilentSwitch()
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        UIApplication.shared.isIdleTimerDisabled = false
+    }
+
+    /// Spoken guidance is the product for a blind user: like a navigation app it plays
+    /// with the ring/silent switch on. WKWebView's audio follows the host app's session.
+    private static func playThroughSilentSwitch() {
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.mixWithOthers])
+        } catch {
+            log.error("audio session: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }

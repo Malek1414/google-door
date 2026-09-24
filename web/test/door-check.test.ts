@@ -119,3 +119,27 @@ describe('one call per screen', () => {
     expect(screen).not.toMatch(/setInterval|requestAnimationFrame|postDoorCheck|while\s*\(/)
   })
 })
+
+describe('door check: aim first, then check; retry on request', () => {
+  const src = readFileSync(resolve(__dirname, '../src/ui/Approach.ts'), 'utf8')
+  const screen = src.slice(src.indexOf('function DoorCheckScreen'))
+  it('says "Kamera auf die Tür halten" and waits before the first frame', async () => {
+    const { AIM_DELAY_MS, AP } = await import('../src/ui/Approach')
+    expect(AIM_DELAY_MS).toBeGreaterThanOrEqual(1500)
+    expect(['Kamera auf die Tür halten.', 'Hold the camera on the door.']).toContain(AP.aim)
+    const aim = screen.slice(screen.indexOf('const aimThenCheck'))
+    expect(aim.indexOf('say(AP.aim)')).toBeGreaterThan(-1)
+    expect(aim).toMatch(/setTimeout\([\s\S]*check\(\)[\s\S]*AIM_DELAY_MS\)/)
+  })
+  it('offers "Nochmal prüfen" as a real button; one request per tap, no loop', () => {
+    expect(screen).toMatch(/h\('button', \{ class: 'apr-big apr-recheck', type: 'button'/)
+    expect(screen).toMatch(/again\.addEventListener\('click'/)
+    expect(screen.match(/runDoorCheckOnce\(/g)).toHaveLength(1)
+    expect(screen).not.toMatch(/setInterval|requestAnimationFrame|while\s*\(/)
+  })
+  it('the retry button is a Maps-size touch target (>= 44 px)', () => {
+    const css = readFileSync(resolve(__dirname, '../src/ui/approach.css'), 'utf8')
+    const m = /\.apr-big, \.apr-trigger \{[^}]*min-height: (\d+)px/.exec(css)
+    expect(Number(m?.[1])).toBeGreaterThanOrEqual(44)
+  })
+})

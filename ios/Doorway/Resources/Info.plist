@@ -11,6 +11,19 @@
   <key>CFBundleVersion</key><string>1</string>
   <key>LSRequiresIPhoneOS</key><true/>
   <!-- Same #131314 as the webview background, so launch -> page has no white flash. -->
+  <!-- iOS 27 refuses to launch an app without a scene manifest. -->
+  <key>UIApplicationSceneManifest</key>
+  <dict>
+    <key>UIApplicationSupportsMultipleScenes</key><false/>
+    <key>UISceneConfigurations</key>
+    <dict>
+      <key>UIWindowSceneSessionRoleApplication</key>
+      <array><dict>
+        <key>UISceneConfigurationName</key><string>Default</string>
+        <key>UISceneDelegateClassName</key><string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+      </dict></array>
+    </dict>
+  </dict>
   <key>UILaunchScreen</key><dict><key>UIColorName</key><string>LaunchBackground</string></dict>
   <key>UISupportedInterfaceOrientations</key>
   <array><string>UIInterfaceOrientationPortrait</string></array>

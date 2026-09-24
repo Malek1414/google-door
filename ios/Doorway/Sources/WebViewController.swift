@@ -151,7 +151,22 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
         attempt = index
         retry.isHidden = true
         status.text = "Verbinde …"
-        webView.load(URLRequest(url: urls[index], cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 12))
+        var req = URLRequest(url: urls[index], cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 12)
+        // Serveo puts a "Browser Warning" page in front of every browser navigation to a
+        // free tunnel. The header skips it for this load; the cookie (set first) skips it
+        // for every later navigation and reload inside the web view.
+        req.setValue("true", forHTTPHeaderField: Self.serveoSkip)
+        skipServeoWarning { [weak self] in self?.webView.load(req) }
+    }
+
+    private static let serveoSkip = "serveo-skip-browser-warning"
+
+    private func skipServeoWarning(then done: @escaping () -> Void) {
+        guard let cookie = HTTPCookie(properties: [
+            .domain: Origins.tunnelHost, .path: "/", .name: Self.serveoSkip, .value: "true",
+            .secure: "TRUE", .expires: Date().addingTimeInterval(365 * 24 * 3600),
+        ]) else { return done() }
+        webView.configuration.websiteDataStore.httpCookieStore.setCookie(cookie, completionHandler: done)
     }
 
     @objc private func retryTapped() { load(from: 0) }

@@ -19,6 +19,14 @@ Last updated: 2026-09-24 08:45, by Malek's agent: merged Sami's round 2 A+B (loo
 
 ## Open
 
+### Q15 · Before the 10:00 freeze: merge origin/main before each push
+- **Area:** `loop/ux` → `main`
+- **Why:** since 06:50 each loop/ux round has been built on the previous loop/ux, not on main, so every round has meant a hand merge of Approach.ts / LiveView.ts / approachEngine.ts / clips.ts (three tonight). Main already contains all of loop/ux up to 6e27a8d, merged and tested (full harness incl. iOS 26/27 simulators).
+- **Ask:** `git merge origin/main` into loop/ux before pushing, so the next round fast-forwards. After 09:30 only fixes, nothing new; 10:00 freeze.
+- **Status:** open
+- **Answer:**
+
+
 ### Q14 · English "View" label on the camera button
 - **Area:** `web/src/strings.ts` (German table)
 - **Why:** the German UI shows "View" on the Live View camera button.

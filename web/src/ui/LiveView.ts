@@ -37,6 +37,11 @@ export type Media = { kind: 'stream'; stream: MediaStream } | { kind: 'image'; u
 export interface Sensors {
   media: Media
   banner?: string
+  /**
+   * True for the ?sim=1 replay. Its track is a straight line to the door, so a real walking
+   * route would make distance, turns and "direkt vor dir" disagree with where it walks.
+   */
+  replay?: boolean
   /** Start feeding fixes and headings; onEnd fires when a replay runs out. Returns stop(). */
   start(onFix: (f: Fix) => void, onHeading: (h: Heading) => void, onEnd?: () => void): () => void
 }
@@ -622,6 +627,8 @@ export function LiveView(opts: {
     // One request, on the first real fix. Re-routing on every frame would burn quota
     // and make the arrow jitter between slightly different paths.
     // The route drawn in the preview is reused, so Start follows exactly what was shown.
+    // A replay walks a straight line: follow that line, never a route it does not walk.
+    if (!routeAsked && opts.sensors.replay) routeAsked = true
     if (!routeAsked) {
       routeAsked = true
       const hit = cachedRoute(pos, target)

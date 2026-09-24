@@ -340,7 +340,7 @@ export function MapView(opts: {
     )
     setSheet('route')
     if (map) {
-      map.setZoom(19)
+      map.setZoom(18)
       map.panTo({ lat: from.lat, lng: from.lon })
     }
     announce(NV.started)

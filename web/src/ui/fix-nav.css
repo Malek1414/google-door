@@ -56,3 +56,5 @@
 .gm-navend .ms { font-size: 26px; }
 .gm-navnear { width: 100%; justify-content: center; min-height: 48px; margin-top: 4px; }
 .gm-navnear[hidden] { display: none; }
+.gm[data-nav='on'][data-sheet='route'] { --sheet-h: 96px; }
+.gm[data-nav='on'][data-sheet='route']:has(.gm-navnear:not([hidden])) { --sheet-h: 156px; }

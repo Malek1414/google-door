@@ -39,6 +39,12 @@ export interface PlaceHit {
   /** true/false when opening hours allow a verdict, null when unknown. */
   openNow?: boolean | null
   photoUrl?: string
+  /** Up to six photos for the card's strip and Fotos tab; photoUrl is the first. */
+  photoUrls?: string[]
+  /** "19:00" while open, from the opening-hour periods. */
+  closesAt?: string
+  /** "9:00" (or "9:00 Mo." when not today) while closed. */
+  opensAt?: string
   access: PlaceAccess
 }
 
@@ -103,6 +109,41 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
 const WEEK_MIN = 7 * 24 * 60
 
 /** Open-now verdict from opening-hour periods in the place's local time; null when unknown. */
+const DAYS_DE = ['So.', 'Mo.', 'Di.', 'Mi.', 'Do.', 'Fr.', 'Sa.']
+const DAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+function clock(weekMin: number): string {
+  const m = ((weekMin % 1440) + 1440) % 1440
+  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`
+}
+
+/** When the place closes (open now) or next opens (closed now), as Maps writes it. */
+function openingEdges(place: google.maps.places.Place): { closesAt?: string; opensAt?: string } {
+  const hours = place.currentOpeningHours ?? place.regularOpeningHours
+  if (!hours || hours.periods.length === 0) return {}
+  const offset = place.utcOffsetMinutes
+  const now = new Date()
+  const local = offset == null ? now : new Date(now.getTime() + (offset + now.getTimezoneOffset()) * 60_000)
+  const nowMin = local.getDay() * 1440 + local.getHours() * 60 + local.getMinutes()
+  let nextOpen = Infinity
+  for (const p of hours.periods) {
+    if (!p.close) return {}
+    const open = p.open.day * 1440 + p.open.hour * 60 + p.open.minute
+    let close = p.close.day * 1440 + p.close.hour * 60 + p.close.minute
+    if (close <= open) close += WEEK_MIN
+    for (const shift of [0, WEEK_MIN]) {
+      if (nowMin + shift >= open && nowMin + shift < close) return { closesAt: clock(close) }
+    }
+    const until = (open - nowMin + WEEK_MIN) % WEEK_MIN
+    if (until < nextOpen) nextOpen = until
+  }
+  if (!Number.isFinite(nextOpen)) return {}
+  const at = nowMin + nextOpen
+  const sameDay = Math.floor(at / 1440) % 7 === local.getDay()
+  const day = (lang().startsWith('de') ? DAYS_DE : DAYS_EN)[Math.floor(at / 1440) % 7]
+  return { opensAt: sameDay ? clock(at) : `${clock(at)} ${day}` }
+}
+
 function computeOpenNow(place: google.maps.places.Place): boolean | null {
   const hours = place.currentOpeningHours ?? place.regularOpeningHours
   if (!hours || hours.periods.length === 0) return null
@@ -124,12 +165,15 @@ function toHit(place: google.maps.places.Place): PlaceHit | null {
   const loc = place.location
   if (!loc) return null
   const acc = place.accessibilityOptions
-  let photoUrl: string | undefined
-  try {
-    photoUrl = place.photos?.[0]?.getURI({ maxHeight: 400 })
-  } catch {
-    photoUrl = undefined
+  const photoUrls: string[] = []
+  for (const ph of (place.photos ?? []).slice(0, 6)) {
+    try {
+      photoUrls.push(ph.getURI({ maxHeight: 400 }))
+    } catch {
+      /* a photo without a URI is skipped */
+    }
   }
+  const photoUrl = photoUrls[0]
   return {
     placeId: place.id,
     name: place.displayName ?? '',
@@ -141,6 +185,8 @@ function toHit(place: google.maps.places.Place): PlaceHit | null {
     address: place.formattedAddress ?? undefined,
     openNow: computeOpenNow(place),
     photoUrl,
+    photoUrls,
+    ...openingEdges(place),
     access: {
       entrance: acc?.hasWheelchairAccessibleEntrance ?? null,
       restroom: acc?.hasWheelchairAccessibleRestroom ?? null,
@@ -203,12 +249,14 @@ export async function searchText(map: google.maps.Map, query: string): Promise<P
  *  can be shown. Same field set as search, so the card renders identically. */
 export async function fetchPlaceById(placeId: string): Promise<PlaceHit | null> {
   const { Place } = (await google.maps.importLibrary('places')) as google.maps.PlacesLibrary
-  const place = new Place({ id: placeId })
+  // Without requestedLanguage a POI tap answers in the browser default, and German
+  // users got "Art museum" on the card while search said "Kunstmuseum".
+  const place = new Place({ id: placeId, requestedLanguage: lang(), requestedRegion: 'de' })
   await place.fetchFields({
     fields: [
       'id', 'displayName', 'location', 'rating', 'userRatingCount',
       'primaryTypeDisplayName', 'formattedAddress', 'regularOpeningHours',
-      'photos', 'accessibilityOptions',
+      'photos', 'accessibilityOptions', 'currentOpeningHours', 'utcOffsetMinutes',
     ],
   })
   return toHit(place)

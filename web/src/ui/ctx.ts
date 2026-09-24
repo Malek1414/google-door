@@ -29,7 +29,7 @@ export interface FeatureCtx {
   /** Fetch walking directions to a point and draw them on the map. Resolves with the
    *  route so a panel can show distance, duration and the first instruction.
    *  MapView owns the polyline, so it also owns clearing it. */
-  showRoute: (to: LatLon) => Promise<Route | null>
+  showRoute: (to: LatLon, label?: string) => Promise<Route | null>
   /** Remove any drawn route. */
   clearRoute: () => void
 }

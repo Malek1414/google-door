@@ -1,69 +1,80 @@
 /* Sheet + bottom nav overrides. All values measured on real Google Maps iOS
    (full_home.png, 443x960 CSS px). Loaded after style.css. */
 
+/* Round 2: the recordings are 443 px wide for a 402 pt screen (iPhone 17 Pro), so one
+   recording pixel is 0.907 CSS px. Round 1 used them 1:1 and everything came out 10 %
+   too big. Numbers in the comments below are recording pixels; the values are scaled
+   by 402/443, except touch targets, which stay at 44 px or more. */
 .gm {
-  --sheet-h: 68px;                                     /* measured: sheet top 791 -> nav top 859 */
+  --sheet-h: 61.5px;                                     /* measured: sheet top 791 -> nav top 859 */
   --nav: #1c2224;                                      /* measured nav bg rgb(28,34,36) */
-  --nav-h: calc(66px + env(safe-area-inset-bottom));   /* measured: 859 -> 925 content, rest = home indicator */
+  --nav-h: calc(60px + env(safe-area-inset-bottom));   /* measured: 859 -> 925 content, rest = home indicator */
 }
 
 /* Sheet */
-.gm-sheet { border-radius: 22px 22px 0 0; background: #151316; } /* measured radius ~22, bg rgb(21,19,22) */
-.gm-handle { height: 22px; padding: 0; } /* measured: handle 9-13px below sheet top = centred in 22px */
+.gm-sheet { border-radius: 20px 20px 0 0; background: #151316; } /* measured radius ~22, bg rgb(21,19,22) */
+.gm-handle { height: 20px; padding: 0; } /* measured: handle 9-13px below sheet top = centred in 22px */
 .gm-handle span { width: 44px; height: 4px; border-radius: 2px; background: #605e61; } /* measured 44x4, rgb(96,94,97) */
-.gm-sheet-body { padding: 0 23px 22px; }             /* measured: title ink starts x=25, badge ends 23px from right */
-.gm-sheet-head { min-height: 44px; gap: 12px; }      /* measured: title centre 44px below sheet top */
-.gm-sheet-title { font-size: 24px; font-weight: 400; line-height: 30px; color: #e6e1e5; } /* measured cap height 18px */
+.gm-sheet-body { padding: 0 21px 20px; }             /* measured: title ink starts x=25, badge ends 23px from right */
+.gm-sheet-head { min-height: 44px; gap: 11px; }      /* measured: title centre 44px below sheet top */
+.gm-sheet-title { font-size: 22px; font-weight: 400; line-height: 27px; color: #e6e1e5; } /* measured cap height 18px */
 
 /* Right badge (weather chip) */
-.gm-badge { height: 44px; min-width: 60px; padding: 0 9px; border-radius: 8px; /* measured 60x44, radius 8 */
-  background: #323033; color: #e6e1e5; font-size: 15px; font-weight: 500;    /* measured bg rgb(50,48,51) */
+.gm-badge { height: 40px; min-width: 54.5px; padding: 0 8px; border-radius: 7.5px; /* measured 60x44, radius 8 */
+  background: #323033; color: #e6e1e5; font-size: 13.5px; font-weight: 500;    /* measured bg rgb(50,48,51) */
   justify-content: center; }
 
 /* Bottom nav */
 .gm-nav { background: var(--nav); }
-.gm-tab { justify-content: flex-start; padding-top: 5px; gap: 7px;  /* measured: pill top 5px below nav top, label cap top 49px */
-  height: 66px; font-size: 13px; line-height: 16px; font-weight: 500; color: #c4c9cb; } /* measured inactive label */
-.gm-tab-ic { width: 70px; height: 34px; border-radius: 17px; }    /* measured pill 70x34 */
-.gm-tab-ic .ms { font-size: 26px; }                                /* measured glyph ~22px */
+.gm-tab { justify-content: flex-start; padding-top: 4.5px; gap: 6.5px;  /* measured: pill top 5px below nav top, label cap top 49px */
+  height: 60px; font-size: 12px; line-height: 14.5px; font-weight: 500; color: #c4c9cb; } /* measured inactive label */
+.gm-tab-ic { width: 63.5px; height: 31px; border-radius: 15.5px; }    /* measured pill 70x34 */
+.gm-tab-ic .ms { font-size: 23.5px; }                                /* measured glyph ~22px */
 .gm-tab[aria-current='page'] { color: #e6e1e5; }                   /* measured active label */
 .gm-tab[aria-current='page'] .gm-tab-ic { background: #063c40; color: #a9f8ff; } /* measured pill rgb(6,60,64), icon rgb(169,248,255) */
 
 /* Route preview sheet. Measured off a screen recording of Maps walking directions:
    one summary line with small round buttons on the right, then a row of actions with
    only the first one filled. The sheet stops at the height of those two rows. */
-.gm[data-sheet='route'] { --sheet-h: 178px; }
+.gm[data-sheet='route'] { --sheet-h: 161.5px; }
 
 .gm-routehead {
   display: grid; grid-template-columns: auto 1fr auto; align-items: center;
-  column-gap: 12px; padding: 4px 4px 2px;
+  column-gap: 11px; padding: 4px 4px 2px;
 }
 .gm-routehead-ic { grid-row: 1 / 3; }
-.gm-routehead-ic .ms { font-size: 28px; color: var(--fg); display: block; }
-.gm-routehead-t { grid-column: 2; margin: 0; font: 500 22px/1.2 'Google Sans Flex', Roboto, sans-serif; color: #fff; }
+.gm-routehead-ic .ms { font-size: 25.5px; color: var(--fg); display: block; }
+.gm-routehead-t { grid-column: 2; margin: 0; font: 500 20px/1.2 'Google Sans Flex', Roboto, sans-serif; color: #fff; }
 .gm-routehead-sub {
-  grid-column: 2; font-size: 14px; color: var(--fg2);
+  grid-column: 2; font-size: 12.5px; color: var(--fg2);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .gm-routehead-sub:empty { display: none; }
-.gm-routehead-btns { grid-column: 3; grid-row: 1 / 3; display: flex; gap: 8px; }
+.gm-routehead-btns { grid-column: 3; grid-row: 1 / 3; display: flex; gap: 7.5px; }
 .gm-round-s {
-  width: 40px; height: 40px; flex: none; border: 0; border-radius: 50%;
+  width: 36.5px; height: 36.5px; flex: none; border: 0; border-radius: 50%;
   background: var(--round); color: var(--fg); display: grid; place-items: center;
   cursor: pointer; position: relative;
 }
-.gm-round-s .ms { font-size: 20px; }
+.gm-round-s .ms { font-size: 18px; }
 /* 44px touch target without growing the button */
 .gm-round-s::after { content: ''; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); }
 
-.gm-routeactions { display: flex; gap: 10px; padding: 14px 4px 0; overflow-x: auto; scrollbar-width: none; }
+.gm-routeactions { display: flex; gap: 9px; padding: 12.5px 4px 0; overflow-x: auto; scrollbar-width: none; }
 .gm-routeactions::-webkit-scrollbar { display: none; }
 
-.gm-steps { margin: 18px 0 0; padding: 0 0 0 22px; color: var(--fg); }
-.gm-steps li { margin: 0 0 14px; line-height: 1.35; }
+.gm-steps { margin: 16.5px 0 0; padding: 0 0 0 20px; color: var(--fg); }
+.gm-steps li { margin: 0 0 12.5px; line-height: 1.35; }
+.gm-sheet-body { scroll-padding-bottom: 87px; } /* a11y #20: a focused row never sits under the nav bar */
 
-/* A door that cannot carry guidance keeps the Start button in place, greyed. It must
-   never vanish: the next action would slide left into the slot the thumb is aiming at. */
-.gm-routeactions .gm-pill[disabled] { background: #2a2b2e; color: #7b7f83; cursor: default; }
-.gm-routeactions .gm-pill[disabled] .ms { color: #7b7f83; }
-.gm-sheet-body { scroll-padding-bottom: 96px; } /* a11y #20: a focused row never sits under the nav bar */
+/* Start that cannot guide (a place without a mapped entrance, a door with steps for a
+   step-free profile): it keeps slot 1 but must not look like the live teal action.
+   Outlined grey instead of filled teal, and the reason in a line under the row.
+   Text stays at 7:1 on the sheet so the label is still readable. */
+.gm-pill-primary:disabled, .gm-pill-primary[aria-disabled='true'] {
+  background: transparent; color: #c4c7c5; box-shadow: inset 0 0 0 1px #5f6368; cursor: not-allowed;
+}
+.gm-pill-primary:disabled .ms, .gm-pill-primary[aria-disabled='true'] .ms { color: #9aa0a6; }
+.gm-route-why { display: flex; gap: 8px; align-items: flex-start; margin: 12px 4px 0; font-size: 14px; line-height: 1.35; color: #c4c7c5; }
+.gm-route-why .ms { font-size: 18px; flex: none; margin-top: 1px; color: #9aa0a6; }
+.gm[data-sheet='route']:has(.gm-route-why) { --sheet-h: 232px; }

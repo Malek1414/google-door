@@ -37,6 +37,15 @@ export const D = {
     thenArrive: (name: string) => `Ankunft: ${name}`,
     liveNoRoute: 'Keine Route. Der Pfeil zeigt direkt zum Eingang, nicht entlang der Straße.',
     rerouting: 'Neue Route wird berechnet …',
+    walking: 'Zu Fuß',
+    fromHere: (to: string) => `Von deinem Standort nach ${to}`,
+    startWhy: {
+      place: 'Start braucht einen erfassten Eingang. Für diesen Ort gibt es noch keinen.',
+      'not-tier1': 'Start braucht einen genau vermessenen Eingang. Dieser ist es noch nicht.',
+      'bad-coords': 'Start geht nicht: Für diesen Eingang fehlt die genaue Position.',
+      'not-step-free': 'Start geht nicht: Dieser Eingang hat Stufen.',
+      'step-free-unknown': 'Start geht nicht: Ob dieser Eingang stufenlos ist, ist nicht bekannt.',
+    } as Record<string, string>,
   },
   en: {
     none: 'There is no walking route for this trip.',
@@ -52,6 +61,15 @@ export const D = {
     thenArrive: (name: string) => `Arrive: ${name}`,
     liveNoRoute: 'No route. The arrow points straight at the entrance, not along the street.',
     rerouting: 'Recalculating route …',
+    walking: 'Walking',
+    fromHere: (to: string) => `From your location to ${to}`,
+    startWhy: {
+      place: 'Start needs a mapped entrance. This place has none yet.',
+      'not-tier1': 'Start needs a precisely surveyed entrance. This one is not yet.',
+      'bad-coords': 'Start is not possible: this entrance has no exact position.',
+      'not-step-free': 'Start is not possible: this entrance has steps.',
+      'step-free-unknown': 'Start is not possible: it is not known whether this entrance is step-free.',
+    } as Record<string, string>,
   },
 }[lang === 'de' ? 'de' : 'en']
 
@@ -153,6 +171,17 @@ export function cachedRoute(from: LatLon, to: LatLon): { route: Route; from: Lat
   if (haversineM(last.to, to) > 3) return null
   if (haversineM(last.from, from) > 40) return null
   return { route: last.route, from: last.from }
+}
+
+/** The grey line under the route time, as Maps shows it: mode, then where to. */
+export function routeSubline(label: string | null): string {
+  return label ? `${D.walking} · ${D.fromHere(label)}` : D.walking
+}
+
+/** Why Start is disabled, in words, for the line under the actions. `reason` is the
+ *  guidance reason of the door, or null when the route goes to a place, not a door. */
+export function startBlockedReason(reason: string | null): string {
+  return D.startWhy[reason ?? 'place'] ?? D.startWhy.place
 }
 
 export function formatDistance(m: number): string {

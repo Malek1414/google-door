@@ -1,4 +1,8 @@
 /* Erkunden feed. Colours measured from the Google Maps iOS dark explore sheet (443x960 frames). */
+/* Round 2: the recordings are 443 px wide for a 402 pt screen (iPhone 17 Pro), so one
+   recording pixel is 0.907 CSS px. Round 1 used them 1:1 and everything came out 10 %
+   too big. Numbers in the comments below are recording pixels; the values are scaled
+   by 402/443, except touch targets, which stay at 44 px or more. */
 .gx-feed {
   --gx-bg: #151316;
   --gx-fg: #e0dee1;
@@ -15,16 +19,16 @@
   --gx-yellow: #ffd60a;
   background: var(--gx-bg);
   color: var(--gx-fg);
-  padding-bottom: 24px;
+  padding-bottom: 22px;
 }
 
 /* The feed runs full bleed with its own 23px insets; cancel the sheet body's 23px
    side padding so the title does not start at 46px. */
-.gm-sheet-body > .gx-feed { margin-inline: -23px; }
+.gm-sheet-body > .gx-feed { margin-inline: -21px; }
 
-.gx-section { padding-top: 12px; }
+.gx-section { padding-top: 11px; }
 .gx-section[hidden] { display: none; }
-.gx-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-right: 23px; }
+.gx-head { display: flex; align-items: center; justify-content: space-between; gap: 11px; padding-right: 21px; }
 /* measured (rec/full_home.png): peek title centre 40px under the sheet top and the weather
    chip ends just above the tab bar. The first visible section drops its top padding so the
    title lands there instead of 56px down with the chip under the nav. */
@@ -34,23 +38,23 @@
 .gx-feed > .gx-section[hidden] + .gx-section .gx-h--lead { padding-top: 4px; }
 .gx-h {
   margin: 0;
-  padding: 12px 23px 14px;
-  font-size: 22px;
-  line-height: 28px;
+  padding: 11px 21px 12.5px;
+  font-size: 20px;
+  line-height: 25.5px;
   font-weight: 400;
   color: var(--gx-fg);
 }
-.gx-h--lead { padding-top: 8px; }
+.gx-h--lead { padding-top: 7.5px; }
 
 .gx-carousel {
   list-style: none;
   margin: 0;
-  padding: 0 23px 4px;
+  padding: 0 21px 4px;
   display: flex;
-  gap: 10px;
+  gap: 9px;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
-  scroll-padding-inline: 23px;
+  scroll-padding-inline: 21px;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
 }
@@ -61,48 +65,48 @@
 .gx-place {
   all: unset;
   box-sizing: border-box;
-  width: min(342px, calc(100vw - 58px));
-  border-radius: 16px;
+  width: min(310.5px, calc(100vw - 52.5px));
+  border-radius: 14.5px;
   overflow: hidden;
   background: var(--gx-card);
   cursor: pointer;
   display: flex;
   flex-direction: column;
 }
-.gx-photo-wrap { position: relative; height: 378px; }
+.gx-photo-wrap { position: relative; height: 343px; }
 .gx-photo { display: block; width: 100%; height: 100%; object-fit: cover; }
 .gx-photo--empty { background: #3a2a22; }
 .gx-badge {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  padding: 0 14px;
-  height: 36px;
+  top: 9px;
+  right: 9px;
+  padding: 0 12.5px;
+  height: 32.5px;
   display: inline-flex;
   align-items: center;
-  border-radius: 18px;
+  border-radius: 16.5px;
   background: var(--gx-badge);
   color: var(--gx-fg);
-  font-size: 15px;
+  font-size: 13.5px;
 }
-.gx-body { padding: 14px 13px 16px; }
-.gx-name { margin: 0 0 4px; font-size: 18px; line-height: 24px; color: var(--gx-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gx-meta { margin: 0; font-size: 15px; line-height: 20px; color: var(--gx-fg2); display: flex; align-items: center; flex-wrap: wrap; }
+.gx-body { padding: 12.5px 12px 14.5px; }
+.gx-name { margin: 0 0 4px; font-size: 16.5px; line-height: 22px; color: var(--gx-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gx-meta { margin: 0; font-size: 13.5px; line-height: 18px; color: var(--gx-fg2); display: flex; align-items: center; flex-wrap: wrap; }
 .gx-rating { color: var(--gx-fg); margin-right: 2px; }
 .gx-star { color: var(--gx-star); flex: none; }
-.gx-open { margin: 2px 0 0; font-size: 15px; line-height: 20px; color: var(--gx-green); }
-.gx-closed { margin: 2px 0 0; font-size: 15px; line-height: 20px; color: var(--gx-red); }
+.gx-open { margin: 2px 0 0; font-size: 13.5px; line-height: 18px; color: var(--gx-green); }
+.gx-closed { margin: 2px 0 0; font-size: 13.5px; line-height: 18px; color: var(--gx-red); }
 
 .gx-all {
   all: unset;
   box-sizing: border-box;
-  margin: 24px 23px 8px;
-  width: calc(100% - 46px);
+  margin: 22px 21px 7.5px;
+  width: calc(100% - 44px);
   min-height: 44px;
-  border-radius: 22px;
+  border-radius: 20px;
   background: var(--gx-pill);
   color: var(--gx-pill-fg);
-  font-size: 15px;
+  font-size: 13.5px;
   font-weight: 500;
   display: flex;
   align-items: center;
@@ -116,49 +120,49 @@
 .gx-door {
   all: unset;
   box-sizing: border-box;
-  width: 248px;
-  min-height: 76px;
-  padding: 12px 14px;
-  border-radius: 16px;
+  width: 225px;
+  min-height: 69px;
+  padding: 11px 12.5px;
+  border-radius: 14.5px;
   background: #211f22;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 11px;
   cursor: pointer;
 }
 .gx-glyph {
   flex: none;
   width: 44px;
   height: 44px;
-  border-radius: 12px;
+  border-radius: 11px;
   background: var(--gx-yellow);
   border: 2px solid #000;
   display: grid;
   place-items: center;
 }
 .gx-door-text { display: flex; flex-direction: column; min-width: 0; }
-.gx-door-name { font-size: 16px; line-height: 22px; color: var(--gx-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gx-door-meta { font-size: 14px; line-height: 20px; color: var(--gx-fg2); }
+.gx-door-name { font-size: 14.5px; line-height: 20px; color: var(--gx-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gx-door-meta { font-size: 12.5px; line-height: 18px; color: var(--gx-fg2); }
 .gx-door-meta--ok { color: var(--gx-green); }
-.gx-empty { margin: 0 23px; color: var(--gx-fg2); font-size: 15px; line-height: 22px; }
+.gx-empty { margin: 0 21px; color: var(--gx-fg2); font-size: 13.5px; line-height: 20px; }
 
 /* Editorial tips, styled like "Tipps für Foodies" */
 .gx-tip {
   box-sizing: border-box;
-  width: min(288px, calc(100vw - 110px));
-  min-height: 250px;
-  padding: 16px 13px;
-  border-radius: 16px;
+  width: min(261.5px, calc(100vw - 100px));
+  min-height: 227px;
+  padding: 14.5px 12px;
+  border-radius: 14.5px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7.5px;
 }
 .gx-tip--teal { background: var(--gx-teal); }
 .gx-tip--plum { background: var(--gx-plum); }
-.gx-tip-title { margin: 0; font-size: 19px; line-height: 27px; font-weight: 400; color: var(--gx-fg); }
-.gx-tip-src { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 14px; color: #d1d1d3; }
-.gx-tip-dot { width: 18px; height: 18px; border-radius: 50%; background: var(--gx-yellow); flex: none; }
-.gx-tip-body { margin: 6px 0 0; font-size: 15px; line-height: 22px; color: var(--gx-fg); }
+.gx-tip-title { margin: 0; font-size: 17px; line-height: 24.5px; font-weight: 400; color: var(--gx-fg); }
+.gx-tip-src { margin: 0; display: flex; align-items: center; gap: 7.5px; font-size: 12.5px; color: #d1d1d3; }
+.gx-tip-dot { width: 16.5px; height: 16.5px; border-radius: 50%; background: var(--gx-yellow); flex: none; }
+.gx-tip-body { margin: 5.5px 0 0; font-size: 13.5px; line-height: 20px; color: var(--gx-fg); }
 
 .gx-place:focus-visible,
 .gx-door:focus-visible,

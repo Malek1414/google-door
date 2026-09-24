@@ -1,60 +1,64 @@
 /* Search bar, chips and "Ähnliche Orte ansehen" pill, matched to the real Maps frame (443x960). */
 
-.gm-top { padding-left: 15px; padding-right: 15px; } /* measured: bar spans x 15..427 */
+/* Round 2: the recordings are 443 px wide for a 402 pt screen (iPhone 17 Pro), so one
+   recording pixel is 0.907 CSS px. Round 1 used them 1:1 and everything came out 10 %
+   too big. Numbers in the comments below are recording pixels; the values are scaled
+   by 402/443, except touch targets, which stay at 44 px or more. */
+.gm-top { padding-left: 13.5px; padding-right: 13.5px; } /* measured: bar spans x 15..427 */
 
 .gm-search {
-  height: 53px;                 /* measured: y 76..128 */
-  border-radius: 26.5px;        /* measured: full pill */
-  padding: 0 9px 0 15px;        /* measured: pin starts 15 in, avatar ends 9 before the edge */
+  height: 48px;                 /* measured: y 76..128 */
+  border-radius: 24px;        /* measured: full pill */
+  padding: 0 8px 0 13.5px;        /* measured: pin starts 15 in, avatar ends 9 before the edge */
   background: #33343b;          /* measured: rgb(51 52 59) */
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.35); /* measured: 2px soft dark fringe under the bar */
 }
 
-.gm-logo { width: 24px; height: 30px; margin-right: 16px; } /* measured: pin x 30..53, y 88..117; text starts x 70 */
+.gm-logo { width: 22px; height: 27px; margin-right: 14.5px; } /* measured: pin x 30..53, y 88..117; text starts x 70 */
 
 .gm-search-input {
-  font: 400 21px/1 'Google Sans Flex', 'Google Sans', Roboto, sans-serif; /* measured: cap height 15px */
+  font: 400 19px/1 'Google Sans Flex', 'Google Sans', Roboto, sans-serif; /* measured: cap height 15px */
   color: #e3e3e8;
 }
 .gm-search-input::placeholder { color: #b1b2b9; opacity: 1; } /* measured: rgb(177 178 185) */
 
-.gm-search-btn { width: 54px; height: 53px; color: #e8eaeb; } /* measured: mic/lens/avatar centres 54px apart, glyph rgb(232 234 235) */
-.gm-search-btn .ms { font-size: 28px; } /* measured: mic glyph 16x22 */
+.gm-search-btn { width: 49px; height: 48px; color: #e8eaeb; } /* measured: mic/lens/avatar centres 54px apart, glyph rgb(232 234 235) */
+.gm-search-btn .ms { font-size: 25.5px; } /* measured: mic glyph 16x22 */
 
 .gm-avatar {
-  width: 33px; height: 33px;    /* measured: x 386..418, y 86..118 */
-  margin-left: 11px;            /* measured: lens centre 347.5 -> avatar left 386 */
+  width: 30px; height: 30px;    /* measured: x 386..418, y 86..118 */
+  margin-left: 10px;            /* measured: lens centre 347.5 -> avatar left 386 */
   background: #6068bf;          /* measured: rgb(96 104 191) */
-  font: 500 17px/33px 'Google Sans Flex', 'Google Sans', Roboto, sans-serif;
+  font: 500 15.5px/30px 'Google Sans Flex', 'Google Sans', Roboto, sans-serif;
 }
 
 .gm-chips {
-  gap: 11px;                    /* measured: 125..136, 270..281 */
-  margin: 15px -15px 0 0;       /* measured: chips top 144, bar bottom 128 */
-  padding-right: 15px;
+  gap: 10px;                    /* measured: 125..136, 270..281 */
+  margin: 13.5px -13.5px 0 0;       /* measured: chips top 144, bar bottom 128 */
+  padding-right: 13.5px;
 }
 
 .gm-chip {
-  height: 35px;                 /* measured: y 144..178 */
-  border-radius: 17.5px;        /* measured: full pill */
-  padding: 0 14px 0 9px;        /* measured: fork glyph at +11, text ends 14 before the edge */
-  gap: 8px;                     /* measured: glyph end 162 -> text start 172 */
+  height: 32px;                 /* measured: y 144..178 */
+  border-radius: 16px;        /* measured: full pill */
+  padding: 0 12.5px 0 8px;        /* measured: fork glyph at +11, text ends 14 before the edge */
+  gap: 7.5px;                     /* measured: glyph end 162 -> text start 172 */
   background: #3b393c;          /* measured: rgb(59 57 60) */
   color: #ebe9ec;               /* measured: rgb(235 233 236) */
-  font-size: 16px;              /* measured: cap height 12px */
+  font-size: 14.5px;              /* measured: cap height 12px */
   font-weight: 500;
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.3); /* measured: faint edge only */
 }
-.gm-chip .ms { font-size: 21px; } /* measured: glyph 16x18 inside a 21 box */
+.gm-chip .ms { font-size: 19px; } /* measured: glyph 16x18 inside a 21 box */
 
 .gm-more {
-  height: 38px;                 /* measured: y 151..188 */
-  border-radius: 19px;          /* measured: full pill */
-  padding: 0 27px;              /* measured: pill x 111..333, text x 138..305 */
-  margin-top: 23px;             /* measured: bar bottom 128 -> pill top 151 */
+  height: 34.5px;                 /* measured: y 151..188 */
+  border-radius: 17px;          /* measured: full pill */
+  padding: 0 24.5px;              /* measured: pill x 111..333, text x 138..305 */
+  margin-top: 21px;             /* measured: bar bottom 128 -> pill top 151 */
   background: #2b2b2f;          /* measured: rgb(43 43 47), opaque */
   color: #6ac6cf;               /* measured: rgb(106 198 207) */
-  font-size: 16px;
+  font-size: 14.5px;
   font-weight: 500;
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
 }

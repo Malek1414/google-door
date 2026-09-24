@@ -79,3 +79,12 @@
 /* Filter chips above a result list (Google style). */
 .pc-filters { margin: 8px -22px 4px 0; }
 .pc-list .gm-sheet-sub { margin: 4px 0 0; }
+
+/* Round 2, side by side with rec/full_place2.png at the same scale: the title is
+   regular weight, not medium; rating, category and hours are three tight grey lines
+   (pitch 22 px), and the pills start 14 px under the last one. */
+.pc-card .gm-sheet-title { font-weight: 400; color: #e3e3e3; }
+.pc-card .pc-meta { margin: 4px 0 0; font-size: 15px; line-height: 22px; }
+.pc-cat { margin: 0; font-size: 15px; line-height: 22px; color: var(--fg2, #c4c7c5); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pc-card > .pc-hours { margin: 0; font-size: 15px; line-height: 22px; }
+.pc-card > .gm-actions { margin-top: 14px; }

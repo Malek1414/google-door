@@ -10,7 +10,7 @@
 
 import { haversineM, type LatLon } from '../core/geo'
 import { CONNECTOR_MIN_M, instructionLine, walkMinutes, type Route } from '../core/route'
-import { computeRoute, D, formatDistance, stepsList, type RouteOutcome } from './Directions'
+import { computeRoute, D, formatDistance, routeSubline, startBlockedReason, stepsList, type RouteOutcome } from './Directions'
 import type { Profile } from '../core/profile'
 import { guidanceFor, markerKind, type ArrowTarget } from '../core/target'
 import type { Building, Entrance } from '../core/types'
@@ -271,16 +271,19 @@ export function MapView(opts: {
     // Start always holds the first slot. When this door cannot carry guidance the
     // button is disabled and says why — it does not disappear, because then the next
     // action shifts left into the place the thumb was already going.
+    const blocked = g?.kind !== 'arrow'
+    const why = blocked ? startBlockedReason(g?.kind === 'text' ? g.reason : null) : null
     const startBtn = h(
       'button',
       {
         class: 'gm-pill gm-pill-primary',
         type: 'button',
-        disabled: g?.kind !== 'arrow',
-        'aria-disabled': String(g?.kind !== 'arrow'),
+        disabled: blocked,
+        'aria-disabled': String(blocked),
+        ...(why ? { 'aria-describedby': 'route-start-why' } : {}),
         onclick: () => e && void beginGuidance(e),
       },
-      icon('navigation', true),
+      icon(blocked ? 'block' : 'navigation', true),
       t.startGuidance,
     )
 
@@ -296,13 +299,14 @@ export function MapView(opts: {
           h('p', {}, out.ok ? '' : out.message, h('small', {}, D.crow(t.metresShort(crowM)))),
         )
 
+    const whyLine = why ? [h('p', { id: 'route-start-why', class: 'gm-route-why' }, icon('info'), why)] : []
     sheetBody.replaceChildren(
       h(
         'div',
         { class: 'gm-routehead' },
         h('span', { class: 'gm-routehead-ic', 'aria-hidden': 'true' }, icon(r ? 'directions_walk' : 'wrong_location', true)),
         h('h2', { id: 'sheet-title', class: 'gm-routehead-t', tabindex: '-1' }, summary),
-        h('span', { class: 'gm-routehead-sub' }, label ?? ''),
+        h('span', { class: 'gm-routehead-sub' }, r ? routeSubline(label) : label ?? ''),
         h('div', { class: 'gm-routehead-btns' },
           e ? h('button', { class: 'gm-round-s', type: 'button', 'aria-label': t.share, onclick: () => void share(e) }, icon('ios_share')) : null,
           h('button', { class: 'gm-round-s', type: 'button', 'aria-label': t.clearRoute, onclick: () => clearRoute() }, icon('close')),
@@ -315,6 +319,7 @@ export function MapView(opts: {
         r ? action('', 'list', t.steps, () => setSheet(sheet.dataset.state === 'full' ? 'route' : 'full')) : action('', 'refresh', D.retry, retry),
         e ? action('', 'door_front', t.otherDoors, () => closeCard()) : null,
       ),
+      ...whyLine,
       body,
     )
     setSheet('route')
@@ -373,12 +378,14 @@ export function MapView(opts: {
     'section',
     { class: 'gm', 'aria-labelledby': 'map-title' },
     h('h1', { id: 'map-title', class: 'sr-only' }, t.mapTitle),
-    mapEl,
     h('div', { class: 'gm-top' }, search, chips, morePill, status),
     layersBtn,
     rightCol,
     sheet,
     nav,
+    // Last in the DOM, first on screen (absolute, under every z-indexed overlay): Tab
+    // reaches the search pill first, not the map region and Google's footer links.
+    mapEl,
   )
   mount(root)
   // The root and the sheet are fixed frames, never scroll containers. focus() and
@@ -425,7 +432,7 @@ export function MapView(opts: {
       opts.onContribute()
     },
     announce: (text) => announce(text),
-    showRoute: (to) => drawRoute(to),
+    showRoute: (to, label) => drawRoute(to, label),
     clearRoute: () => clearRoute(),
   }
   const order: SheetState[] = ['peek', 'half', 'full']

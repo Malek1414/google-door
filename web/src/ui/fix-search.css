@@ -60,7 +60,7 @@
 }
 
 /* designer review: measured Google profile purple */
-.gm-avatar { background: #807fc7; }
+.gm-avatar { background: #5f5eb0; } /* a11y #21: white S at 6.1:1 (was #807fc7, 3.6:1) */
 
 /* The pill is a button that opens the search screen (a11y blocker 1), styled as the field was. */
 button.gm-search-input { padding: 0; text-align: left; cursor: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: normal; }

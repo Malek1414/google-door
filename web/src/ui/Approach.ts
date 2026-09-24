@@ -150,7 +150,8 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
   root.classList.add('apr-guide')
 
   const arrow = bigArrow()
-  const angleEl = h('span', { class: 'apr-angle' }, '')
+  // Distance and direction are already spoken via #live; a bare "64°" adds nothing.
+  const angleEl = h('span', { class: 'apr-angle', 'aria-hidden': 'true' }, '')
   const distEl = h('p', { class: 'apr-dist' }, '')
   const instrEl = h('p', { class: 'apr-instr' }, '')
   const srcEl = h('p', { class: 'apr-src', hidden: true }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'map'), AP.fromMap)

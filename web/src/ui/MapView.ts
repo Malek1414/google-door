@@ -696,6 +696,7 @@ export function MapView(opts: {
     const fill = () => {
       if (!weather) return
       chip.replaceChildren(icon(weather.icon), h('span', {}, `${Math.round(weather.temp)}°`))
+      chip.setAttribute('role', 'img')
       chip.setAttribute('aria-label', `${Math.round(weather.temp)} Grad`)
       chip.hidden = false
     }

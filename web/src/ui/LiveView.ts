@@ -402,7 +402,8 @@ export function LiveView(opts: {
         noRouteEl.hidden = true
         lastWord = ''
       } else if (!route) {
-        noRouteEl.textContent = `${out.message} ${D.liveNoRoute}`
+        // Short, no technical reason (the key/quota detail helps nobody on the pavement).
+        noRouteEl.textContent = lang === 'de' ? 'Keine Route. Der Pfeil zeigt direkt zum Eingang.' : 'No route. The arrow points straight at the entrance.'
         noRouteEl.hidden = false
         announce(noRouteEl.textContent)
       }
@@ -626,7 +627,8 @@ export function LiveView(opts: {
     maybeSafety(now)
 
     distEl.textContent = t.metres(dist)
-    accEl.textContent = fix.accuracy !== null ? t.accuracy(fix.accuracy) : ''
+    // Good GPS needs no note; poor GPS is worth reading (fix-live.css: 16 px, 7:1).
+    accEl.textContent = fix.accuracy !== null && fix.accuracy > 10 ? t.accuracy(fix.accuracy) : ''
 
     if (arrived) {
       // Walked away again before leaving: cancel arrival and guide on.

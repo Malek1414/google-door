@@ -80,7 +80,8 @@ describe('the painted path', () => {
   it('near 180 the side already shown is kept, so the path does not flap', () => {
     expect(pathTurn(179, -1)).toBeLessThan(0)
     expect(pathTurn(-179, 1)).toBeGreaterThan(0)
-    expect(pathTurn(120, -1)).toBe(120) // a clear side wins
+    expect(pathTurn(100, -1)).toBe(100) // a clear side wins
+    expect(pathTurn(140)).toBe(MAX_TURN_DEG)
   })
   it('the path starts straight ahead of the feet', () => {
     const p = pathPoint(1, 90)

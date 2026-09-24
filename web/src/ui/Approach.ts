@@ -16,7 +16,7 @@ import type { OutputConfig } from '../core/profile'
 import type { Entrance } from '../core/types'
 import { announce, keepScreenOn, session } from '../session'
 import { lang } from '../strings'
-import { engine, type ApproachMode, type ApproachView } from './approachPort'
+import { engine, type ApproachMode, type ApproachView, type StartApproach } from './approachPort'
 import { playInstruction, playLine, preloadClips, reportMissingClips, stopLines } from './clips'
 import { checkDoor, runDoorCheckOnce, verdictNote, verdictRows } from './doorCheck'
 import { h, mount, s } from './dom'
@@ -171,7 +171,18 @@ function bigArrow(): SVGSVGElement {
   )
 }
 
-export function Approach(opts: { door: Entrance; mode: ApproachMode; config: OutputConfig; onExit: () => void }): () => void {
+export interface ApproachOpts {
+  door: Entrance
+  mode: ApproachMode
+  config: OutputConfig
+  onExit: () => void
+  /** The engine to run. Default: approachPort.engine() (the real one, or ?approach=demo). */
+  start?: StartApproach
+  /** The ?demo=1 loop: close this long after `through`, so the demo returns to the map. */
+  exitAfterThroughMs?: number
+}
+
+export function Approach(opts: ApproachOpts): () => void {
   // The phone is held up for the whole approach: the screen must not lock under it.
   const releaseScreen = keepScreenOn()
   let released = false
@@ -199,7 +210,7 @@ function shell(title: string, onExit: () => void) {
   return { root, cam }
 }
 
-function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () => void }): () => void {
+function GuideScreen(opts: ApproachOpts): () => void {
   const name = pathDoorName(opts.door)
   const { root, cam } = shell(`${AP.title}: ${name}`, () => exit())
   root.classList.add('apr-guide')
@@ -232,6 +243,7 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
   const steady = new SteadyAngle()
   let shownDeg: number | null = null
   let current: ApproachView | null = null
+  let throughTimer = 0
   let hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden'
   const render = (v: ApproachView) => {
     current = v
@@ -262,6 +274,9 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
     safetyEl.hidden = !lay.safety
     // VoiceOver: land on the only thing there is to do in `through`.
     if (enteringThrough) outsideBtn.focus()
+    // Demo loop only: `through` ends the approach and the map comes back.
+    if (v.phase === 'through' && opts.exitAfterThroughMs !== undefined && !throughTimer)
+      throughTimer = window.setTimeout(() => exit(), opts.exitAfterThroughMs)
 
     // Backgrounded: draw, but say nothing and keep the beacon off; resume re-says it.
     const say = hidden ? null : narrator.next(v)
@@ -287,7 +302,7 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
   }
 
   const stopHeading: (() => void)[] = []
-  const run = engine()({
+  const run = (opts.start ?? engine())({
     door: opts.door,
     frame: () => grabFrame(cam),
     onHeading: (cb) => {
@@ -340,6 +355,7 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
     if (done) return
     done = true
     document.removeEventListener('visibilitychange', onVisibility)
+    clearTimeout(throughTimer)
     unsubscribe()
     run.stop()
     stopHeading.forEach((f) => f())

@@ -66,6 +66,26 @@ export function sampleTrack(track: TrackPoint[], at: number): TrackPoint {
   }
 }
 
+/** How far out the ?demo=1 walk starts, and how fast it walks (m/s). */
+export const DEMO_WALK_M = 9
+export const DEMO_WALK_MPS = 1.5
+
+/**
+ * The ?demo=1 walk: a straight line to the door along its approach bearing, DEMO_WALK_M
+ * long, then a minute standing at the door (so "Wiedergabe beendet" does not talk over the
+ * arrival sheet). Arrives (core/beacon ARRIVE_M) after about 4 s; the sheet follows 1.5 s later.
+ */
+export function demoWalkTrack(door: { lat: number; lon: number; approachBearing: number | null }): TrackPoint[] {
+  const heading = door.approachBearing ?? 0
+  const back = ((heading + 180) * Math.PI) / 180
+  const mLat = 111_195
+  const mLon = mLat * Math.cos((door.lat * Math.PI) / 180)
+  const at = (m: number) => ({ lat: door.lat + (Math.cos(back) * m) / mLat, lon: door.lon + (Math.sin(back) * m) / mLon })
+  const walkS = DEMO_WALK_M / DEMO_WALK_MPS
+  const pt = (t: number, m: number): TrackPoint => ({ t, ...at(m), heading, accuracy: 5, headingSource: 'ios-webkit' })
+  return [pt(0, DEMO_WALK_M), pt(walkS / 2, DEMO_WALK_M / 2), pt(walkS, 0), pt(walkS + 60, 0)]
+}
+
 export async function loadTrack(path: string): Promise<TrackPoint[]> {
   const r = await fetch(`${import.meta.env.BASE_URL}${path}`)
   if (!r.ok) throw new Error(`track ${path}: HTTP ${r.status}`)

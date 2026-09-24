@@ -12,9 +12,9 @@
   "counts": {
    "buildings": 106,
    "entrances": 3061,
-   "tier1": 296,
+   "tier1": 297,
    "described": 296,
-   "withBearing": 147
+   "withBearing": 148
   }
  },
  "buildings": [
@@ -54742,18 +54742,20 @@
    "buildingId": null,
    "lat": 52.523126,
    "lon": 13.39214,
-   "name": null,
-   "kind": "yes",
-   "level": null,
+   "name": "Google Berlin, Haupteingang Tucholskystra\u00dfe 2",
+   "kind": "main",
+   "level": 0,
    "stepFree": null,
-   "tier": 0,
+   "tier": 1,
    "confidence": "unknown",
    "door": "hinged",
    "automatic": false,
-   "approachBearing": null,
-   "description": null,
+   "approachBearing": 109.6,
+   "description": "Haupteingang unter dem Vordach an der Tucholskystra\u00dfe, T\u00fcr nach Osten. Stufen noch nicht gepr\u00fcft.",
    "warnings": [],
-   "source": "osm"
+   "source": "osm",
+   "demo": true,
+   "verify": "vor Ort best\u00e4tigen: stepFree (Stufen/Schwelle), T\u00fcrbreite, automatische T\u00fcr, Klingel, Lage der T\u00fcr unter dem Vordach"
   },
   {
    "id": "node/8725363670",

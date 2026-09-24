@@ -51,3 +51,7 @@
   outline: 2px solid var(--health-banner-fg);
   outline-offset: 2px;
 }
+
+/* During the approach the guidance is the only voice: no banner over the camera view,
+   and no polite live-region announcement in the middle of "Leicht links". */
+body:has(.apr) .health-banner { display: none; }

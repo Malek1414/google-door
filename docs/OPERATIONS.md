@@ -68,7 +68,8 @@ silent-but-safe: the line goes to `/api/speak` and costs one request.
 ## Rebuilding
 
     cd web && npm test && npm run build        # 306 tests
-    cd ios && xcodebuild -project Doorway.xcodeproj -scheme Doorway \
+    cd ios && xcodegen generate     # the .xcodeproj is gitignored; a stale one lacks SceneDelegate
+    xcodebuild -project Doorway.xcodeproj -scheme Doorway \
       -configuration Debug -destination 'id=<UDID>' -derivedDataPath /tmp/dw-dd build
     xcrun devicectl device install app --device <UDID> \
       /tmp/dw-dd/Build/Products/Debug-iphoneos/Doorway.app

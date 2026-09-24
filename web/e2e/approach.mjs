@@ -37,6 +37,7 @@ const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Conte
 const SAFETY = /Ich führe dich nur zur Tür/
 const UNSURE = /Ich bin mir gerade unsicher/
 const FROM_MAP = /Richtung aus der Karte/
+const NO_DIRECTION = /Ich sehe den Eingang nicht und habe keine Richtung dafür/
 const PROFILE_KEY = 'doorway.profile'
 const BLIND = { stepFreeRequired: false, channels: ['speech', 'visual'] }
 const WHEELCHAIR = { stepFreeRequired: true, channels: ['visual'] }
@@ -47,16 +48,15 @@ const WHEELCHAIR = { stepFreeRequired: true, channels: ['visual'] }
 const DOOR_COMPASS = 60
 const SIM_DOOR = 'node/10795939972' // config.ts DEFAULT_SIM_DOOR
 const STEP_M = 0.68
-const world = { heading: 100, distanceM: 8, walking: false }
+const world = { heading: 100, distanceM: 8, walking: false, visionFails: false, surveyBearing: true }
 const overrides = [] // DoorFix bodies served before falling back to the truth
 const doorFixLog = [] // { ts, heading, body }
 let doorCheckCalls = 0
-// `through` with the real engine: core/approach.ts has visionSaysInside(), but neither
-// DoorFix (CONTRACT) nor /api/door-fix carries an "inside" signal, and the core has no
-// "user stops in the threshold" rule yet. So nothing can end the threshold phase, and
-// every check that needs `through` is SKIPPED (not failed) until Malek adds one.
-const THROUGH_REACHABLE = DEMO
-const THROUGH_SKIP = 'no "inside" signal in DoorFix/door-fix and no stop rule in core/approach.ts (question for Malek)'
+// `through` is PROPOSED two ways (CONTRACT § Phases, 0c88afc):
+//   DoorFix.inside  explicit true at confidence >= 0.6 (0.55 must not count)
+//   stillness       no steps for STILL_MS = 4 s while in `threshold`
+// "Noch draußen" takes either back and restarts the stillness clock.
+const STILL_MS = 4000
 
 const rel = (compass, heading) => ((((compass - heading) % 360) + 540) % 360) - 180
 function truthFix() {
@@ -67,16 +67,19 @@ function truthFix() {
     confidence: 0.88,
     kind: 'sliding',
     note: 'Glastür',
+    inside: false,
     ts: Date.now(),
     source: 'gemini-frame',
   }
 }
-const NOT_FOUND = () => ({ found: false, bearingDeg: 0, distanceM: 0, confidence: 0.1, kind: 'unknown', note: '', ts: Date.now(), source: 'gemini-frame' })
+const NOT_FOUND = () => ({ found: false, bearingDeg: 0, distanceM: 0, confidence: 0.1, kind: 'unknown', note: '', inside: false, ts: Date.now(), source: 'gemini-frame' })
+
+const INSIDE = (confidence) => ({ ...truthFix(), inside: true, confidence })
 
 // ── page-side instrumentation (runs before the app) ─────────────────────────
 function initScript({ profileKey, profile }) {
   try { localStorage.setItem(profileKey, JSON.stringify(profile)) } catch { /* ignored */ }
-  const rec = { live: [], phases: [], outsideVisibleIn: [], fromMapSeen: 0, geoTotal: 0, geoDuringApproach: 0, aprSeen: false, stepsSent: 0 }
+  const rec = { live: [], phases: [], phaseAt: [], arrowShownAt: [], outsideVisibleIn: [], fromMapSeen: 0, geoTotal: 0, geoDuringApproach: 0, aprSeen: false, stepsSent: 0 }
   window.__rec = rec
   // Count every geolocation call; the ones after the approach screen opens must be zero.
   const geo = navigator.geolocation
@@ -102,9 +105,14 @@ function initScript({ profileKey, profile }) {
       const src = apr?.querySelector('.apr-src')
       if (src && !src.hidden && !rec.fromMapVisible) rec.fromMapSeen++
       rec.fromMapVisible = !!(src && !src.hidden)
+      const dir = apr?.querySelector('.apr-dir')
+      const arrowOn = !!(dir && !dir.hidden && !dir.closest('[hidden]'))
+      if (arrowOn && !rec.arrowVisible) rec.arrowShownAt.push(Date.now())
+      rec.arrowVisible = arrowOn
       const ph = apr?.getAttribute('data-phase')
       if (ph && rec.phases[rec.phases.length - 1] !== ph) {
         rec.phases.push(ph)
+        rec.phaseAt.push(Date.now())
         const btn = apr.querySelector('.apr-big')
         if (btn && !btn.hidden) rec.outsideVisibleIn.push(ph)
       }
@@ -114,7 +122,9 @@ function initScript({ profileKey, profile }) {
   else document.addEventListener('DOMContentLoaded', watchDom)
 
   // Sensor driver: compass + pitch at 20 Hz, motion at 50 Hz.
-  const drive = { heading: 100, beta: 80, walking: false, stepHz: 2 }
+  // motion:false stops devicemotion entirely (the stillness route); walking:false still
+  // sends flat noise, as a phone held by a standing person does.
+  const drive = { heading: 100, beta: 80, walking: false, stepHz: 2, motion: true }
   window.__drive = drive
   let t0 = performance.now()
   // Desktop Chrome may lack the sensor event constructors: fall back to a plain Event
@@ -139,6 +149,7 @@ function initScript({ profileKey, profile }) {
   }, 50)
   let lastPhase = 0
   setInterval(() => {
+    if (!drive.motion) return
     const t = (performance.now() - t0) / 1000
     // One sharp vertical peak per step while walking, flat noise while standing.
     const phase = (t * drive.stepHz) % 1
@@ -162,13 +173,16 @@ const browser = await chromium.launch({
 })
 const results = []
 function check(name, ok, note = '') {
-  results.push({ name, ok, skipped: false })
+  results.push({ name, ok })
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${note ? `  (${note})` : ''}`)
 }
-function skip(name, reason) {
+/** Real engine: a check. Demo engine: SKIP with the reason, never a fake PASS or FAIL. */
+function realOnly(reason, name, ok, note = '') {
+  if (!DEMO) return check(name, ok, note)
   results.push({ name, ok: true, skipped: true })
-  console.log(`SKIP ${name}  (${reason})`)
+  console.log(`SKIP ${name}  (demo: ${reason})`)
 }
+const NO_FIX_CALLS = 'the scripted demo makes no door-fix calls'
 const errors = []
 
 async function newPage(profile) {
@@ -179,7 +193,7 @@ async function newPage(profile) {
   await ctx.addInitScript(initScript, { profileKey: PROFILE_KEY, profile })
   // Vision: scripted. Live token: refused, so the engine takes the per-frame path.
   await ctx.route('**/api/door-fix**', async (route) => {
-    const body = overrides.length ? overrides.shift() : truthFix()
+    const body = overrides.length ? overrides.shift() : world.visionFails ? NOT_FOUND() : truthFix()
     doorFixLog.push({ ts: Date.now(), heading: world.heading, body })
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
   })
@@ -188,8 +202,9 @@ async function newPage(profile) {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ step: false, widthCm: 92, opens: 'automatic', note: 'Schiebetür', confidence: 0.9 }) })
   })
   // The sim door (Hbf, node/10795939972) has no surveyed approachBearing, so the map
-  // fallback could never fire. Give it one that matches the scripted world.
-  await ctx.route('**/data/berlin-mitte.json', async (route) => {
+  // fallback could never fire. Give it one that matches the scripted world, except in
+  // the no-direction scenario, which needs exactly that gap.
+  if (world.surveyBearing) await ctx.route('**/data/berlin-mitte.json', async (route) => {
     const res = await route.fetch()
     const d = await res.json()
     const list = Array.isArray(d) ? d : d.entrances ?? []
@@ -288,34 +303,65 @@ if (results.at(-1).ok) {
   const fromMapShown = await srcNote.count().catch(() => 0)
   await shot(page, '03-osm-fallback')
   overrides.length = 0
-  // e. threshold: under 1.5 m.
+  // e. threshold: under 1.5 m. Keep stepping in place from here on, so the stillness
+  //    route cannot fire while the vision route is under test.
   await walk(1)
+  world.walking = true
+  await setDrive(page, { walking: true })
   const atThreshold = await waitPhase(page, ['threshold'], 8000)
   await shot(page, '04-threshold')
-  // f. through: the demo script gets there by itself; the real engine cannot (see THROUGH_SKIP).
-  const through = THROUGH_REACHABLE ? await waitPhase(page, ['through'], 12000) : false
-  if (THROUGH_REACHABLE) await shot(page, '05-through')
 
-  // g. "Noch draußen" overrides and guidance keeps running.
+  // f. hedged interior: inside:true at confidence 0.55 must NOT propose `through`.
+  const hedgedFrom = doorFixLog.length
+  for (let i = 0; i < 12; i++) overrides.push(INSIDE(0.55))
+  const hedgedPhasesFrom = (await rec(page)).phases.length
+  await page.waitForTimeout(DEMO ? 1000 : 7000)
+  const hedgedServed = doorFixLog.slice(hedgedFrom).filter((x) => x.body.inside && x.body.confidence < 0.6).length
+  const hedgedPhases = (await rec(page)).phases.slice(hedgedPhasesFrom)
+  overrides.length = 0
+
+  // g. vision route: inside:true at confidence 0.8 → `through`, while still stepping.
+  for (let i = 0; i < 12; i++) overrides.push(INSIDE(0.8))
+  const visionThrough = await waitPhase(page, ['through'], DEMO ? 20000 : 10000)
+  const insideServed = doorFixLog.filter((x) => x.body.inside && x.body.confidence >= 0.6).length
+  overrides.length = 0
+  await shot(page, '05-through-vision')
   const btn = page.locator('button.apr-big', { hasText: 'Noch draußen' }).first()
-  const btnVisible = await btn.isVisible().catch(() => false)
+  const btnVisible = visionThrough && (await btn.isVisible().catch(() => false))
+
+  // h. "Noch draußen": back to threshold, guidance keeps running, and standing there
+  //    does not re-propose within STILL_MS (the clock restarted on the press).
+  world.walking = false
+  await setDrive(page, { walking: false, motion: false })
   let keptRunning = false
+  let reproposed = true
   let afterNote = 'button not visible'
+  let pressedAt = 0
   if (btnVisible) {
     world.distanceM = 1
     const fixesBefore = doorFixLog.length
     const liveBefore = (await rec(page)).live.length
     await btn.click()
+    pressedAt = Date.now()
     await page.waitForTimeout(1000)
-    const ph = await phaseOf(page) // right after the override: out of `through`
-    await page.waitForTimeout(3000) // then: still asking vision / still talking
-    const alive = await page.locator('section.apr').count()
+    const ph = await phaseOf(page)
+    await page.waitForTimeout(STILL_MS - 1500) // still inside the fresh stillness window
+    const phNow = await phaseOf(page)
     const r2 = await rec(page)
     const progressed = doorFixLog.length > fixesBefore || r2.live.length > liveBefore
-    keptRunning = alive > 0 && ph !== 'through' && progressed
-    afterNote = `phase ${ph}, +${doorFixLog.length - fixesBefore} door-fix, +${r2.live.length - liveBefore} announcements`
+    keptRunning = (await page.locator('section.apr').count()) > 0 && ph === 'threshold' && progressed
+    reproposed = r2.phaseAt.some((t, k) => t > pressedAt && r2.phases[k] === 'through')
+    afterNote = `phase ${ph} then ${phNow}, +${doorFixLog.length - fixesBefore} door-fix, +${r2.live.length - liveBefore} announcements`
     await shot(page, '06-still-outside')
   }
+
+  // i. stillness route: no motion at all, no inside flag → `through` after STILL_MS.
+  const stillThrough = pressedAt ? await waitPhase(page, ['through'], STILL_MS + 6000) : false
+  const r3 = await rec(page)
+  const stillAt = r3.phaseAt.find((t, k) => t > pressedAt && r3.phases[k] === 'through')
+  const stillAfterMs = stillAt ? stillAt - pressedAt : null
+  const insideDuringStill = doorFixLog.some((x) => x.ts > pressedAt && x.body.inside)
+  if (stillThrough) await shot(page, '06b-through-stillness')
 
   const r = await rec(page)
   const hits = (re) => r.live.reduce((n, x) => n + (x.match(new RegExp(re.source, 'g')) ?? []).length, 0)
@@ -329,23 +375,56 @@ if (results.at(-1).ok) {
   check('guide: threshold reached under 1.5 m', atThreshold || r.phases.includes('threshold'))
   const wrongPhases = r.outsideVisibleIn.filter((p) => p !== 'through')
   check('guide: "Noch draußen" never outside through', wrongPhases.length === 0, wrongPhases.length ? `also in ${wrongPhases.join(',')}` : '')
-  if (THROUGH_REACHABLE) {
-    check('guide: through after threshold', through && r.phases.lastIndexOf('through') > firstIdx[2], r.phases.join('→'))
-    check('guide: "Noch draußen" visible in through', btnVisible)
-    check('guide: "Noch draußen" keeps guidance running', keptRunning, afterNote)
-  } else {
-    skip('guide: through after threshold', THROUGH_SKIP)
-    skip('guide: "Noch draußen" visible in through', THROUGH_SKIP)
-    skip('guide: "Noch draußen" keeps guidance running', THROUGH_SKIP)
-  }
+  realOnly(NO_FIX_CALLS, 'guide: inside at 0.55 does not propose through', hedgedServed > 0 && !hedgedPhases.includes('through'), `${hedgedServed} hedged fix(es) served, phases ${hedgedPhases.join('→') || '(none)'}`)
+  realOnly(NO_FIX_CALLS, 'guide: inside at 0.8 proposes through', visionThrough && insideServed > 0 && r.phases.lastIndexOf('through') > firstIdx[2], `${insideServed} inside fix(es) served; ${r.phases.join('→')}`)
+  check('guide: "Noch draußen" visible in through', btnVisible)
+  check('guide: "Noch draußen" → threshold, guidance keeps running', keptRunning, afterNote)
+  check('guide: not re-proposed right after "Noch draußen"', pressedAt > 0 && !reproposed)
+  check('guide: stillness > 4 s at threshold proposes through', stillThrough && stillAfterMs !== null && stillAfterMs >= STILL_MS - 300 && !insideDuringStill,
+    `${stillAfterMs === null ? 'never' : `${stillAfterMs} ms after press`}${insideDuringStill ? ', but an inside fix was served' : ''}`)
 
   check('guide: osm-fallback shown when vision fails', fromMapShown > 0 || r.fromMapSeen > 0, `${fromMapShown} visible now, shown ${r.fromMapSeen}x`)
   const unsureHits = hits(UNSURE)
   check('guide: unstable fixes → unsure line once', unsureHits === 1, `${unsureHits}x`)
   check('guide: no geolocation during approach', r.geoDuringApproach === 0, `${r.geoDuringApproach} call(s) after open, ${r.geoTotal} total`)
-  check('guide: engine asked vision', DEMO || doorFixLog.length > 0, `${doorFixLog.length} door-fix call(s), ${doorFixLog.filter((x) => !x.body.found).length} not found, ${r.stepsSent} steps sent`)
+  realOnly(NO_FIX_CALLS, 'guide: engine asked vision', doorFixLog.length > 0, `${doorFixLog.length} door-fix call(s), ${doorFixLog.filter((x) => !x.body.found).length} not found, ${r.stepsSent} steps sent`)
 }
 await page.context().close()
+
+// ── 2. no direction: vision fails and the door has no surveyed bearing ───────
+// A short run of good fixes, then only found:false. The sim door is NOT patched here,
+// so there is nothing honest to point at: the engine must say so once and hide the arrow.
+Object.assign(world, { heading: 60, distanceM: 8, walking: false, visionFails: false, surveyBearing: false })
+overrides.length = 0
+doorFixLog.length = 0
+page = await newPage(BLIND)
+try {
+  how = await reachApproach(page, 'demo')
+  await page.waitForTimeout(3000)
+  world.visionFails = true
+  const failFrom = Date.now()
+  // Stale anchor (> 8 s) plus FALLBACK_AFTER misses, then time to (not) repeat itself.
+  const deadline = Date.now() + 30000
+  while (Date.now() < deadline) {
+    const r = await rec(page)
+    if (r.live.some((x) => NO_DIRECTION.test(x))) break
+    await page.waitForTimeout(500)
+  }
+  await page.waitForTimeout(6000)
+  await shot(page, '08-no-direction')
+  const r = await rec(page)
+  const n = r.live.reduce((k, x) => k + (x.match(new RegExp(NO_DIRECTION.source, 'g')) ?? []).length, 0)
+  const lineAt = Date.now()
+  const arrowNow = r.arrowVisible
+  const misses = doorFixLog.filter((x) => x.ts >= failFrom && !x.body.found).length
+  check('no-direction: line spoken once', n === 1, `${n}x, ${misses} not-found fix(es), ${how}`)
+  realOnly('the script shows no-direction only in its first step, then moves on (unit test covers the layout)', 'no-direction: no arrow', !arrowNow && !r.fromMapSeen, `arrow ${arrowNow ? 'visible' : 'hidden'} at ${lineAt - failFrom} ms, map note shown ${r.fromMapSeen}x`)
+} catch (e) {
+  await shot(page, '08-no-direction')
+  check('no-direction: line spoken once', false, String(e.message || e).split('\n')[0])
+}
+await page.context().close()
+world.surveyBearing = true
 
 // ── 2. wheelchair: one verdict ──────────────────────────────────────────────
 page = await newPage(WHEELCHAIR)

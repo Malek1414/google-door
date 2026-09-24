@@ -12,7 +12,7 @@ import './entrance-editor.css'
 
 const de = {
   title: 'Eingang eintragen',
-  dragHint: 'Genau auf die Tür ziehen',
+  dragHint: 'Zieh die Stecknadel genau auf die Tür, oder nutze die Knöpfe hier.',
   pinMoved: 'Stecknadel verschoben.',
   useMyLocation: 'Meinen Standort verwenden',
   nudgeGroup: 'Stecknadel um 2 Meter verschieben',
@@ -22,12 +22,13 @@ const de = {
   noMap: 'Keine Karte verfügbar. Position als Zahlen eingeben.',
   name: 'Name (optional)',
   namePh: 'z. B. Haupteingang',
-  stepFree: 'Stufenlos?',
+  stepFree: 'Kommt man ohne Stufen hinein?',
   yes: 'Ja',
   no: 'Nein',
   unknown: 'Weiß nicht',
   ramp: 'Rampe vorhanden',
   doorType: 'Türart',
+  doorUnknown: 'Weiß nicht',
   doorNone: 'Keine Tür',
   doorHinged: 'Flügeltür',
   doorSliding: 'Schiebetür',
@@ -35,7 +36,7 @@ const de = {
   automatic: 'Öffnet automatisch',
   bell: 'Klingel vorhanden',
   width: 'Türbreite in cm',
-  tactile: 'Blindenleitsystem oder taktile Hinweise',
+  tactile: 'Tastbare Bodenrillen oder Hinweise für blinde Menschen',
   note: 'Notiz',
   notePh: 'Was sollte man vor Ort wissen?',
   photo: 'Foto der Tür',
@@ -50,7 +51,7 @@ const de = {
 }
 const en: typeof de = {
   title: 'Add entrance',
-  dragHint: 'Drag exactly onto the door',
+  dragHint: 'Drag the pin exactly onto the door, or use the buttons here.',
   pinMoved: 'Pin moved.',
   useMyLocation: 'Use my location',
   nudgeGroup: 'Move the pin by 2 metres',
@@ -60,12 +61,13 @@ const en: typeof de = {
   noMap: 'No map available. Enter the position as numbers.',
   name: 'Name (optional)',
   namePh: 'e.g. Main entrance',
-  stepFree: 'Step-free?',
+  stepFree: 'Can you get in without steps?',
   yes: 'Yes',
   no: 'No',
   unknown: 'Not sure',
   ramp: 'Ramp available',
   doorType: 'Door type',
+  doorUnknown: 'Not sure',
   doorNone: 'No door',
   doorHinged: 'Hinged door',
   doorSliding: 'Sliding door',
@@ -73,7 +75,7 @@ const en: typeof de = {
   automatic: 'Opens automatically',
   bell: 'Doorbell available',
   width: 'Door width in cm',
-  tactile: 'Tactile paving or guidance',
+  tactile: 'Tactile paving or hints for blind people',
   note: 'Note',
   notePh: 'What should people know on site?',
   photo: 'Photo of the door',
@@ -229,6 +231,7 @@ export function openEntranceEditor(ctx: FeatureCtx, el: HTMLElement, opts: Entra
     latIn = h('input', { id: `${id}-lat`, class: 'ee-input', type: 'number', step: 'any', inputmode: 'decimal', value: String(pos.lat) }) as HTMLInputElement
     lonIn = h('input', { id: `${id}-lon`, class: 'ee-input', type: 'number', step: 'any', inputmode: 'decimal', value: String(pos.lon) }) as HTMLInputElement
     coordsBlock = h('div', { class: 'ee-row' }, field(L.lat, latIn, `${id}-lat`), field(L.lon, lonIn, `${id}-lon`))
+    for (const i of [latIn, lonIn]) i.addEventListener('input', () => { i.removeAttribute('aria-invalid'); i.removeAttribute('aria-describedby') })
   }
 
   const nameIn = h('input', { id: `${id}-name`, class: 'ee-input', type: 'text', placeholder: L.namePh, value: init.name ?? '', autocomplete: 'off' }) as HTMLInputElement
@@ -239,18 +242,34 @@ export function openEntranceEditor(ctx: FeatureCtx, el: HTMLElement, opts: Entra
     { v: false, label: L.no },
     { v: null, label: L.unknown },
   ]
+  // One choice of three: an ARIA radio group (a11y #25). Only the checked radio is a Tab stop,
+  // the arrow keys move the choice, as in iOS and every native radio group.
   const segBtns = segOpts.map((o) =>
-    h('button', { class: 'ee-seg-btn', type: 'button', 'aria-pressed': String(o.v === stepFree), onclick: () => setStepFree(o.v) }, o.label),
+    h('button', { class: 'ee-seg-btn', type: 'button', role: 'radio', onclick: () => setStepFree(o.v) }, o.label),
   )
-  const setStepFree = (v: YesNo) => {
+  const setStepFree = (v: YesNo, focus = false) => {
     stepFree = v
-    segBtns.forEach((b, i) => b.setAttribute('aria-pressed', String(segOpts[i].v === v)))
+    segBtns.forEach((b, i) => {
+      const on = segOpts[i].v === v
+      b.setAttribute('aria-checked', String(on))
+      b.tabIndex = on ? 0 : -1
+      if (on && focus) b.focus()
+    })
   }
+  const segGroup = h('div', { class: 'ee-seg', role: 'radiogroup', 'aria-labelledby': `${id}-sf` }, ...segBtns)
+  segGroup.addEventListener('keydown', (ev) => {
+    const step = ev.key === 'ArrowRight' || ev.key === 'ArrowDown' ? 1 : ev.key === 'ArrowLeft' || ev.key === 'ArrowUp' ? -1 : 0
+    if (!step) return
+    ev.preventDefault()
+    const i = segOpts.findIndex((o) => o.v === stepFree)
+    setStepFree(segOpts[(i + step + segOpts.length) % segOpts.length].v, true)
+  })
+  setStepFree(stepFree)
   const seg = h(
     'div',
     { class: 'ee-field' },
     h('span', { class: 'ee-label', id: `${id}-sf` }, L.stepFree),
-    h('div', { class: 'ee-seg', role: 'group', 'aria-labelledby': `${id}-sf` }, ...segBtns),
+    segGroup,
   )
 
   const initAny = init as Record<string, unknown>
@@ -259,12 +278,14 @@ export function openEntranceEditor(ctx: FeatureCtx, el: HTMLElement, opts: Entra
   const doorSel = h(
     'select',
     { id: `${id}-door`, class: 'ee-input' },
+    // "Weiß nicht" first: a blind contributor who skips the field must not save a door type (a11y #26).
     ...([
+      ['', L.doorUnknown],
       ['no', L.doorNone],
       ['hinged', L.doorHinged],
       ['sliding', L.doorSliding],
       ['revolving', L.doorRevolving],
-    ] as const).map(([v, label]) => h('option', { value: v, selected: (init.door ?? 'yes') === v }, label)),
+    ] as const).map(([v, label]) => h('option', { value: v, selected: (init.door ?? '') === v }, label)),
   ) as HTMLSelectElement
   const automatic = check(L.automatic, init.automatic)
   const bell = check(L.bell, initAny.bell as boolean | undefined)
@@ -301,7 +322,7 @@ export function openEntranceEditor(ctx: FeatureCtx, el: HTMLElement, opts: Entra
   })
   renderPreview()
 
-  const err = h('p', { class: 'ee-error', role: 'alert' })
+  const err = h('p', { class: 'ee-error', id: `${id}-err`, role: 'alert' })
   const saveBtn = h('button', { class: 'gm-pill gm-pill-primary ee-btn', type: 'submit' }, L.save)
   const cancelBtn = h('button', { class: 'gm-pill ee-btn', type: 'button', onclick: () => { cleanup(); opts.onCancel() } }, L.cancel)
 
@@ -334,11 +355,13 @@ export function openEntranceEditor(ctx: FeatureCtx, el: HTMLElement, opts: Entra
       const lo = Number(lonIn.value)
       if (!latIn.value || !lonIn.value || !Number.isFinite(la) || !Number.isFinite(lo) || Math.abs(la) > 90 || Math.abs(lo) > 180) {
         err.textContent = L.badCoords
+        for (const i of [latIn, lonIn]) { i.setAttribute('aria-invalid', 'true'); i.setAttribute('aria-describedby', err.id) }
+        latIn.focus()
         return
       }
       pos = { lat: la, lon: lo }
     }
-    const door = doorSel.value as DoorType
+    const door = (doorSel.value || null) as DoorType | null
     const width = widthIn.value ? Math.round(Number(widthIn.value)) : undefined
     const note = noteIn.value.trim()
     const entrance = {

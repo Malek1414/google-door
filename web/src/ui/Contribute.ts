@@ -10,6 +10,7 @@ import { lang } from '../strings'
 import type { FeatureCtx, Panel } from './ctx'
 import { h, s } from './dom'
 import { openEntranceEditor } from './EntranceEditor'
+import { doorName } from './doorName'
 
 const S = {
   de: {
@@ -31,7 +32,6 @@ const S = {
     nearbyHead: 'Eingänge ohne Angaben in der Nähe',
     nearbyEmpty: 'Hier in der Nähe fehlen gerade keine Angaben.',
     ask: 'Ist dieser Eingang stufenlos?',
-    unnamed: 'Eingang ohne Namen',
     statsHead: 'Beiträge insgesamt',
     fresh: (n: number) => `${n} neu`,
     chartLabel: (n: number) => `Verlauf deiner Beiträge, insgesamt ${n}`,
@@ -68,7 +68,6 @@ const S = {
     nearbyHead: 'Entrances nearby without data',
     nearbyEmpty: 'No entrances nearby are missing data right now.',
     ask: 'Is this entrance step-free?',
-    unnamed: 'Unnamed entrance',
     statsHead: 'Total contributions',
     fresh: (n: number) => `${n} new`,
     chartLabel: (n: number) => `History of your contributions, ${n} in total`,
@@ -331,11 +330,11 @@ export const contributePanel: Panel = (el, ctx) => {
                   {
                     class: 'gm-row',
                     type: 'button',
-                    'aria-label': `${e.name ?? L.unnamed}, ${L.metres(d)}. ${L.ask}`,
+                    'aria-label': `${doorName(e, o, c.buildings())}, ${L.metres(d)}. ${L.ask}`,
                     onclick: () => openEditor({ lat: e.lat, lon: e.lon }, { name: e.name }),
                   },
                   h('span', { class: 'ct-q', 'aria-hidden': 'true' }, icon('help')),
-                  h('span', { class: 'gm-row-text' }, h('span', { class: 'gm-row-title' }, e.name ?? L.unnamed), h('span', { class: 'gm-row-meta' }, `${L.metres(d)} · ${L.ask}`)),
+                  h('span', { class: 'gm-row-text' }, h('span', { class: 'gm-row-title' }, doorName(e, o, c.buildings())), h('span', { class: 'gm-row-meta' }, `${L.metres(d)} · ${L.ask}`)),
                   icon('chevron_right'),
                 ),
               ),
@@ -367,7 +366,7 @@ export const contributePanel: Panel = (el, ctx) => {
                   'li',
                   { class: 'gm-row ct-mine-row' },
                   h('span', { class: 'ct-q', 'aria-hidden': 'true' }, icon(c.photo ? 'photo_camera' : 'check')),
-                  h('span', { class: 'gm-row-text' }, h('span', { class: 'gm-row-title' }, c.name || L.unnamed), h('span', { class: 'gm-row-meta' }, meta)),
+                  h('span', { class: 'gm-row-text' }, h('span', { class: 'gm-row-title' }, doorName(c, o, ctx.buildings())), h('span', { class: 'gm-row-meta' }, meta)),
                 )
               })
           : [h('li', { class: 'gm-empty' }, L.mineEmpty)]),

@@ -14,9 +14,12 @@
 .ee-seg { display: flex; border: 1px solid #8e918f; border-radius: 22px; overflow: hidden; }
 .ee-seg-btn { flex: 1; min-height: 44px; border: 0; border-left: 1px solid #8e918f; background: transparent; color: var(--fg, #e6e1e5); font-size: 15px; font-weight: 500; cursor: pointer; }
 .ee-seg-btn:first-child { border-left: 0; }
-.ee-seg-btn[aria-pressed='true'] { background: var(--tonal, #063c40); color: var(--tonal-ink, #cdeef0); }
+.ee-seg-btn[aria-checked='true'] { background: var(--tonal, #063c40); color: var(--tonal-ink, #cdeef0); font-weight: 700; box-shadow: inset 0 0 0 3px var(--teal, #62c4cb); }
+/* The chosen answer carries a tick too, so the state never rests on colour alone. */
+.ee-seg-btn[aria-checked='true']::before { content: '✓ ' / ''; }
+.ee-seg-btn { overflow-wrap: anywhere; padding: 4px 6px; }
 .ee-check { display: flex; align-items: center; gap: 14px; min-height: 44px; cursor: pointer; }
-.ee-check-input { width: 22px; height: 22px; margin: 0; accent-color: var(--teal, #62c4cb); flex: none; }
+.ee-check-input { width: 26px; height: 26px; margin: 0; accent-color: var(--teal, #62c4cb); flex: none; }
 .ee-file { min-height: 44px; color: var(--fg2, #c9c5ca); font: inherit; }
 .ee-file::file-selector-button { min-height: 44px; margin-right: 12px; padding: 0 16px; border: 1px solid #8e918f; border-radius: 22px; background: transparent; color: var(--teal, #62c4cb); font: inherit; font-weight: 500; }
 .ee-preview { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
@@ -28,5 +31,8 @@
 
 /* Pin without dragging (a11y #12) */
 .ee-pin-tools { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 12px; }
-.ee-nudge { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.ee-nudge { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 6px; }
 .ee-nudge .ee-nudge-btn { min-width: 0; width: 100%; min-height: 44px; padding: 0 4px; justify-content: center; font-size: 14px; }
+
+/* Long German titles wrap instead of being cut off at large text sizes. */
+.ee .gm-sheet-title { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }

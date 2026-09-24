@@ -10,6 +10,7 @@ import type { Entrance } from '../core/types'
 import { lang } from '../strings'
 import type { FeatureCtx, Panel } from './ctx'
 import { glyphPaths, h, s } from './dom'
+import { doorName } from './doorName'
 
 const SAVED_KEY = 'doorway.saved'
 const RECENT_KEY = 'doorway.recent'
@@ -44,9 +45,6 @@ const L = {
     cat: { free: 'Stufenlos', steps: 'Mit Stufen', all: 'Alle' } as Record<Cat, string>,
     none: 'Keine Eingänge passen zu diesen Filtern.',
     noneAtAll: 'Noch keine Orte. Öffne oder speichere einen Eingang auf der Karte.',
-    entrance: 'Eingang',
-    mainEntrance: 'Haupteingang',
-    unnamed: 'Eingang ohne Namen',
     stepFreeYes: 'Stufenlos',
     stepFreeNo: 'Mit Stufen',
     stepFreeUnknown: 'Stufen unbekannt',
@@ -101,9 +99,6 @@ const L = {
     cat: { free: 'Step-free', steps: 'With steps', all: 'All' } as Record<Cat, string>,
     none: 'No entrances match these filters.',
     noneAtAll: 'No places yet. Open or save an entrance on the map.',
-    entrance: 'Entrance',
-    mainEntrance: 'Main entrance',
-    unnamed: 'Unnamed entrance',
     stepFreeYes: 'Step-free',
     stepFreeNo: 'With steps',
     stepFreeUnknown: 'Steps unknown',
@@ -184,7 +179,6 @@ function readLists(): List[] {
 
 const stepFreeText = (v: boolean | null) => (v === true ? T.stepFreeYes : v === false ? T.stepFreeNo : T.stepFreeUnknown)
 const tone = (e: Entrance) => (e.stepFree === true ? 'free' : e.stepFree === false ? 'steps' : 'unknown')
-const nameOf = (e: Entrance) => e.name ?? T.unnamed
 const walkMin = (m: number) => Math.max(1, Math.round(m / WALK_M_PER_MIN))
 
 const icon = (name: string, cls = '') => h('span', { class: `ms ${cls}`.trim(), 'aria-hidden': 'true' }, name)
@@ -197,10 +191,10 @@ function thumb(e: Entrance, cls: string): HTMLElement {
   return el
 }
 
-async function share(e: Entrance, ctx: FeatureCtx): Promise<void> {
+async function share(e: Entrance, name: string, ctx: FeatureCtx): Promise<void> {
   const url = `https://www.google.com/maps/search/?api=1&query=${e.lat},${e.lon}`
   try {
-    if (navigator.share) await navigator.share({ title: nameOf(e), url })
+    if (navigator.share) await navigator.share({ title: name, url })
     else {
       await navigator.clipboard.writeText(url)
       ctx.announce(T.shared)
@@ -267,6 +261,10 @@ export const forYouPanel: Panel = (el, ctx) => {
   const byId = new Map(entrances.map((e) => [e.id, e] as const))
   const origin = ctx.origin()
   const dist = (e: Entrance) => haversineM(origin, e)
+  const buildings = ctx.buildings()
+  const nameOf = (e: Entrance) => doorName(e, origin, buildings)
+  // Name plus distance: two doors in the same direction still read differently.
+  const labelOf = (e: Entrance) => `${nameOf(e)}, ${T.metres(dist(e))}`
 
   const recommended = entrances
     .filter((e) => guidanceFor(e, ctx.profile).kind === 'arrow')
@@ -322,7 +320,7 @@ export const forYouPanel: Panel = (el, ctx) => {
       const on = savedSet.has(e.id)
       const more: HTMLButtonElement = h(
         'button',
-        { type: 'button', class: 'fy-more', 'aria-label': T.more(nameOf(e)), 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: () => openMenu(more, [{ label: T.remove, run: () => removeEntry(e) }, { label: T.share, run: () => void share(e, ctx) }]) },
+        { type: 'button', class: 'fy-more', 'aria-label': T.more(labelOf(e)), 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: () => openMenu(more, [{ label: T.remove, run: () => removeEntry(e) }, { label: T.share, run: () => void share(e, nameOf(e), ctx) }]) },
         icon('more_horiz'),
       )
       return h(
@@ -330,23 +328,24 @@ export const forYouPanel: Panel = (el, ctx) => {
         { class: 'fy-row' },
         h(
           'button',
-          { type: 'button', class: 'fy-row-main', onclick: () => ctx.openDoor(e) },
+          { type: 'button', class: 'fy-row-main', 'aria-label': `${labelOf(e)}, ${stepFreeText(e.stepFree)}`, onclick: () => ctx.openDoor(e) },
           thumb(e, 'fy-thumb'),
           h(
             'span',
             { class: 'fy-row-text' },
             h('span', { class: 'fy-row-title' }, nameOf(e)),
-            h('span', { class: 'fy-row-cat' }, `${e.kind === 'main' ? T.mainEntrance : T.entrance} · ${stepFreeText(e.stepFree)}`),
+            h('span', { class: 'fy-row-cat' }, stepFreeText(e.stepFree)),
             metaLine(e),
           ),
         ),
-        h('button', { type: 'button', class: `fy-save${on ? ' is-on' : ''}`, 'data-save': e.id, 'aria-pressed': String(on), 'aria-label': `${on ? T.unsave : T.save}: ${nameOf(e)}`, onclick: () => toggleSave(e) }, icon('bookmark', on ? 'ms-fill' : '')),
+        h('button', { type: 'button', class: `fy-save${on ? ' is-on' : ''}`, 'data-save': e.id, 'aria-pressed': String(on), 'aria-label': `${on ? T.unsave : T.save}: ${labelOf(e)}`, onclick: () => toggleSave(e) }, icon('bookmark', on ? 'ms-fill' : '')),
         more,
       )
     }
 
-    const chip = (id: string, label: string, active: boolean, items: { label: string; checked: boolean; run: () => void }[]) => {
-      const b: HTMLButtonElement = h('button', { type: 'button', class: `fy-chip${active ? ' is-active' : ''}`, 'data-chip': id, 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: () => openMenu(b, items) }, label, icon('arrow_drop_down'))
+    const chip = (id: string, filterName: string, label: string, active: boolean, items: { label: string; checked: boolean; run: () => void }[]) => {
+      // Active chips show the chosen value; the name keeps the filter, so the state never rests on colour.
+      const b: HTMLButtonElement = h('button', { type: 'button', class: `fy-chip${active ? ' is-active' : ''}`, 'data-chip': id, 'aria-label': active ? `${filterName}: ${label}` : undefined, 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: () => openMenu(b, items) }, label, icon('arrow_drop_down'))
       return b
     }
     const set = <K extends 'src' | 'region' | 'cat'>(k: K, v: (typeof state)[K], chipId: string) => () => {
@@ -371,9 +370,9 @@ export const forYouPanel: Panel = (el, ctx) => {
       'div',
       { class: 'fy-chips', role: 'toolbar', 'aria-label': T.recentTitle },
       searchBtn,
-      chip('src', state.src === 'all' ? T.filterSrc : T.src[state.src], state.src !== 'all', (['saved', 'recent', 'all'] as Src[]).map((v) => ({ label: T.src[v], checked: state.src === v, run: set('src', v, 'src') }))),
-      chip('region', state.region ? T.region(state.region) : T.filterRegion, !!state.region, ([500, 2000, 0] as Region[]).map((v) => ({ label: T.region(v), checked: state.region === v, run: set('region', v, 'region') }))),
-      chip('cat', state.cat === 'all' ? T.filterCat : T.cat[state.cat], state.cat !== 'all', (['free', 'steps', 'all'] as Cat[]).map((v) => ({ label: T.cat[v], checked: state.cat === v, run: set('cat', v, 'cat') }))),
+      chip('src', T.filterSrc, state.src === 'all' ? T.filterSrc : T.src[state.src], state.src !== 'all', (['saved', 'recent', 'all'] as Src[]).map((v) => ({ label: T.src[v], checked: state.src === v, run: set('src', v, 'src') }))),
+      chip('region', T.filterRegion, state.region ? T.region(state.region) : T.filterRegion, !!state.region, ([500, 2000, 0] as Region[]).map((v) => ({ label: T.region(v), checked: state.region === v, run: set('region', v, 'region') }))),
+      chip('cat', T.filterCat, state.cat === 'all' ? T.filterCat : T.cat[state.cat], state.cat !== 'all', (['free', 'steps', 'all'] as Cat[]).map((v) => ({ label: T.cat[v], checked: state.cat === v, run: set('cat', v, 'cat') }))),
     )
 
     const rows: HTMLElement[] = shown.map(placeRow)

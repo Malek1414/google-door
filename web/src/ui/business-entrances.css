@@ -1,7 +1,7 @@
 /* Entrances manager in the "Unternehmen" tab. Reuses gm-* tokens (sheet, teal, tonal). */
 .bem { display: flex; flex-direction: column; padding-bottom: 24px; }
 .bem-top { display: flex; align-items: center; gap: 8px; min-height: 48px; }
-.bem-back { width: 44px; height: 44px; flex: none; }
+.bem .bem-back { width: 44px; height: 44px; min-width: 44px; flex: none; }
 .bem-h { flex: 1; min-width: 0; margin: 0; font: 500 20px/1.3 'Google Sans Flex', Roboto, sans-serif; color: var(--fg); }
 .bem-count { font-size: 14px; color: var(--fg2); }
 .bem-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }

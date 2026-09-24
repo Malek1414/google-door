@@ -51,7 +51,8 @@ const S = {
     perfSub: 'Zahlen von diesem Gerät',
     statEntrances: 'Eingänge',
     statPhotos: 'mit Foto',
-    statScore: 'Score',
+    profileScore: 'Profil vollständig',
+    statScore: 'Vollständig',
     of: (a: number, b: number) => `${a} von ${b}`,
   },
   en: {
@@ -75,7 +76,8 @@ const S = {
     perfSub: 'Counts from this device',
     statEntrances: 'Entrances',
     statPhotos: 'with photo',
-    statScore: 'Score',
+    profileScore: 'Profile complete',
+    statScore: 'Complete',
     of: (a: number, b: number) => `${a} of ${b}`,
   },
 }
@@ -209,7 +211,7 @@ export function businessHomeHeader(_ctx: FeatureCtx, business: BusinessProfile, 
     h('ul', { class: 'bzh-stats' },
       stat(L.statEntrances, String(stats.entrances), `${L.statEntrances}: ${stats.entrances}`),
       stat(L.statPhotos, String(stats.withPhoto), `${L.statPhotos}: ${L.of(stats.withPhoto, stats.entrances)}`),
-      stat(L.statScore, String(stats.score), `${L.statScore}: ${L.of(stats.score, 100)}`, ' bzh-stat-score', `--p:${stats.score}`),
+      stat(L.statScore, String(stats.score), `${L.profileScore}: ${L.of(stats.score, 100)}`, ' bzh-stat-score', `--p:${stats.score}`),
     ),
   )
 

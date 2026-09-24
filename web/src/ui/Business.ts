@@ -19,6 +19,7 @@ import { lang } from '../strings'
 import type { FeatureCtx, Panel } from './ctx'
 import { h } from './dom'
 import { openEntranceEditor } from './EntranceEditor'
+import { doorName } from './doorName'
 import { openBusinessData } from './BusinessData'
 import { openBusinessEdit } from './BusinessEdit'
 import { openEntrancesManager } from './BusinessEntrances'
@@ -54,7 +55,6 @@ const S = {
     entrancesHead: 'Eingänge verwalten',
     entrancesEmpty: 'Noch keine Eingänge. Füge den Eingang hinzu, den Besucher mit Rollstuhl, Rollator oder Kinderwagen nutzen können.',
     addEntrance: 'Eingang hinzufügen',
-    unnamed: 'Eingang ohne Namen',
     stepFree: 'stufenlos',
     notStepFree: 'nicht stufenlos',
     unknown: 'stufenlos unbekannt',
@@ -112,7 +112,6 @@ const S = {
     entrancesHead: 'Manage entrances',
     entrancesEmpty: 'No entrances yet. Add the entrance visitors with a wheelchair, walker or pram can use.',
     addEntrance: 'Add entrance',
-    unnamed: 'Unnamed entrance',
     stepFree: 'step-free',
     notStepFree: 'not step-free',
     unknown: 'step-free unknown',
@@ -227,6 +226,7 @@ export const businessPanel: Panel = (el, ctx) => {
   function renderCreate(prefill?: BusinessProfile): void {
     let pos: LatLon | null = prefill && validLatLon(prefill.lat, prefill.lon) ? { lat: prefill.lat, lon: prefill.lon } : null
     const msg = status()
+    msg.id = `${id}-msg`
     const nameIn = h('input', {
       id: `${id}-name`, class: 'bz-input', type: 'text', required: true, autocomplete: 'organization',
       placeholder: L.namePh, maxlength: 120, value: prefill?.name ?? '',
@@ -235,22 +235,33 @@ export const businessPanel: Panel = (el, ctx) => {
       id: `${id}-addr`, class: 'bz-input', type: 'text', autocomplete: 'street-address',
       placeholder: L.addrPh, maxlength: 200, value: prefill?.address ?? '',
     })
+    nameIn.addEventListener('input', () => {
+      nameIn.removeAttribute('aria-invalid')
+      nameIn.removeAttribute('aria-describedby')
+    })
     const locText = h('p', { class: 'gm-p bz-loc-text', id: `${id}-loc` }, pos ? L.locSet(pos) : L.locNone)
     const takeLoc = () => {
       pos = mapCentre(ctx)
+      locBtn.setAttribute('aria-describedby', `${id}-loc`)
       locText.textContent = L.locSet(pos)
       ctx.announce(L.locSet(pos))
     }
+    const locBtn = h('button', { class: 'gm-pill bz-wide', type: 'button', onclick: takeLoc, 'aria-describedby': `${id}-loc` }, icon('my_location'), L.locTake)
     const submit = (ev: Event) => {
       ev.preventDefault()
       const name = nameIn.value.trim()
+      // The error is tied to the field it is about (a11y #27), and focus goes there.
       if (!name) {
         msg.textContent = L.nameMissing
+        nameIn.setAttribute('aria-invalid', 'true')
+        nameIn.setAttribute('aria-describedby', msg.id)
         nameIn.focus()
         return
       }
       if (!pos) {
         msg.textContent = L.locMissing
+        locBtn.setAttribute('aria-describedby', `${id}-loc ${msg.id}`)
+        locBtn.focus()
         return
       }
       const address = addrIn.value.trim()
@@ -281,7 +292,7 @@ export const businessPanel: Panel = (el, ctx) => {
       h('label', { class: 'bz-label', for: `${id}-name` }, L.nameLabel),
       nameIn,
       h('div', { class: 'bz-label', id: `${id}-loclabel` }, L.locLabel),
-      h('button', { class: 'gm-pill bz-wide', type: 'button', onclick: takeLoc, 'aria-describedby': `${id}-loc` }, icon('my_location'), L.locTake),
+      locBtn,
       locText,
       h('label', { class: 'bz-label', for: `${id}-addr` }, L.addrLabel),
       addrIn,
@@ -320,7 +331,7 @@ export const businessPanel: Panel = (el, ctx) => {
     }
 
     // accessibility toggle card
-    const toggle = h('input', { id: `${id}-offer`, class: 'bz-switch', type: 'checkbox', role: 'switch', checked: b.accessibility, 'aria-describedby': `${id}-offer-sub` })
+    const toggle = h('input', { id: `${id}-offer`, class: 'bz-switch', type: 'checkbox', role: 'switch', checked: b.accessibility, 'aria-labelledby': `${id}-offer-title`, 'aria-describedby': `${id}-offer-sub` })
     toggle.addEventListener('change', () => {
       if (!persist({ ...b, accessibility: toggle.checked })) {
         toggle.checked = !toggle.checked
@@ -332,7 +343,7 @@ export const businessPanel: Panel = (el, ctx) => {
     const offer = h(
       'label',
       { class: 'bz-card bz-toggle', for: `${id}-offer` },
-      h('span', { class: 'bz-toggle-text' }, h('span', { class: 'gm-row-title' }, L.offerLabel), h('span', { class: 'gm-row-meta', id: `${id}-offer-sub` }, L.offerSub)),
+      h('span', { class: 'bz-toggle-text' }, h('span', { class: 'gm-row-title', id: `${id}-offer-title` }, L.offerLabel), h('span', { class: 'gm-row-meta', id: `${id}-offer-sub` }, L.offerSub)),
       toggle,
     )
 
@@ -343,7 +354,7 @@ export const businessPanel: Panel = (el, ctx) => {
       return h('li', {},
         h('button', { class: 'gm-row', type: 'button', onclick: () => ctx.openDoor(e) },
           h('span', { class: `bz-dot${e.stepFree === true ? ' bz-dot-ok' : ''}`, 'aria-hidden': 'true' }, icon(e.stepFree === true ? 'accessible' : 'door_front', true)),
-          h('span', { class: 'gm-row-text' }, h('span', { class: 'gm-row-title' }, e.name ?? L.unnamed), h('span', { class: 'gm-row-meta' }, meta)),
+          h('span', { class: 'gm-row-text' }, h('span', { class: 'gm-row-title' }, doorName(e, ctx.origin(), ctx.buildings())), h('span', { class: 'gm-row-meta' }, meta)),
         ),
       )
     }

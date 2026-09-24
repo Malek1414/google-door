@@ -71,7 +71,7 @@ export function openBusinessEdit(el: HTMLElement, ctx: FeatureCtx, businessId: s
   const d = initial(businessId)
   let closed = false
 
-  const status = h('p', { class: 'be-status', role: 'status', 'aria-live': 'polite' })
+  const status = h('p', { class: 'be-status', id: nextId('status'), role: 'status', 'aria-live': 'polite' })
   const scoreText = h('span', { class: 'be-score' })
   const scoreFill = h('div', { class: 'be-bar-fill' })
   const updateScore = () => {
@@ -103,20 +103,29 @@ export function openBusinessEdit(el: HTMLElement, ctx: FeatureCtx, businessId: s
   // Info
   const desc = h('textarea', { class: 'be-input be-textarea', rows: 5, maxlength: MAX_DESCRIPTION, placeholder: 'Was macht dein Unternehmen aus?' }) as HTMLTextAreaElement
   desc.value = d.description
-  const counter = h('p', { class: 'be-hint', 'aria-live': 'polite' })
+  // Not a live region: it would speak on every keystroke (a11y #28). The field describes
+  // itself with the counter, and only nearing and reaching the limit is announced.
+  const counterId = nextId('count')
+  const counter = h('p', { class: 'be-hint', id: counterId })
+  desc.setAttribute('aria-describedby', counterId)
   const setCounter = () => (counter.textContent = `${desc.value.length} von ${MAX_DESCRIPTION} Zeichen`)
   setCounter()
+  const NEAR_LIMIT = MAX_DESCRIPTION - 50
   desc.addEventListener('input', () => {
+    const before = d.description.length
     d.description = desc.value.slice(0, MAX_DESCRIPTION)
+    const now = d.description.length
     setCounter()
     updateScore()
+    if (before < MAX_DESCRIPTION && now >= MAX_DESCRIPTION) ctx.announce(`${MAX_DESCRIPTION} Zeichen erreicht, mehr passt nicht.`)
+    else if (before < NEAR_LIMIT && now >= NEAR_LIMIT) ctx.announce(`Noch ${MAX_DESCRIPTION - now} Zeichen frei.`)
   })
 
   // Standort
   const locText = h('p', { class: 'be-hint' })
   const setLocText = () =>
     (locText.textContent =
-      d.lat !== null && d.lon !== null ? `Pin: ${d.lat.toFixed(5)}, ${d.lon.toFixed(5)}` : 'Noch kein Pin gesetzt.')
+      d.lat !== null && d.lon !== null ? `Standort: ${d.lat.toFixed(5)}, ${d.lon.toFixed(5)}` : 'Noch kein Standort gesetzt.')
   setLocText()
   const pinBtn = h(
     'button',
@@ -130,19 +139,21 @@ export function openBusinessEdit(el: HTMLElement, ctx: FeatureCtx, businessId: s
         d.lon = p.lon
         setLocText()
         updateScore()
-        ctx.announce('Pin auf die Kartenmitte gesetzt.')
+        ctx.announce('Standort auf die Kartenmitte gesetzt.')
       },
     },
     h('span', { class: 'ms', 'aria-hidden': 'true' }, 'location_on'),
-    'Pin auf Karte neu setzen',
+    'Kartenmitte als Standort nehmen',
   )
 
   // Öffnungszeiten
   const hoursRows = DAYS.map((day, i) => {
     const hrs = d.hours[i]
     const cbId = nextId('day')
-    const cb = h('input', { type: 'checkbox', class: 'be-check', id: cbId, checked: hrs.open }) as HTMLInputElement
-    const state = h('span', { class: 'be-day-state' }, hrs.open ? 'Geöffnet' : 'Geschlossen')
+    // A fixed name ("Montag geöffnet"); the Geöffnet/Geschlossen text is for the eye only,
+    // or VoiceOver reads "Samstag Geschlossen, nicht aktiviert" (a11y #18).
+    const cb = h('input', { type: 'checkbox', class: 'be-check', id: cbId, checked: hrs.open, 'aria-label': `${day} geöffnet` }) as HTMLInputElement
+    const state = h('span', { class: 'be-day-state', 'aria-hidden': 'true' }, hrs.open ? 'Geöffnet' : 'Geschlossen')
     const from = h('input', { type: 'time', class: 'be-input be-time', value: hrs.from, 'aria-label': `${day} von` }) as HTMLInputElement
     const to = h('input', { type: 'time', class: 'be-input be-time', value: hrs.to, 'aria-label': `${day} bis` }) as HTMLInputElement
     const times = h('div', { class: 'be-times' }, from, h('span', { class: 'be-dash', 'aria-hidden': 'true' }, 'bis'), to)
@@ -253,6 +264,8 @@ export function openBusinessEdit(el: HTMLElement, ctx: FeatureCtx, businessId: s
       onclick: () => {
         if (!d.name.trim()) {
           status.textContent = 'Bitte gib einen Namen ein.'
+          nameInput.setAttribute('aria-invalid', 'true')
+          nameInput.setAttribute('aria-describedby', status.id)
           nameInput.focus()
           return
         }
@@ -268,6 +281,10 @@ export function openBusinessEdit(el: HTMLElement, ctx: FeatureCtx, businessId: s
   )
 
   const nameInput = text('name', 'text', 'z. B. Café am Platz', 'organization')
+  nameInput.addEventListener('input', () => {
+    nameInput.removeAttribute('aria-invalid')
+    nameInput.removeAttribute('aria-describedby')
+  })
 
   const root = h(
     'form',

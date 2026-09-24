@@ -29,6 +29,7 @@ const chromium = pw.chromium ?? pw.default?.chromium
 
 const BASE = (process.argv[2] || 'https://localhost:5173/').replace(/\/?$/, '/')
 const DEMO = process.env.APPROACH_DEMO === '1'
+const STOP_SHORT_M = Number(process.env.STOP_SHORT_M || 0)
 const OUT = join(dirname(fileURLToPath(import.meta.url)), 'out')
 mkdirSync(OUT, { recursive: true })
 const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
@@ -211,6 +212,16 @@ async function newPage(profile) {
     for (const e of list) if (e.id === SIM_DOOR && e.approachBearing == null) e.approachBearing = DOOR_COMPASS
     await route.fulfill({ response: res, body: JSON.stringify(d), headers: { ...res.headers(), 'content-type': 'application/json' } })
   })
+  // STOP_SHORT_M=10: the sim walk ends that far from the door, as real GPS near a
+  // building does. The arrival card never appears; the Live View panel trigger must.
+  if (STOP_SHORT_M > 0) await ctx.route('**/tracks/*.json', async (route) => {
+    const res = await route.fetch()
+    const pts = await res.json()
+    const door = { lat: 52.52721, lon: 13.371167 }
+    const m = (p) => Math.hypot((p.lat - door.lat) * 111195, (p.lon - door.lon) * 111195 * Math.cos((door.lat * Math.PI) / 180))
+    const cut = pts.findIndex((p) => m(p) < STOP_SHORT_M)
+    await route.fulfill({ response: res, body: JSON.stringify(cut > 1 ? pts.slice(0, cut) : pts), headers: { ...res.headers(), 'content-type': 'application/json' } })
+  })
   await ctx.route('**/api/live-token**', (route) => route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"disabled in e2e"}' }))
   await ctx.route('**/api/speak**', (route) => route.fulfill({ status: 503, body: '' }))
   const page = await ctx.newPage()
@@ -233,7 +244,7 @@ async function waitPhase(page, want, ms) {
   return false
 }
 
-/** ?sim=1 → Start → arrival card → "Zum Eingang führen". Returns how it got there. */
+/** ?sim=1 → Start → "Zum Eingang führen" (Live View panel from 25 m, or the arrival card). Returns how it got there. */
 async function reachApproach(page, directParam) {
   if (DEMO) {
     await page.goto(`${BASE}?approach=${directParam}`, { waitUntil: 'domcontentloaded', timeout: 30000 })
@@ -241,7 +252,7 @@ async function reachApproach(page, directParam) {
     return `?approach=${directParam}`
   }
   await page.goto(`${BASE}?sim=1&speed=20`, { waitUntil: 'domcontentloaded', timeout: 30000 })
-  const trigger = page.locator('button.apr-trigger', { hasText: 'Zum Eingang führen' }).first()
+  const trigger = page.locator('button.apr-trigger:visible', { hasText: 'Zum Eingang führen' }).first()
   const deadline = Date.now() + 90000
   let clicks = 0
   while (Date.now() < deadline) {
@@ -249,7 +260,8 @@ async function reachApproach(page, directParam) {
       await shot(page, `00-arrival-${directParam === 'demo' ? 'guide' : 'check'}`)
       await trigger.click()
       await page.locator('section.apr').first().waitFor({ state: 'visible', timeout: 10000 })
-      return `sim arrival after ${clicks} start click(s)`
+      const where = (await page.locator('.arrival').count()) ? 'arrival card' : 'live view panel'
+      return `sim ${where} after ${clicks} start click(s)`
     }
     const next = page.locator('button:visible').filter({ hasText: /^(weiter|los|start|starten|fertig|ok|verstanden)/i }).first()
     if (clicks < 20 && (await next.count())) await next.click({ timeout: 2000 }).then(() => { clicks++ }).catch(() => {})

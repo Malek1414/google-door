@@ -57,13 +57,35 @@ async function load(key: ClipKey): Promise<AudioBuffer | null> {
   return buf
 }
 
+const sounding = new Set<AudioBufferSourceNode>()
+/** Bumped by every say() and every stopSpeech(); a network reply for an older one is dropped. */
+let sayGen = 0
+
 function play(buf: AudioBuffer): void {
   if (!ctx) return
   const src = ctx.createBufferSource()
   src.buffer = buf
   src.connect(ctx.destination)
+  sounding.add(src)
+  src.onended = () => sounding.delete(src)
   src.start()
 }
+
+/** Cut off every clip this module is playing and void pending /api/speak replies. */
+export function stopSpeech(): void {
+  sayGen += 1
+  for (const src of sounding) {
+    try {
+      src.stop()
+    } catch {
+      /* already ended */
+    }
+  }
+  sounding.clear()
+}
+
+/** /api/speak gets this long before the device voice takes over (the server retries 429 for a minute). */
+export const API_SPEAK_TIMEOUT_MS = 2000
 
 /** Distances are spoken from a fixed ladder of clips; pick the nearest one we have. */
 const DISTANCE_STEPS = [5, 10, 15, 20, 30, 40, 50, 75, 100]
@@ -80,7 +102,8 @@ export type SpeechTier = 'clip' | 'api' | 'synth' | 'failed'
  * and what tiers 2 and 3 speak. Returns which tier actually produced sound, so the
  * caller can make a failure audible rather than leaving silence.
  */
-export async function say(key: ClipKey | null, text: string, apiBase = ''): Promise<SpeechTier> {
+export async function say(key: ClipKey | null, text: string, apiBase = '', opts: { apiTimeoutMs?: number } = {}): Promise<SpeechTier> {
+  const gen = ++sayGen
   if (key) {
     try {
       const buf = await load(key)
@@ -92,24 +115,32 @@ export async function say(key: ClipKey | null, text: string, apiBase = ''): Prom
       /* fall through */
     }
   }
+  const abort = typeof AbortController === 'undefined' ? null : new AbortController()
+  const timer = abort ? setTimeout(() => abort.abort(), opts.apiTimeoutMs ?? API_SPEAK_TIMEOUT_MS) : null
   try {
     const r = await fetch(`${apiBase}/api/speak`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),
+      signal: abort?.signal,
     })
     if (r.ok && ctx) {
       const buf = await ctx.decodeAudioData(await r.arrayBuffer())
+      // A newer line was asked for (or speech was stopped) meanwhile: this one is stale.
+      if (gen !== sayGen) return 'api'
       play(buf)
       return 'api'
     }
   } catch {
-    /* fall through */
+    /* timeout, offline, quota: fall through */
+  } finally {
+    if (timer !== null) clearTimeout(timer)
   }
+  if (gen !== sayGen) return 'synth' // superseded while waiting: say nothing stale
   try {
     if ('speechSynthesis' in window) {
       const u = new SpeechSynthesisUtterance(text)
-      u.lang = document.documentElement.lang || 'de'
+      u.lang = (document.documentElement.lang || 'de').startsWith('de') ? 'de-DE' : 'en-US'
       u.rate = 1.05
       speechSynthesis.speak(u)
       return 'synth'

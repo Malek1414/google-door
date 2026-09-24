@@ -19,3 +19,32 @@ describe('speech clip selection', () => {
     }
   })
 })
+
+describe('stopSpeech voids a pending /api/speak fallback (arrival card vs. approach)', () => {
+  it('say() with a hanging fetch, then stopSpeech(): the device voice never speaks the stale line', async () => {
+    const { vi } = await import('vitest')
+    const { say, stopSpeech, API_SPEAK_TIMEOUT_MS } = await import('../src/core/speech')
+    vi.useFakeTimers()
+    const spoken: string[] = []
+    const g = globalThis as Record<string, unknown>
+    const saved = { window: g.window, document: g.document, speechSynthesis: g.speechSynthesis, SpeechSynthesisUtterance: g.SpeechSynthesisUtterance, fetch: g.fetch }
+    const synth = { speak: vi.fn((u: { text: string }) => spoken.push(u.text)), cancel: vi.fn() }
+    g.speechSynthesis = synth
+    g.window = { speechSynthesis: synth }
+    g.document = { documentElement: { lang: 'de' } }
+    g.SpeechSynthesisUtterance = class { lang = ''; rate = 1; constructor(public text: string) {} }
+    // Hangs until aborted, like /api/speak retrying a 429.
+    g.fetch = vi.fn((_u: string, init: { signal?: AbortSignal }) => new Promise((_res, rej) => init.signal?.addEventListener('abort', () => rej(new Error('aborted')))))
+    try {
+      const p = say(null, 'Du bist angekommen. Ein langer Absatz.')
+      stopSpeech()
+      await vi.advanceTimersByTimeAsync(API_SPEAK_TIMEOUT_MS + 500)
+      await p
+      expect(synth.speak).not.toHaveBeenCalled()
+      expect(spoken).toEqual([])
+    } finally {
+      vi.useRealTimers()
+      Object.assign(g, saved)
+    }
+  })
+})

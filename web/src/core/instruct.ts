@@ -9,6 +9,8 @@
 // arrive after the turn has already overshot, which is why "links … links … links"
 // makes people spin past the door.
 
+import type { DoorType } from './types'
+
 export type Band = 'straight' | 'slight-left' | 'slight-right' | 'left' | 'right' | 'sharp-left' | 'sharp-right' | 'turn-around'
 
 export const ON_BEARING_DEG = 8
@@ -123,6 +125,33 @@ export function thresholdLine(lang = 'de'): string {
   return lang.startsWith('de') ? 'Die Tür ist direkt vor dir.' : 'The door is right in front of you.'
 }
 
+const DOOR_DE: Record<DoorType, [string, string] | null> = {
+  // [manual, automatic]
+  sliding: ['Schiebetür.', 'Automatische Schiebetür.'],
+  revolving: ['Drehtür.', 'Automatische Drehtür.'],
+  hinged: ['Drehflügeltür.', 'Automatische Tür.'],
+  no: ['Offener Durchgang, keine Tür.', 'Offener Durchgang, keine Tür.'],
+  yes: null,
+}
+const DOOR_EN: Record<DoorType, [string, string] | null> = {
+  sliding: ['Sliding door.', 'Automatic sliding door.'],
+  revolving: ['Revolving door.', 'Automatic revolving door.'],
+  hinged: ['Hinged door.', 'Automatic door.'],
+  no: ['Open passage, no door.', 'Open passage, no door.'],
+  yes: null,
+}
+
+/**
+ * The door type, said after thresholdLine. From the SURVEYED entrance record only
+ * (Entrance.door / automatic) — never from the vision model's `kind`, which is a guess
+ * about a picture. Null when the record does not say: no line beats a guessed one.
+ */
+export function doorTypeLine(door: DoorType | null, automatic: boolean, lang = 'de'): string | null {
+  const row = (lang.startsWith('de') ? DOOR_DE : DOOR_EN)[door ?? 'yes'] ?? null
+  if (row) return row[automatic ? 1 : 0]
+  return automatic ? (lang.startsWith('de') ? 'Automatische Tür.' : 'Automatic door.') : null
+}
+
 /** Spoken when vision fails AND the door has no surveyed bearing either — so there
  *  is genuinely nothing to point at. Saying "according to the map" would be a lie.
  *  Rule 2 says never dead-reckon; it does not say fall silent, and silence is
@@ -133,7 +162,32 @@ export function noDirectionLine(lang = 'de'): string {
     : "I can't see the entrance and have no direction for it. Pan the camera slowly."
 }
 
-/** Spoken when the user should be inside. Vision proposes; the user can take it back. */
+/** Spoken once when no compass reading has arrived a few seconds in. Without a
+ *  heading there is no direction to give at all, and silence reads as a crash. */
+export function noCompassLine(lang = 'de'): string {
+  return lang.startsWith('de')
+    ? 'Kein Kompass. Ich kann dir keine Richtung geben.'
+    : 'No compass. I cannot give you a direction.'
+}
+
+/** Spoken once when the camera delivers no picture, so vision cannot even try. */
+export function noCameraLine(lang = 'de'): string {
+  return lang.startsWith('de') ? 'Ich bekomme kein Kamerabild.' : "I'm not getting a camera picture."
+}
+
+/** Spoken once when vision goes quiet (the fix aged out, or the model did not answer
+ *  in time): short, so the user knows the app is working and not crashed. */
+export function searchingLine(lang = 'de'): string {
+  return lang.startsWith('de') ? 'Ich suche die Tür.' : "I'm looking for the door."
+}
+
+/** Spoken when stillness at the threshold proposed `through`. Standing still is also
+ *  what someone does with a hand on the door, so this does not claim "inside". */
+export function atDoorLine(lang = 'de'): string {
+  return lang.startsWith('de') ? 'Du bist an der Tür.' : 'You are at the door.'
+}
+
+/** Spoken when vision sees the interior. Vision proposes; the user can take it back. */
 export function throughLine(lang = 'de'): string {
   return lang.startsWith('de') ? 'Du müsstest jetzt drin sein.' : 'You should be inside now.'
 }
@@ -166,12 +220,18 @@ export function metresLine(m: number, lang = 'de'): string {
 export type ApproachLine =
   | { kind: 'band'; band: Band }
   | { kind: 'metres'; m: number }
-  | { kind: 'safety' | 'fallback' | 'unsure' | 'threshold' | 'through' | 'noDirection' }
+  | { kind: 'door'; door: DoorType | null; automatic: boolean }
+  | { kind: 'safety' | 'fallback' | 'unsure' | 'threshold' | 'through' | 'noDirection' | 'noCompass' | 'noCamera' | 'searching' | 'atDoor' }
 
 export function clipKeyFor(line: ApproachLine): string | null {
   switch (line.kind) {
     case 'band':
       return bandClipKey(line.band)
+    case 'door': {
+      if (doorTypeLine(line.door, line.automatic) === null) return null
+      const d = line.door ?? 'yes'
+      return d === 'no' ? 'door_no' : `door_${d}${line.automatic ? '_auto' : ''}`
+    }
     case 'metres': {
       const n = Math.max(0, Math.round(line.m))
       // Only the bank that exists: 1..10 m. Anything further is spoken live, and by
@@ -192,8 +252,19 @@ export function approachClipBank(lang = 'de'): { key: string; text: string }[] {
     { key: 'approach_threshold', text: thresholdLine(lang) },
     { key: 'approach_through', text: throughLine(lang) },
     { key: 'approach_noDirection', text: noDirectionLine(lang) },
+    { key: 'approach_noCompass', text: noCompassLine(lang) },
+    { key: 'approach_noCamera', text: noCameraLine(lang) },
+    { key: 'approach_searching', text: searchingLine(lang) },
+    { key: 'approach_atDoor', text: atDoorLine(lang) },
   ]
   for (let n = 1; n <= 10; n++) out.push({ key: `m_${n}`, text: metresLine(n, lang) })
+  for (const door of ['sliding', 'revolving', 'hinged', 'no', 'yes'] as DoorType[]) {
+    for (const automatic of [false, true]) {
+      const key = clipKeyFor({ kind: 'door', door, automatic })
+      const text = doorTypeLine(door, automatic, lang)
+      if (key && text && !out.some((o) => o.key === key)) out.push({ key, text })
+    }
+  }
   return out
 }
 

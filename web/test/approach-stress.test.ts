@@ -4,14 +4,16 @@
 // for more than QUIET_MS without being told why, and nothing runs after stop().
 import { describe, expect, it } from 'vitest'
 import { STEP_M } from '../src/core/anchor'
-import { bandFor, bandText, fallbackLine, safetyLine } from '../src/core/instruct'
+import { bandFor, bandText, fallbackLine, noCompassLine, safetyLine, searchingLine } from '../src/core/instruct'
 import { angleDelta } from '../src/core/stability'
 import type { Entrance } from '../src/core/types'
 import {
   createApproachEngine,
+  EXPLAINED_QUIET_MS,
   NO_COMPASS_MS,
-  noCompassLine,
+  QUIET_MS,
   RATE_LIMIT_BACKOFF_MS,
+  TIMEOUT_MS,
 } from '../src/ui/approachEngine'
 import { Narrator } from '../src/ui/Approach'
 import type { ApproachView, CompassReading } from '../src/ui/approachPort'
@@ -93,9 +95,14 @@ const door = (compassDeg: number, metres: number) => (req: { headingDeg: number 
   body: { found: true, bearingDeg: angleDelta(req.headingDeg, compassDeg), distanceM: metres - 0 * STEP_M, confidence: 0.9, source: 'gemini-frame' },
 })
 
+/** Longest stretch without a spoken line, from the start to now. */
+const longestGap = (said: { t: number }[], start: number, end: number) => {
+  const ts = [start, ...said.map((s) => s.t), end]
+  return Math.max(...ts.slice(1).map((x, i) => x - ts[i]))
+}
 
 describe('approach under stress: never silent without a reason', () => {
-  it('no compass at all: the safety line, then "no compass" once within NO_COMPASS_MS, then silence', async () => {
+  it('no compass at all: the safety line, then "no compass" once within NO_COMPASS_MS, then silence (voice calm)', async () => {
     const r = rig(door(70, 8))
     await r.run(100000)
     expect(r.said[0].text).toBe(safetyLine('de'))
@@ -103,8 +110,7 @@ describe('approach under stress: never silent without a reason', () => {
     expect(nc).toHaveLength(1)
     expect(nc[0].t - 1000).toBeLessThanOrEqual(NO_COMPASS_MS + 100)
     expect(r.said).toHaveLength(2)
-    expect(r.calls).toHaveLength(0) // no heading, no frame worth sending
-    expect(r.views.every((v) => v.relBearingDeg === null && v.beaconPitch === undefined)).toBe(true)
+    expect(r.calls).toHaveLength(0)
   })
 
   it('60 s standing still with a jittery compass: nothing after the opening lines', async () => {
@@ -125,11 +131,12 @@ describe('approach under stress: never silent without a reason', () => {
     expect(r.said.some((s) => s.text.includes(fallbackLine('de')))).toBe(true)
   })
 
-  it('backend that never answers (timeout): never more than one request in flight', async () => {
+  it('backend that never answers (timeout): one request in flight, abandoned after TIMEOUT_MS', async () => {
     const r = rig(() => new Promise<never>(() => {}))
     r.heading(100)
     await r.run(20000)
-    expect(r.calls).toHaveLength(1)
+    expect(r.calls.length).toBeGreaterThanOrEqual(2)
+    for (let i = 1; i < r.calls.length; i++) expect(r.calls[i] - r.calls[i - 1]).toBeGreaterThanOrEqual(TIMEOUT_MS)
   })
 
   it('429 backs off for RATE_LIMIT_BACKOFF_MS instead of hammering the quota', async () => {
@@ -218,6 +225,9 @@ describe('ClipPlayer: stale directions never pile up', () => {
     const left = bandText(bandFor(-60), 'de')
     const straight = bandText(bandFor(0), 'de')
     void p.playInstruction(safetyLine('de'), 'de') // playing now
+    // Let it start sounding. (Merge note: main's newest-line-wins player drops a line that
+    // has not started yet, so the first line must actually be playing before the others.)
+    await new Promise((r) => setTimeout(r, 0))
     void p.playInstruction(`${left} 5 Meter`, 'de') // queued
     void p.playInstruction(`${fallbackLine('de')} ${straight}`, 'de') // newer: left + 5 m are stale
     for (let i = 0; i < 5; i++) {

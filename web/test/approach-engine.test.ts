@@ -6,10 +6,10 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { STEP_M } from '../src/core/anchor'
 import { STILL_MS } from '../src/core/approach'
-import { fallbackLine, noDirectionLine, pitchFor, safetyLine, thresholdLine, throughLine, unsureLine } from '../src/core/instruct'
+import { atDoorLine, bandText, doorTypeLine, fallbackLine, noCameraLine, noCompassLine, noDirectionLine, pitchFor, safetyLine, searchingLine, thresholdLine, throughLine, unsureLine } from '../src/core/instruct'
 import { angleDelta } from '../src/core/stability'
 import type { Entrance } from '../src/core/types'
-import { createApproachEngine, FALLBACK_AFTER, INSIDE_MIN_CONFIDENCE, parseDoorFix, saysInside } from '../src/ui/approachEngine'
+import { createApproachEngine, FALLBACK_AFTER, TIMEOUT_MS, INSIDE_MIN_CONFIDENCE, parseDoorFix, saysInside } from '../src/ui/approachEngine'
 import { engine, type ApproachView, type CompassReading } from '../src/ui/approachPort'
 import { startDemoApproach } from '../src/ui/approachDemo'
 import { MIN_STEP_MS, StepDetector } from '../src/ui/stepCounter'
@@ -23,7 +23,7 @@ const DOOR: Entrance = {
 type Reply = unknown | Promise<unknown>
 
 /** A phone in a fake world: compass, accelerometer, camera, network, clock. */
-function rig(world: (req: { frame: string; headingDeg: number }) => Reply, door: Partial<Entrance> = {}) {
+function rig(world: (req: { frame: string; headingDeg: number }) => Reply, door: Partial<Entrance> = {}, frame: () => string | null = () => 'JPEGBASE64') {
   let t = 1000
   let tickFn: () => void = () => {}
   let headingCb: (h: CompassReading) => void = () => {}
@@ -49,7 +49,7 @@ function rig(world: (req: { frame: string; headingDeg: number }) => Reply, door:
     lang: 'de',
   })({
     door: { ...DOOR, ...door },
-    frame: () => 'JPEGBASE64',
+    frame,
     onHeading: (cb) => ((headingCb = cb), () => {}),
     onMotion: (cb) => ((motionCb = cb), () => {}),
     apiBase: 'https://api.test',
@@ -111,6 +111,21 @@ describe('the real engine, driven through ApproachIO', () => {
     expect(spoken[0]).toBe(safetyLine('de'))
     expect(spoken.filter((x) => x.includes(safetyLine('de')))).toHaveLength(1)
     expect(spoken.join(' ')).toContain(thresholdLine('de'))
+  })
+
+  it('at the threshold the door line stays: no metres line replaces it on later ticks', async () => {
+    let r!: ReturnType<typeof rig>
+    r = rig(door(100, 9, () => r.stepsTaken))
+    r.heading(100)
+    for (let i = 0; i < 4; i++) await r.tick(200)
+    for (let i = 0; i < 14; i++) { r.step(); await r.tick() }
+    expect(r.views.at(-1)!.phase).toBe('threshold')
+    for (let i = 0; i < 6; i++) await r.tick(300)
+    const at = r.views.findIndex((v) => v.phase === 'threshold')
+    for (const v of r.views.slice(at)) {
+      expect(v.instruction).toContain(thresholdLine('de'))
+      expect(v.instruction).not.toMatch(/Meter/)
+    }
   })
 
   it('says each distance once and counts down', async () => {
@@ -189,7 +204,7 @@ describe('the real engine, driven through ApproachIO', () => {
     let release!: (v: unknown) => void
     const r = rig(() => new Promise((res) => (release = res)))
     r.heading(100)
-    for (let i = 0; i < 100; i++) await r.tick()
+    for (let i = 0; i < 45; i++) await r.tick() // under TIMEOUT_MS
     expect(r.calls).toHaveLength(1)
     release({ found: true, bearingDeg: 0, distanceM: 5, confidence: 0.9, source: 'gemini-frame' })
     await r.tick()
@@ -231,7 +246,7 @@ const atDoor = (extra: Record<string, unknown> = {}) => () => ({
 })
 
 describe('through: proposed by vision or by stillness, taken back by "Noch draußen"', () => {
-  it('standing still STILL_MS at the threshold proposes through, said once', async () => {
+  it('standing still STILL_MS at the threshold proposes through as "at the door", never "inside", said once', async () => {
     const r = rig(atDoor())
     r.heading(100)
     await r.tick()
@@ -244,7 +259,8 @@ describe('through: proposed by vision or by stillness, taken back by "Noch drau�
     expect(r.views.at(-1)!.beaconPitch).toBeUndefined()
     expect(r.views.at(-1)!.relBearingDeg).toBeNull()
     expect(r.views.at(-1)!.distanceM).toBeNull()
-    expect(r.spoken().filter((x) => x.includes(throughLine('de')))).toHaveLength(1)
+    expect(r.spoken().filter((x) => x.includes(atDoorLine('de')))).toHaveLength(1)
+    expect(r.spoken().some((x) => x.includes(throughLine('de')))).toBe(false)
   })
 
   it('a step resets the stillness clock', async () => {
@@ -308,6 +324,171 @@ describe('through: proposed by vision or by stillness, taken back by "Noch drau�
     for (let i = 0; i < 17; i++) await r.tick()
     expect(n).toBe(2)
     expect(r.views.at(-1)!.phase).not.toBe('through')
+  })
+})
+
+describe('vision lost at the door (rule 2: no map anchor, no dead reckoning)', () => {
+  /** Door 1.2 m straight ahead on the first reply, then vision never sees it again. */
+  const lostAtDoor = () => {
+    let n = 0
+    return () => (n++ === 0 ? atDoor()() : { found: false, confidence: 0.1 })
+  }
+
+  it('once at the threshold, losing vision never demotes to walking or falls back to the map', async () => {
+    const r = rig(lostAtDoor())
+    r.heading(100)
+    await r.tick()
+    await r.tick()
+    expect(r.views.at(-1)!.phase).toBe('threshold')
+    const from = r.views.length
+    // 30 s at the door, shuffling a step every 2 s so stillness never completes.
+    for (let i = 0; i < 300; i++) {
+      if (i % 20 === 0) r.step()
+      await r.tick()
+    }
+    const after = r.views.slice(from)
+    expect(after.every((v) => v.phase === 'threshold')).toBe(true)
+    expect(after.some((v) => v.source === 'osm-fallback')).toBe(false)
+    expect(r.spoken().some((x) => x.includes(fallbackLine('de')))).toBe(false)
+  })
+
+  it('standing still at the door proposes through even after the anchor went stale', async () => {
+    const r = rig(lostAtDoor())
+    r.heading(100)
+    await r.tick()
+    await r.tick()
+    // Shuffle at the door past MAX_AGE_MS, so the only anchor is stale.
+    for (let i = 0; i < 100; i++) {
+      if (i % 10 === 0) r.step()
+      await r.tick()
+    }
+    expect(r.views.at(-1)!.phase).toBe('threshold')
+    for (let ms = 0; ms <= STILL_MS + 500; ms += 100) await r.tick()
+    expect(r.views.at(-1)!.phase).toBe('through')
+  })
+
+  it('a map-bearing-only session never reaches threshold or through by walking or standing', async () => {
+    const r = rig(() => ({ found: false, confidence: 0.1 }))
+    r.heading(120) // facing the surveyed approachBearing
+    for (let i = 0; i < 16 * FALLBACK_AFTER; i++) await r.tick()
+    expect(r.views.at(-1)!.source).toBe('osm-fallback')
+    for (let i = 0; i < 30; i++) { r.step(); await r.tick() } // ~20 m of dead reckoning
+    for (let ms = 0; ms <= STILL_MS * 2; ms += 100) await r.tick()
+    expect(r.views.some((v) => v.phase === 'threshold' || v.phase === 'through')).toBe(false)
+  })
+
+  it('a map anchor is re-minted when it ages out: the beacon does not drop every 8 s', async () => {
+    const r = rig(() => ({ found: false, confidence: 0.1 }))
+    r.heading(100)
+    for (let i = 0; i < 16 * FALLBACK_AFTER; i++) await r.tick()
+    expect(r.views.at(-1)!.source).toBe('osm-fallback')
+    const from = r.views.length
+    for (let i = 0; i < 300; i++) await r.tick() // 30 s
+    expect(r.views.slice(from).every((v) => v.beaconPitch !== undefined)).toBe(true)
+  })
+})
+
+describe('band speech does not chatter on compass jitter', () => {
+  it('±3° jitter on a band edge speaks at most 2 band lines in 5 s, while the beacon keeps moving', async () => {
+    const BANDS = ['straight', 'slight-left', 'slight-right', 'left', 'right', 'sharp-left', 'sharp-right', 'turn-around'] as const
+    const bandLines = new Set(BANDS.map((b) => bandText(b, 'de')))
+    const r = rig(door(108, 8, () => 0)) // door 8° right of 100: the straight/slight-right edge
+    let seed = 7
+    const jitter = () => ((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31) * 6 - 3
+    r.heading(100)
+    await r.tick()
+    await r.tick()
+    const from = r.views.length
+    for (let i = 0; i < 50; i++) { r.heading(100 + jitter()); await r.tick() }
+    const said = r.views.slice(from).map((v) => v.instruction).filter((x, i, a) => i === 0 || x !== a[i - 1])
+    expect(said.filter((x) => bandLines.has(x)).length).toBeLessThanOrEqual(2)
+    expect(new Set(r.views.slice(from).map((v) => v.beaconPitch)).size).toBeGreaterThan(1)
+  })
+})
+
+describe('no compass', () => {
+  it('says so once, 3 s in, instead of staying silent after the safety line', async () => {
+    const r = rig(() => ({ found: false }))
+    for (let i = 0; i < 25; i++) await r.tick()
+    expect(r.spoken()).toEqual([safetyLine('de')])
+    for (let i = 0; i < 100; i++) await r.tick()
+    expect(r.spoken()).toEqual([safetyLine('de'), noCompassLine('de')])
+    expect(r.calls).toHaveLength(0) // still no heading, so still no request
+  })
+})
+
+describe('no camera frame', () => {
+  it('counts as a failed attempt: falls back to the surveyed bearing and says why, once', async () => {
+    const r = rig(() => ({ found: false }), { approachBearing: 120 }, () => null)
+    r.heading(100)
+    for (let i = 0; i < 16 * FALLBACK_AFTER; i++) await r.tick()
+    expect(r.calls).toHaveLength(0)
+    expect(r.views.at(-1)!.source).toBe('osm-fallback')
+    for (let i = 0; i < 100; i++) await r.tick()
+    const said = r.spoken().join(' ')
+    expect(said.split(fallbackLine('de'))).toHaveLength(2)
+    expect(said.split(noCameraLine('de'))).toHaveLength(2)
+  })
+})
+
+describe('a slow or rate-limited model', () => {
+  const hang = () => new Promise(() => {})
+
+  it('a request that never answers is abandoned after TIMEOUT_MS and retried', async () => {
+    const r = rig(hang)
+    r.heading(100)
+    await r.tick()
+    expect(r.calls).toHaveLength(1)
+    for (let ms = 0; ms < TIMEOUT_MS + 200; ms += 100) await r.tick()
+    expect(r.calls).toHaveLength(2)
+  })
+
+  it('after the fix, a model that never answers again is heard within 10 s', async () => {
+    let n = 0
+    const r = rig(() => (n++ === 0 ? { found: true, bearingDeg: -40, distanceM: 8, confidence: 0.9, source: 'gemini-frame' } : hang()))
+    r.heading(100)
+    await r.tick()
+    expect(r.views.at(-1)!.source).toBe('gemini-frame')
+    const t0 = r.t
+    while (r.t - t0 < 10000) await r.tick()
+    expect(r.spoken().filter((x) => x.includes(searchingLine('de')))).toHaveLength(1)
+  })
+
+  it('with no fix ever, the first timeout is heard (well before the map fallback)', async () => {
+    const r = rig(hang)
+    r.heading(100)
+    for (let ms = 0; ms <= TIMEOUT_MS + 500; ms += 100) await r.tick()
+    expect(r.spoken()).toEqual([safetyLine('de'), searchingLine('de')])
+    for (let i = 0; i < 300; i++) await r.tick()
+    expect(r.spoken().filter((x) => x.includes(searchingLine('de')))).toHaveLength(1)
+    expect(r.spoken().some((x) => x.includes(fallbackLine('de')))).toBe(true)
+  })
+})
+
+describe('door type at the threshold: surveyed record only', () => {
+  it('appends the surveyed door type to the threshold line', async () => {
+    const r = rig(atDoor()) // DOOR: sliding, automatic
+    r.heading(100)
+    await r.tick()
+    await r.tick()
+    expect(r.views.at(-1)!.phase).toBe('threshold')
+    expect(r.spoken().join(' ')).toContain(`${thresholdLine('de')} Automatische Schiebetür.`)
+  })
+
+  it('says no door type when the record has none, whatever vision calls it', async () => {
+    const r = rig(atDoor({ kind: 'revolving' }), { door: null, automatic: false })
+    r.heading(100)
+    await r.tick()
+    await r.tick()
+    expect(r.spoken().join(' ')).toContain(thresholdLine('de'))
+    expect(r.spoken().join(' ')).not.toMatch(/Drehtür|Schiebetür|Automatische/)
+  })
+
+  it('doorTypeLine covers the record', () => {
+    expect(doorTypeLine('sliding', true)).toBe('Automatische Schiebetür.')
+    expect(doorTypeLine('revolving', false, 'en')).toBe('Revolving door.')
+    expect(doorTypeLine('yes', false)).toBeNull()
+    expect(doorTypeLine(null, true)).toBe('Automatische Tür.')
   })
 })
 

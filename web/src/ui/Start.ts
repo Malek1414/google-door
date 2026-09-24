@@ -11,7 +11,7 @@
 import { initSpeech, preload } from '../core/speech'
 import { requestHeadingPermission } from '../core/heading'
 import { unlockAudio } from '../audio'
-import { resumeAudioOnTap, session, announce } from '../session'
+import { resumeAudioOnTap, session, announce, setPlaybackSession } from '../session'
 import { t } from '../strings'
 import { h, mount } from './dom'
 
@@ -25,6 +25,8 @@ export async function unlockAll(opts: { camera: boolean }): Promise<UnlockResult
   // Sound first and synchronously: iOS only unlocks an AudioContext inside the tap, and
   // after the first await below the gesture may be gone. No await happens before
   // requestHeadingPermission(), so the compass prompt still sees the tap too.
+  // iOS 17+: speech and clips play through the silent switch, like a navigation app.
+  setPlaybackSession()
   try {
     const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     if (Ctx) {

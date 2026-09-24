@@ -1,5 +1,6 @@
 import UIKit
 import WebKit
+import AVFoundation
 import CoreLocation
 import os
 
@@ -111,6 +112,32 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
         load(from: 0)
     }
 
+    // MARK: - Screen and sound stay on while Doorway is in front
+
+    /// The phone is held up and walked with; auto-lock mid-approach would cut the camera,
+    /// the compass and the voice. Only while this screen is visible (iOS itself ignores
+    /// the flag in the background).
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        UIApplication.shared.isIdleTimerDisabled = true
+        Self.playThroughSilentSwitch()
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        UIApplication.shared.isIdleTimerDisabled = false
+    }
+
+    /// Spoken guidance is the product for a blind user: like a navigation app it plays
+    /// with the ring/silent switch on. WKWebView's audio follows the host app's session.
+    private static func playThroughSilentSwitch() {
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.mixWithOthers])
+        } catch {
+            log.error("audio session: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
     override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
     override var prefersHomeIndicatorAutoHidden: Bool { true }
 
@@ -124,7 +151,22 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
         attempt = index
         retry.isHidden = true
         status.text = "Verbinde …"
-        webView.load(URLRequest(url: urls[index], cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 12))
+        var req = URLRequest(url: urls[index], cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 12)
+        // Serveo puts a "Browser Warning" page in front of every browser navigation to a
+        // free tunnel. The header skips it for this load; the cookie (set first) skips it
+        // for every later navigation and reload inside the web view.
+        req.setValue("true", forHTTPHeaderField: Self.serveoSkip)
+        skipServeoWarning { [weak self] in self?.webView.load(req) }
+    }
+
+    private static let serveoSkip = "serveo-skip-browser-warning"
+
+    private func skipServeoWarning(then done: @escaping () -> Void) {
+        guard let cookie = HTTPCookie(properties: [
+            .domain: Origins.tunnelHost, .path: "/", .name: Self.serveoSkip, .value: "true",
+            .secure: "TRUE", .expires: Date().addingTimeInterval(365 * 24 * 3600),
+        ]) else { return done() }
+        webView.configuration.websiteDataStore.httpCookieStore.setCookie(cookie, completionHandler: done)
     }
 
     @objc private func retryTapped() { load(from: 0) }

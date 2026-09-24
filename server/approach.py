@@ -75,7 +75,14 @@ class FrameReq(BaseModel):
     headingDeg: float = 0.0
 
 
-async def _ask(prompt: str, frame_b64: str) -> dict:
+# The blind path is a live loop: the client abandons a door fix after 5 s and counts it
+# as a miss. Under the upstream default (20 s per try) a hung Gemini call answered long
+# after anyone was listening; each try now has to land inside the client's budget. The
+# default 3 tries stay: a fast 429/503 retry (0.8 s, 1.6 s backoff) still fits in 5 s.
+FIX_TIMEOUT_S = 4.5
+
+
+async def _ask(prompt: str, frame_b64: str, **kw) -> dict:
     body = {
         "contents": [{"parts": [
             {"text": prompt},
@@ -92,7 +99,7 @@ async def _ask(prompt: str, frame_b64: str) -> dict:
         },
     }
     # 503 naming GEMINI_API_KEY when it is missing; 429/5xx retried; outcome recorded.
-    r = await upstream.gemini(MODEL_FIX, body)
+    r = await upstream.gemini(MODEL_FIX, body, **kw)
     if r.status_code != 200:
         raise HTTPException(502, f"gemini {r.status_code}")
     try:
@@ -118,7 +125,7 @@ OPENS = {"automatic", "push", "pull", "revolving", "none", "unknown"}
 async def door_fix(req: FrameReq):
     """Blind path. Bearing is relative to the camera centre, never a compass heading:
     the model sees a picture, not a heading, and converting here would hide that."""
-    d = await _ask(FIX_PROMPT, req.frame)
+    d = await _ask(FIX_PROMPT, req.frame, timeout=FIX_TIMEOUT_S)
     conf = _num(d.get("confidence"), 0.0, 1.0) or 0.0
     bearing = _num(d.get("bearingDeg"), -60.0, 60.0)
     dist = _num(d.get("distanceM"), 0.0, 60.0)

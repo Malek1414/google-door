@@ -57,7 +57,7 @@ describe('voice calm', () => {
   it('approach narrator: safety and one-off lines pass the gap, direction-only lines wait', () => {
     const nar = new Narrator('de', new LineGate())
     const v = (instruction: string): ApproachView => ({ phase: 'walking', relBearingDeg: 0, distanceM: 5, instruction, source: 'gemini-frame', unsure: false })
-    expect(nar.next(v(safetyLine('de')), 0)?.interrupt).toBe(true)
+    expect(nar.next(v(safetyLine('de')), 0)?.interrupt).toBe(false) // main: the first line never interrupts (iOS primer)
     expect(nar.next(v('Links'), 500)).toBeNull() // inside the gap after the safety line
     expect(nar.next(v(thresholdLine('de')), 1000)).not.toBeNull() // one-off: passes
     expect(nar.next(v('Links'), 12000)?.text).toBe('Links') // said later, still current

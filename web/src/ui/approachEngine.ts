@@ -15,17 +15,23 @@
 import { Approach, type ApproachState } from '../core/approach'
 import { MAX_AGE_MS, type Anchor } from '../core/anchor'
 import {
+  atDoorLine,
   type Band,
   bandText,
+  doorTypeLine,
   fallbackLine,
   metresLine,
+  noCameraLine,
+  noCompassLine,
   noDirectionLine,
   pitchFor,
   safetyLine,
+  searchingLine,
   thresholdLine,
   throughLine,
   unsureLine,
 } from '../core/instruct'
+import { HeadingSmoother } from '../core/smooth'
 import { StabilityGuard, angleDelta } from '../core/stability'
 import { lang as appLang } from '../strings'
 import type { ApproachIO, ApproachSession, ApproachView, DoorFixSource, StartApproach } from './approachPort'
@@ -41,28 +47,22 @@ export const FALLBACK_AFTER = 3
  *  direction, not a distance, and GPS is not allowed to supply one. */
 export const FALLBACK_ASSUMED_M = 10
 export const TICK_MS = 100
+/** No compass reading this long after start: say so instead of staying silent. */
+export const NO_COMPASS_MS = 3000
+/** Longest stretch without a spoken line while guidance runs (blind user: silence reads as a crash). */
+export const QUIET_MS = 5000
+/** Once the reason for silence has been said (no compass), repeat it only this often. */
+export const EXPLAINED_QUIET_MS = 15000
+/** After a 429 from /api/door-fix, wait this long before the next request. */
+export const RATE_LIMIT_BACKOFF_MS = 5000
+/** A new band must hold this long before it is spoken: compass jitter across a band
+ *  edge otherwise speaks a line per tick. The beacon still follows every tick. */
+export const BAND_HOLD_MS = 700
+/** And band lines are at least this far apart. */
+export const BAND_GAP_MS = 1500
 /** CONTRACT "DoorFix": `inside` ends the guidance, so it needs an explicit true at
  *  this confidence or above. A wrong true abandons someone on the pavement. */
 export const INSIDE_MIN_CONFIDENCE = 0.6
-/** No compass reading this long after the start: say so instead of going silent. */
-export const NO_COMPASS_MS = 3000
-/** No camera frame this long counts as one vision miss, so the map fallback still fires. */
-export const NO_FRAME_MISS_MS = 1500
-/** After a 429 from /api/door-fix, wait this long before the next request. */
-export const RATE_LIMIT_BACKOFF_MS = 5000
-/** One /api/door-fix longer than this is a miss; the next try follows. */
-export const DOOR_FIX_TIMEOUT_MS = 8000
-
-// Two lines the engine needs that core/instruct.ts does not have yet (see questions.md).
-// Same register as the core lines; move them there once Malek agrees.
-export function noCompassLine(lang = 'de'): string {
-  return lang.startsWith('de')
-    ? 'Ich bekomme keine Kompassrichtung. Halte das Handy aufrecht vor dich.'
-    : "I'm not getting a compass direction. Hold the phone upright in front of you."
-}
-export function searchingLine(lang = 'de'): string {
-  return lang.startsWith('de') ? 'Ich suche noch den Eingang. Halte die Kamera nach vorn.' : 'Still looking for the entrance. Hold the camera forward.'
-}
 
 export interface EngineDeps {
   fetch: typeof fetch
@@ -112,15 +112,24 @@ export function parseDoorFix(raw: unknown): VisionFix | null {
   return { bearingDeg, distanceM, confidence, source }
 }
 
+/** A door fix slower than this is abandoned and counts as a miss. Three misses hand
+ *  over to the map bearing, so this bounds the silence a slow or rate-limited model
+ *  can cause. Measured on the engine clock, so it is testable. */
+export const TIMEOUT_MS = 5000
+
 interface VisionReply {
   fix: VisionFix | null
   inside: boolean
 }
 
-/** null: no usable answer (network, 5xx, timeout). 'rate-limited': 429, back off. */
-async function requestFix(deps: EngineDeps, base: string, frame: string, headingDeg: number): Promise<VisionReply | 'rate-limited' | null> {
-  const ctl = new AbortController()
-  const timer = setTimeout(() => ctl.abort(), DOOR_FIX_TIMEOUT_MS)
+/** null: no usable answer (network, 5xx, abort). 'rate-limited': 429, back off. */
+async function requestFix(
+  deps: EngineDeps,
+  base: string,
+  frame: string,
+  headingDeg: number,
+  ctl: AbortController,
+): Promise<VisionReply | 'rate-limited' | null> {
   try {
     const r = await deps.fetch(`${base}/api/door-fix`, {
       method: 'POST',
@@ -134,8 +143,6 @@ async function requestFix(deps: EngineDeps, base: string, frame: string, heading
     return { fix: parseDoorFix(raw), inside: saysInside(raw) }
   } catch {
     return null
-  } finally {
-    clearTimeout(timer)
   }
 }
 
@@ -147,24 +154,39 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     const guard = new StabilityGuard()
     const subs = new Set<(v: ApproachView) => void>()
 
+    // Raw compass as it arrives; `heading` is the smoothed value every tick works from.
+    let rawHeading: number | null = null
     let heading: number | null = null
+    const smoother = new HeadingSmoother({ tau: 0.2, deadbandDeg: 1.5 })
     let steps = 0
     let anchor: Anchor | null = null
     let inFlight = false
     let lastRequestAt = -Infinity
+    /** 429 backoff: no request before this. */
     let notBefore = -Infinity
     let failures = 0
     let saidUnsure = false
     let lastBand: Band | null = null
+    let candidateBand: Band | null = null
+    let candidateSince = 0
+    let lastBandAt = -Infinity
     let lastPhase = approach.currentPhase
     let lastSourceSpoken: DoorFixSource | null = null
     let stopped = false
     let pendingUnsure = false
     let pendingNoDirection = false
     let saidNoDirection = false
+    let saidNoCompass = false
+    let noFrames = 0
+    let pendingNoCamera = false
+    let saidNoCamera = false
+    // The request in flight, so a timeout can abandon it and a late answer is ignored.
+    let ctl: AbortController | null = null
+    let reqSeq = 0
+    let timedOut = false
+    let saidSearching = false
     const startedAt = deps.now()
     let seq = 0
-    let saidNoCompass = false
 
     // The safety line is the first thing the session ever says, and it is said once.
     let view: ApproachView = {
@@ -187,7 +209,6 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
 
     /** Say `text` again (or for the first time) even if it equals the current instruction. */
     const remind = (text: string, patch: Partial<ApproachView> = {}) => {
-      if (text === noCompassLine(L)) saidNoCompass = true
       seq += 1
       emit({ ...view, ...patch, instruction: text, seq })
     }
@@ -203,10 +224,12 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     /** Is the current anchor still young enough to speak from? (Read-only: no tick.) */
     const anchorFresh = () => anchor !== null && deps.now() - anchor.ts <= MAX_AGE_MS
 
-    /** One try without a trusted fix: after FALLBACK_AFTER of them, the map bearing. */
+    /** One attempt without a trusted fix; enough of them hand over to the map bearing. */
     const miss = () => {
       failures += 1
-      if (failures >= FALLBACK_AFTER && !anchorFresh()) {
+      // Never at the threshold: losing the door there is expected (the user is AT
+      // it), and a map anchor would demote them to walking with a wrong direction.
+      if (failures >= FALLBACK_AFTER && !anchorFresh() && approach.currentPhase !== 'threshold') {
         const fb = fallbackAnchor()
         if (fb) {
           anchor = fb
@@ -228,29 +251,36 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
       if (!due) return
       const frame = io.frame()
       if (!frame) {
-        // No camera picture (denied, not started, backgrounded): count it as a miss at
-        // the on-demand cadence, so the map fallback or the no-direction line still come.
-        if (now - lastRequestAt >= NO_FRAME_MISS_MS) {
-          lastRequestAt = now
-          miss()
-        }
+        // No picture is a failed attempt like any other, or the map bearing never
+        // takes over for a phone whose camera never started.
+        lastRequestAt = now
+        noFrames += 1
+        if (noFrames >= FALLBACK_AFTER && !saidNoCamera) pendingNoCamera = true
+        miss()
         return
       }
+      noFrames = 0
       // The fix is the truth at the moment of the frame: anchor it to the heading,
       // steps and time of the frame, not of the answer.
       const at = { heading, steps, ts: now }
       inFlight = true
       lastRequestAt = now
-      void requestFix(deps, io.apiBase, frame, at.heading).then((got) => {
+      const mine = ++reqSeq
+      ctl = new AbortController()
+      void requestFix(deps, io.apiBase, frame, at.heading, ctl).then((got) => {
+        if (mine !== reqSeq) return // timed out and abandoned
         inFlight = false
+        ctl = null
         if (stopped) return
+        // 429: the quota is out; hammering it only extends the outage. Counts as a miss.
         if (got === 'rate-limited') notBefore = deps.now() + RATE_LIMIT_BACKOFF_MS
         const reply = got === 'rate-limited' ? null : got
         const fix = reply?.fix ?? null
         const wasLive = guard.mode === 'live'
-        const verdict = fix ? guard.push({ bearingDeg: fix.bearingDeg, headingDeg: at.heading, confidence: fix.confidence }) : null
+        const verdict = fix ? guard.push({ bearingDeg: fix.bearingDeg, headingDeg: at.heading, confidence: fix.confidence, distanceM: fix.distanceM }) : null
         if (fix && verdict?.trusted) {
           failures = 0
+          saidSearching = false
           anchor = { bearingDeg: fix.bearingDeg, distanceM: fix.distanceM, headingDeg: at.heading, steps: at.steps, ts: at.ts, source: fix.source }
           approach.setAnchor(anchor)
         } else {
@@ -268,20 +298,53 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     const tick = () => {
       if (stopped) return
       const now = deps.now()
-      if (heading === null) {
-        // No compass at all: nothing can be pointed at. Say why, and keep saying it now
-        // and then, instead of leaving a blind user with the safety line and silence.
-        // Said once: it is an event (the compass never came), not a loop.
-        if (now - startedAt >= NO_COMPASS_MS && view.instruction !== noCompassLine(L) && !saidNoCompass) remind(noCompassLine(L), { relBearingDeg: null, distanceM: null, beaconPitch: undefined })
+      if (rawHeading === null) {
+        // Said once: it is an event (the compass never came), not a loop (voice calm).
+        if (now - startedAt >= NO_COMPASS_MS && !saidNoCompass) {
+          saidNoCompass = true
+          remind(noCompassLine(L), { relBearingDeg: null, distanceM: null, beaconPitch: undefined })
+        }
         return
       }
-      const st = approach.tick({ headingDeg: heading, steps, nowMs: now })
+      heading = smoother.push(rawHeading, now)
+      if (inFlight && now - lastRequestAt >= TIMEOUT_MS) {
+        ctl?.abort()
+        ctl = null
+        reqSeq += 1
+        inFlight = false
+        timedOut = true
+        miss()
+      }
+      // A map anchor that has aged out is simply re-minted: the surveyed bearing does
+      // not go stale, and letting it lapse drops the beacon every MAX_AGE_MS.
+      if (anchor?.source === 'osm-fallback' && !anchorFresh() && approach.currentPhase !== 'threshold') {
+        const fb = fallbackAnchor()
+        if (fb) {
+          anchor = fb
+          approach.setAnchor(fb)
+        }
+      }
+      const st = approach.tick({ headingDeg: heading, steps, nowMs: deps.now() })
       const lines: string[] = []
 
       if (pendingUnsure && !saidUnsure) {
         saidUnsure = true
         pendingUnsure = false
         lines.push(unsureLine(L))
+      }
+      // Vision has gone quiet: the fix went stale, or a request timed out with nothing
+      // fresh to speak from. Said once per loss; not at the door, where the stillness
+      // path is already running and "looking for the door" would contradict it.
+      const lost = st.lostFix || (timedOut && !anchorFresh())
+      timedOut = false
+      if (lost && !saidSearching && st.phase !== 'threshold' && st.phase !== 'through') {
+        saidSearching = true
+        lines.push(searchingLine(L))
+      }
+      if (pendingNoCamera && !saidNoCamera) {
+        saidNoCamera = true
+        pendingNoCamera = false
+        lines.push(noCameraLine(L))
       }
       if (pendingNoDirection && !saidNoDirection) {
         saidNoDirection = true
@@ -299,13 +362,30 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
         if (st.phase !== 'through') {
           if (st.phase === 'threshold' && lastPhase !== 'threshold' && p.source !== 'osm-fallback') {
             lines.push(thresholdLine(L))
-          } else if (st.band !== lastBand) {
-            lines.push(bandText(st.band, L))
-            lastBand = st.band
+            const doorType = doorTypeLine(io.door.door, io.door.automatic, L)
+            if (doorType) lines.push(doorType)
+          } else if (st.band === lastBand) {
+            candidateBand = null
+          } else {
+            if (st.band !== candidateBand) {
+              candidateBand = st.band
+              candidateSince = now
+            }
+            // The first band after a (re)gained fix is said at once; a CHANGE of band
+            // must hold BAND_HOLD_MS and wait out BAND_GAP_MS since the last band line.
+            if (lastBand === null || (now - candidateSince >= BAND_HOLD_MS && now - lastBandAt >= BAND_GAP_MS)) {
+              lines.push(bandText(st.band, L))
+              lastBand = st.band
+              lastBandAt = now
+              candidateBand = null
+            }
           }
         }
-        // A map bearing gives a direction, never a distance.
-        if (st.speakDistanceM !== null && p.source !== 'osm-fallback') lines.push(metresLine(st.speakDistanceM, L))
+        // A map bearing gives a direction, never a distance. At the threshold the door
+        // line already says where it is; a metres line would replace it within a tick.
+        if (st.speakDistanceM !== null && p.source !== 'osm-fallback' && st.phase !== 'threshold') {
+          lines.push(metresLine(st.speakDistanceM, L))
+        }
       } else if (st.lostFix) {
         // Stop speaking confidently the moment the anchor is stale; the next band is
         // said again once a fix is back.
@@ -313,7 +393,8 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
       }
       // Vision can propose "through" from a reply with no door in it, so this does not
       // wait for a fresh projection.
-      if (st.phase === 'through' && lastPhase !== 'through') lines.push(throughLine(L))
+      // Only vision earns "inside"; stillness only knows the user stopped at the door.
+      if (st.phase === 'through' && lastPhase !== 'through') lines.push(st.throughBy === 'still' ? atDoorLine(L) : throughLine(L))
       lastPhase = st.phase
 
       // In `through` there is nothing left to point at: no arrow, no metres, no beacon.
@@ -330,13 +411,14 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
       }
       emit(next)
       // No periodic repeats (Sami: "stop playing the voice when nothing happens"):
-      // the voice speaks on events only; the beacon carries the rest.
+      // the voice speaks on events only; the beacon carries the rest. QUIET_MS stays
+      // exported for the tests that assert the calm.
       maybeRequest(st)
     }
 
     const offHeading = io.onHeading((h) => {
       if (!Number.isFinite(h.deg)) return
-      heading = h.deg
+      rawHeading = h.deg
     })
     const offSteps = countSteps(io.onMotion, (n) => (steps = n), deps.now)
     const offTimer = deps.every(TICK_MS, tick)
@@ -358,6 +440,7 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
       stop() {
         if (stopped) return
         stopped = true
+        ctl?.abort()
         offTimer()
         offHeading()
         offSteps()

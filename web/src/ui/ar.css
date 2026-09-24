@@ -94,6 +94,13 @@
   -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
 .ar-look-out:empty { display: none; }
 
+/* ── "Zum Eingang führen" in the panel, from 25 m in (same pill as the arrival card) ── */
+.ar .ar-near { position: absolute; left: 14px; right: 14px; width: auto; z-index: 5;
+  bottom: calc(96px + env(safe-area-inset-bottom)); min-height: 64px; font-size: 20px; }
+.ar[data-near='1'] .ar-look { bottom: calc(172px + env(safe-area-inset-bottom)); }
+.ar[data-near='1'] .ar-look-out { bottom: calc(226px + env(safe-area-inset-bottom)); }
+.ar[data-near='1'] .ar-meta { display: none; }
+
 @media (prefers-reduced-motion: reduce) {
   .ar-chev, .ar-scan-art { animation: none !important; }
   .ar-card, .ar-safe { animation-duration: 0.01ms !important; }

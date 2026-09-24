@@ -14,6 +14,9 @@ import { bandFor, shouldSpeakDistance, type Band } from './instruct'
 import { project, needsReanchor, type Anchor, type Projection } from './anchor'
 
 export type Phase = 'orienting' | 'walking' | 'threshold' | 'through'
+/** What proposed `through`: vision saw interior, or the user stood still at the door.
+ *  They warrant different words — standing still may just mean "at the handle". */
+export type ThroughBy = 'vision' | 'still'
 
 /** Bearing error that counts as aimed. Matches the "straight ahead" band. */
 export const AIMED_DEG = 8
@@ -49,6 +52,8 @@ export interface ApproachState {
   /** True the first tick after the anchor stopped being trustworthy. */
   lostFix: boolean
   needsFix: boolean
+  /** Why the phase is `through`; null in every other phase. */
+  throughBy: ThroughBy | null
 }
 
 export class Approach {
@@ -61,13 +66,15 @@ export class Approach {
   private stillSinceMs: number | null = null
   private insideVetoedAtSteps: number | null = null
   private lastDistanceM: number | null = null
+  private throughBy: ThroughBy | null = null
 
   /** Feed a fresh vision (or fallback) fix. */
   setAnchor(a: Anchor): void {
     this.anchor = a
     // Seed the distance before the first tick, so an `inside` arriving with the very
-    // first fix is judged on how far the door actually is.
-    if (this.lastDistanceM === null) this.lastDistanceM = a.distanceM
+    // first fix is judged on how far the door actually is. A map-bearing anchor has no
+    // distance of its own (it is an assumed placeholder), so it seeds nothing.
+    if (this.lastDistanceM === null && a.source !== 'osm-fallback') this.lastDistanceM = a.distanceM
   }
 
   /** The user pressed "Noch draußen": the proposal was wrong, keep guiding.
@@ -76,6 +83,7 @@ export class Approach {
   stillOutside(): void {
     this.confirmedThrough = false
     this.stillSinceMs = null
+    this.throughBy = null
     // The user has just told us the last claim was wrong. Do not make it again until
     // something has actually changed — that is, until they have walked further.
     this.insideVetoedAtSteps = this.lastSteps
@@ -105,37 +113,52 @@ export class Approach {
     // Honoured before the anchor checks below, because walking through a door is
     // exactly when vision loses the door: gating the one signal that ends the mode
     // behind a fresh anchor means it can arrive too late to be worth anything. (Q6)
-    if (this.confirmedThrough) this.phase = 'through'
+    if (this.confirmedThrough) {
+      this.phase = 'through'
+      this.throughBy = 'vision'
+    }
 
     if (!this.anchor) {
-      return { phase: this.phase, projection: null, band: 'straight', speakDistanceM: null, lostFix: false, needsFix: true }
+      return { phase: this.phase, projection: null, band: 'straight', speakDistanceM: null, lostFix: false, needsFix: true, throughBy: this.throughBy }
     }
 
     const p = project(this.anchor, s.headingDeg, s.steps, s.nowMs)
+    // A map-bearing anchor gives a direction, never a distance: its distanceM is an
+    // assumed placeholder, and stepping it down would be dead reckoning (rule 2). So it
+    // drives no distance rule, no stillness and no `inside` gate.
+    const mapOnly = this.anchor.source === 'osm-fallback'
+
+    // Stillness is only meaningful at the threshold; anywhere else a pause is just a
+    // pause. Reset the clock on any step. Runs before the freshness check: at the door
+    // is exactly where vision loses the door, and a stale anchor there must not make
+    // `through` unreachable.
+    if (s.steps !== this.lastSteps) {
+      // Walked on since rejecting a proposal: vision may claim "inside" again.
+      if (this.insideVetoedAtSteps !== null && s.steps > this.insideVetoedAtSteps) this.insideVetoedAtSteps = null
+      this.lastSteps = s.steps
+      this.stillSinceMs = null
+    } else if (this.phase === 'threshold' && !mapOnly && this.stillSinceMs === null) {
+      this.stillSinceMs = s.nowMs
+    }
+    const stoodStill = this.phase === 'threshold' && !mapOnly && this.stillSinceMs !== null && s.nowMs - this.stillSinceMs >= STILL_MS
 
     // A stale anchor is reported once and then stops producing guidance. Guidance that
     // keeps speaking confidently while drifting is the failure that actually hurts.
     if (!p.fresh) {
       const lostFix = !this.wasStale
       this.wasStale = true
-      return { phase: this.phase, projection: p, band: 'straight', speakDistanceM: null, lostFix, needsFix: true }
+      // Stood still at the door long enough: propose through even without a fresh fix.
+      if (stoodStill && this.phase !== 'through') {
+        this.phase = 'through'
+        this.throughBy = 'still'
+      }
+      return { phase: this.phase, projection: p, band: 'straight', speakDistanceM: null, lostFix, needsFix: true, throughBy: this.throughBy }
     }
     this.wasStale = false
-    this.lastDistanceM = p.distanceM
+    if (!mapOnly) this.lastDistanceM = p.distanceM
 
     const band = bandFor(p.relBearingDeg)
     const aimed = Math.abs(p.relBearingDeg) <= AIMED_DEG
-
-    // Stillness is only meaningful at the threshold; anywhere else a pause is just a
-    // pause. Reset the clock on any step.
-    if (s.steps !== this.lastSteps) {
-      // Walked on since rejecting a proposal: vision may claim "inside" again.
-      if (this.insideVetoedAtSteps !== null && s.steps > this.insideVetoedAtSteps) this.insideVetoedAtSteps = null
-      this.lastSteps = s.steps
-      this.stillSinceMs = null
-    } else if (this.phase === 'threshold' && this.stillSinceMs === null) {
-      this.stillSinceMs = s.nowMs
-    }
 
     if (this.confirmedThrough) {
       this.phase = 'through'
@@ -149,15 +172,16 @@ export class Approach {
         if (this.phase === 'orienting') {
           if (aimed) this.phase = 'walking'
         } else if (this.phase === 'walking') {
-          if (p.distanceM <= THRESHOLD_M) this.phase = 'threshold'
+          if (!mapOnly && p.distanceM <= THRESHOLD_M) this.phase = 'threshold'
           // Hysteresis, not AIMED_DEG: a person sways while walking, and bouncing them
           // back to orienting every few steps would make the mode unusable.
           else if (Math.abs(p.relBearingDeg) > LOST_AIM_DEG) this.phase = 'orienting'
         } else if (this.phase === 'threshold') {
-          if (p.distanceM > THRESHOLD_M * 2) this.phase = 'walking'
+          if (!mapOnly && p.distanceM > THRESHOLD_M * 2) this.phase = 'walking'
           // Stood still at the door long enough: propose that they are through.
-          else if (this.stillSinceMs !== null && s.nowMs - this.stillSinceMs >= STILL_MS) {
+          else if (stoodStill) {
             this.phase = 'through'
+            this.throughBy = 'still'
           }
         }
         if (this.phase === before) break
@@ -179,6 +203,7 @@ export class Approach {
       speakDistanceM,
       lostFix: false,
       needsFix: needsReanchor(this.anchor, s.headingDeg, s.steps, s.nowMs),
+      throughBy: this.throughBy,
     }
   }
 
@@ -190,5 +215,6 @@ export class Approach {
     this.confirmedThrough = false
     this.lastSteps = -1
     this.stillSinceMs = null
+    this.throughBy = null
   }
 }

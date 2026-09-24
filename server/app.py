@@ -65,7 +65,7 @@ app = FastAPI(title="Doorway")
 from server import upstream
 from server.surface import router as surface_router
 from server.route import router as route_router
-from server.approach import router as approach_router
+from server.approach import router as approach_router, look_target_text
 from server.arcore import router as arcore_router
 
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -181,6 +181,7 @@ class LookReq(BaseModel):
     heading: float
     distanceM: float
     target: str
+    doorId: Optional[str] = None  # optional; adds the door's surveyed description
 
 @app.post("/api/look")
 async def look(req: LookReq):
@@ -189,7 +190,7 @@ async def look(req: LookReq):
     prompt = (
         f"You are helping a partially-blind person find a building entrance.\n"
         f"They are about {req.distanceM:.0f} metres away, facing {req.heading:.0f} degrees.\n"
-        f"They are looking for: {req.target}.\n\n"
+        f"They are looking for: {look_target_text(req.doorId, req.target)}.\n\n"
         "Describe in ONE short spoken sentence where that entrance is relative to them "
         "(left / ahead / right, roughly how far). Plain language, no lists, no preamble.\n"
         "If you cannot see an entrance matching that description, say exactly: "

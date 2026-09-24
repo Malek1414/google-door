@@ -10,10 +10,10 @@ Both refuse to guess. At ten metres a hallucinated door is someone walking into 
 so "I cannot see it" is a first-class answer here, not a failure — the caller falls back
 to the surveyed OSM bearing and says which source is talking.
 """
-import base64, json, os
+import base64, glob, json, os
 from typing import Optional
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from server import upstream
 
@@ -70,9 +70,82 @@ Return JSON only:
 {"step":null,"widthCm":null,"opens":"unknown","note":"","confidence":0}"""
 
 
+# A surveyed door can say what it looks like, so vision looks for THAT door and not
+# the nearest one (at Google Berlin the main door with steps is six metres from the
+# step-free one). Source: data/demo/<place>/route.json, "door.target" and an optional
+# small "door.referenceImage". No entry: the prompts stay exactly as they were.
+DEMO_ROUTES = "data/demo/*/route.json"
+REF_MAX_BYTES = 60_000
+_targets: Optional[dict] = None
+
+
+def door_targets() -> dict:
+    """entranceId -> {"name", "en", "de", "ref"}. Read once; a broken file is skipped."""
+    global _targets
+    if _targets is None:
+        out = {}
+        for path in sorted(glob.glob(DEMO_ROUTES)):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    d = json.load(f)
+                door = d.get("door") or {}
+                target = door.get("target") or {}
+                eid = d.get("entranceId")
+                if not isinstance(eid, str) or not isinstance(target.get("en"), str):
+                    continue
+                ref = None
+                if isinstance(door.get("referenceImage"), str):
+                    rp = os.path.join(os.path.dirname(path), door["referenceImage"])
+                    if os.path.isfile(rp) and os.path.getsize(rp) <= REF_MAX_BYTES:
+                        with open(rp, "rb") as f:
+                            ref = base64.b64encode(f.read()).decode()
+                out[eid] = {"name": d.get("entranceName"), "en": target["en"],
+                            "de": target.get("de"), "ref": ref}
+            except (OSError, ValueError):
+                continue
+        _targets = out
+    return _targets
+
+
+def target_for(door_id: Optional[str], text: str = "") -> Optional[dict]:
+    """The surveyed description for a door, by id, or by its name inside a free-text
+    target (the /api/look caller sends "entrance, named <name>" and no id)."""
+    t = door_targets()
+    if door_id and door_id in t:
+        return t[door_id]
+    for v in t.values():
+        if v["name"] and v["name"] in text:
+            return v
+    return None
+
+
+def look_target_text(door_id: Optional[str], text: str) -> str:
+    """What /api/look tells the model the person is looking for."""
+    t = target_for(door_id, text)
+    if not t:
+        return text
+    return f"{text}. Surveyed on site, it is {t['en']}"
+
+
+FIX_TARGET = """
+
+THE ENTRANCE TO FIND is one specific door, surveyed on site: {target}.
+Report only that door. Any other entrance in view (for example a main entrance with
+steps) is NOT the target: if only another entrance is visible, return found false."""
+
+FIX_REFERENCE = """
+
+Two images follow. IMAGE 1 is a reference photo of the target door taken on site: use
+it only to recognise the door. IMAGE 2 is the live camera. bearingDeg, distanceM and
+inside are about IMAGE 2 only. If the door is not visible in IMAGE 2, return found false."""
+
+
 class FrameReq(BaseModel):
     frame: str          # base64 jpeg
     headingDeg: float = 0.0
+    # The door being approached (Entrance.id). Only used to look up its surveyed
+    # description; unknown ids are ignored.
+    doorId: Optional[str] = Field(default=None, max_length=128)
 
 
 # The blind path is a live loop: the client abandons a door fix after 5 s and counts it
@@ -82,12 +155,15 @@ class FrameReq(BaseModel):
 FIX_TIMEOUT_S = 4.5
 
 
-async def _ask(prompt: str, frame_b64: str, **kw) -> dict:
+async def _ask(prompt: str, frame_b64: str, ref_b64: Optional[str] = None, **kw) -> dict:
+    parts = [{"text": prompt}]
+    if ref_b64:
+        parts += [{"text": "IMAGE 1 (reference photo of the target door):"},
+                  {"inline_data": {"mime_type": "image/jpeg", "data": ref_b64}},
+                  {"text": "IMAGE 2 (live camera):"}]
+    parts.append({"inline_data": {"mime_type": "image/jpeg", "data": frame_b64}})
     body = {
-        "contents": [{"parts": [
-            {"text": prompt},
-            {"inline_data": {"mime_type": "image/jpeg", "data": frame_b64}},
-        ]}],
+        "contents": [{"parts": parts}],
         "generationConfig": {
             "temperature": 0.0,
             # Gemini 3.x reasons by default and thinking is charged against
@@ -125,7 +201,14 @@ OPENS = {"automatic", "push", "pull", "revolving", "none", "unknown"}
 async def door_fix(req: FrameReq):
     """Blind path. Bearing is relative to the camera centre, never a compass heading:
     the model sees a picture, not a heading, and converting here would hide that."""
-    d = await _ask(FIX_PROMPT, req.frame, timeout=FIX_TIMEOUT_S)
+    t = target_for(req.doorId)
+    prompt, ref = FIX_PROMPT, None
+    if t:
+        prompt += FIX_TARGET.format(target=t["en"])
+        if t["ref"]:
+            prompt += FIX_REFERENCE
+            ref = t["ref"]
+    d = await _ask(prompt, req.frame, ref, timeout=FIX_TIMEOUT_S)
     conf = _num(d.get("confidence"), 0.0, 1.0) or 0.0
     bearing = _num(d.get("bearingDeg"), -60.0, 60.0)
     dist = _num(d.get("distanceM"), 0.0, 60.0)

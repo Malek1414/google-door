@@ -212,13 +212,13 @@ describe('the real engine, driven through ApproachIO', () => {
     expect(r.calls).toHaveLength(2)
   })
 
-  it('posts frame and headingDeg to /api/door-fix, and waits for the compass', async () => {
+  it('posts frame, headingDeg and the door id to /api/door-fix, and waits for the compass', async () => {
     const r = rig(() => ({ found: false }))
     for (let i = 0; i < 20; i++) await r.tick()
     expect(r.calls).toHaveLength(0)
     r.heading(42)
     await r.tick()
-    expect(r.calls[0]).toEqual({ url: 'https://api.test/api/door-fix', body: { frame: 'JPEGBASE64', headingDeg: 42 } })
+    expect(r.calls[0]).toEqual({ url: 'https://api.test/api/door-fix', body: { frame: 'JPEGBASE64', headingDeg: 42, doorId: 'node/1' } })
   })
 
   it('beacon pitch rises as the bearing error falls, silent without a fix', async () => {

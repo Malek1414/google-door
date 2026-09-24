@@ -1,0 +1,267 @@
+{
+ "version": 1,
+ "entranceId": "demo/google-accessible",
+ "entranceName": "Google Berlin, barrierefreier Zugang Tucholskystraße 2",
+ "mainEntranceId": "node/8725243884",
+ "place": "Google Berlin, Tucholskystraße 2, 10117 Berlin",
+ "recorded": "2026-09-24",
+ "note": "Aus zwei iPhone-Videos von Sami (24.09.2026, 11:37). Die Videos selbst liegen nicht im Repo. heading_deg ist geschätzt aus OSM-Umriss und Bildrichtung, nicht gemessen. t ist die Sekunde im jeweiligen Video.",
+ "videos": [
+  {
+   "id": "IMG_3137",
+   "created": "2026-09-24T11:37:15+02:00",
+   "durationS": 15.1,
+   "lens": "1x (26 mm)",
+   "iso6709": "+52.5232+013.3918+051.891/",
+   "accuracyM": 5.1,
+   "covers": "Haupteingang bis barrierefreie Tür"
+  },
+  {
+   "id": "IMG_3138",
+   "created": "2026-09-24T11:37:41+02:00",
+   "durationS": 13.4,
+   "lens": "0,5x (13 mm)",
+   "iso6709": "+52.5231+013.3919+059.108/",
+   "accuracyM": 5.5,
+   "covers": "Gehweg Tucholskystraße bis barrierefreie Tür"
+  }
+ ],
+ "door": {
+  "lat": 52.523073,
+  "lon": 13.392169,
+  "approachBearing": 107.2,
+  "certainty": "Lage etwa ±5 m: GPS im Video ist auf 4 Nachkommastellen gerundet (etwa 11 m), die Position kommt aus dem OSM-Gebäudeumriss (Ecke Vordach/Hof) und dem Bild. Richtung Ost-Südost wie beim Haupteingang.",
+  "relativeToMain": "etwa 6 m südsüdöstlich vom Haupteingang, rechts um die Ecke, gleiche Blickrichtung beim Hineingehen",
+  "target": {
+   "de": "dunkelgrüne Holztür ohne Glas in einer roten Ziegelwand, auf der Tür zwei Schilder auf Augenhöhe: oben rot umrandet \"BMZ\", darunter weiß \"Barrierefreier Zugang\" mit Rollstuhlsymbol; links daneben ein Fallrohr, ein Stahlkasten \"FSD\" und ein schwarzer Kartenleser; vor der Tür ein Ablaufgitter im Kopfsteinpflaster. Sie liegt etwa 6 m rechts vom Haupteingang (Glastür mit drei Stufen) und ist NICHT der Haupteingang",
+   "en": "a dark green wooden door without glass in a red brick wall, with two signs at eye level: a red-framed \"BMZ\" sign and below it a white \"Barrierefreier Zugang\" sign with a wheelchair symbol; to its left a drainpipe, a steel box marked \"FSD\" and a black card reader; a drainage grate in the cobblestones in front of it. It is about 6 m to the right of the main entrance (glass door behind three steps) and is NOT the main entrance"
+  },
+  "referenceImage": "keyframes/ref-door-fix.jpg",
+  "stepFree": true,
+  "stepFreeEvidence": "Beide Videos zeigen einen ebenen Weg vom Gehweg bis zur Tür: Gehwegplatten gehen ohne Kante in Kopfsteinpflaster über, keine Stufe, keine Rampe nötig. An der Tür liegt das Pflaster bis an das Türblatt, die Schwelle ist im Bild unter 2 cm. Schild an der Tür: \"Barrierefreier Zugang\". Schwellenhöhe und Türbreite nicht gemessen."
+ },
+ "keyframes": [
+  {
+   "file": "keyframes/01-haupteingang-stufen.jpg",
+   "video": "IMG_3137",
+   "t": 3.0,
+   "shows": {
+    "de": "Haupteingang mit drei gerundeten Stufen und Handlauf, rechts am Pfeiler das Schild \"Barrierefreier Zugang\" mit Pfeil. Glasflächen verwischt (Personen dahinter).",
+    "en": "Main entrance with three rounded steps and a handrail; on the right pillar the \"Barrierefreier Zugang\" sign with an arrow. Glass blurred (people behind it)."
+   }
+  },
+  {
+   "file": "keyframes/02-weg-zur-tuer.jpg",
+   "video": "IMG_3138",
+   "t": 10.0,
+   "shows": {
+    "de": "Letzte Meter: helle Steinwand links, Fallrohr an der Ecke, dunkelgrüne Tür in der roten Ziegelwand. Lieferwagen rechts verwischt.",
+    "en": "Last metres: light stone wall on the left, drainpipe at the corner, dark green door in the red brick wall. Van on the right blurred."
+   }
+  },
+  {
+   "file": "keyframes/03-tuer-kontext.jpg",
+   "video": "IMG_3137",
+   "t": 12.0,
+   "shows": {
+    "de": "Die Tür mit Schildern, links Stahlkasten FSD und Kartenleser, davor das Ablaufgitter.",
+    "en": "The door with its signs, steel box FSD and card reader on the left, drainage grate in front."
+   }
+  },
+  {
+   "file": "keyframes/04-tuer-schilder.jpg",
+   "video": "IMG_3137",
+   "t": 14.0,
+   "shows": {
+    "de": "Nah: Schilder BMZ und Barrierefreier Zugang, Knauf links, Gitter vor der Tür.",
+    "en": "Close: BMZ and Barrierefreier Zugang signs, knob on the left, grate in front of the door."
+   }
+  }
+ ],
+ "waypoints": [
+  {
+   "id": "gehweg",
+   "t": {
+    "IMG_3138": 0.0
+   },
+   "heading_deg": 200,
+   "turn": "straight",
+   "landmark": {
+    "de": "Gehweg an der Ostseite der Tucholskystraße: helle Betonplatten mit Streifen aus kleinem Pflaster, graue Metallpoller an der Bordsteinkante, Fahrradständer und ein Parkschild. Links beginnt ein Vordach auf hellen Natursteinpfeilern.",
+    "en": "Pavement on the east side of Tucholskystraße: light concrete slabs with strips of small setts, grey metal bollards at the kerb, bike racks and a parking sign. On the left a canopy on light stone pillars begins."
+   },
+   "instruction": {
+    "de": "Auf dem Gehweg bleiben, bis links das Vordach auf hellen Steinpfeilern kommt.",
+    "en": "Stay on the pavement until the canopy on light stone pillars appears on your left."
+   },
+   "hazards": [
+    "Poller an der Bordsteinkante",
+    "abgestellte Roller und Motorräder am Gehwegrand",
+    "Fahrräder an den Ständern"
+   ],
+   "wheelchair_ok": true,
+   "blind_hint": {
+    "de": "Halte dich zur Hauswand. Zwischen den Pollern an der Straße stehen Roller und Motorräder.",
+    "en": "Keep to the building side. Scooters and motorbikes stand between the bollards by the road."
+   }
+  },
+  {
+   "id": "vordach",
+   "t": {
+    "IMG_3138": 3.5
+   },
+   "heading_deg": 110,
+   "turn": "left",
+   "landmark": {
+    "de": "Großes Vordach auf hellen Natursteinpfeilern. Der Boden wechselt ohne Kante von Gehwegplatten zu grauem Kopfsteinpflaster.",
+    "en": "Large canopy on light natural stone pillars. The ground changes from paving slabs to grey cobblestones without a kerb."
+   },
+   "instruction": {
+    "de": "Links unter das Vordach. Der Boden wird Kopfsteinpflaster, ohne Stufe.",
+    "en": "Turn left under the canopy. The ground becomes cobblestones, no step."
+   },
+   "hazards": [
+    "Steinpfeiler des Vordachs",
+    "Zufahrt: Autos und Lieferwagen fahren unter dem Vordach durch",
+    "Kopfsteinpflaster uneben"
+   ],
+   "wheelchair_ok": true,
+   "blind_hint": {
+    "de": "Unter dem Vordach ist eine Zufahrt. Auf Motorgeräusche achten, die Pfeiler mit dem Stock suchen.",
+    "en": "There is a driveway under the canopy. Listen for engines and find the pillars with your cane."
+   }
+  },
+  {
+   "id": "haupteingang",
+   "t": {
+    "IMG_3137": 0.0,
+    "IMG_3138": 5.0
+   },
+   "heading_deg": 110,
+   "turn": "right",
+   "landmark": {
+    "de": "Haupteingang geradeaus: doppelte Glastür mit Leuchtring, davor drei gerundete Steinstufen mit Handlauf in der Mitte, Wandleuchten links und rechts. Am Pfeiler rechts der Tür ein Schild \"Barrierefreier Zugang\" mit Rollstuhl und Pfeil nach rechts.",
+    "en": "Main entrance ahead: glass double door with a ring light, three rounded stone steps with a handrail in the middle, wall lamps on both sides. On the pillar right of the door a \"Barrierefreier Zugang\" sign with a wheelchair and an arrow to the right."
+   },
+   "instruction": {
+    "de": "Vor dir ist der Haupteingang mit drei Stufen. Nicht hinauf, sondern rechts daran vorbei.",
+    "en": "The main entrance with three steps is ahead. Do not go up; pass it on the right."
+   },
+   "hazards": [
+    "Haupteingang nur über drei Stufen, ohne Rampe",
+    "Handlauf mitten auf der Treppe"
+   ],
+   "wheelchair_ok": true,
+   "blind_hint": {
+    "de": "Die Stufen sind rund und ragen in den Weg. Wenn der Stock an eine Stufe stößt, nach rechts ausweichen.",
+    "en": "The steps are rounded and stick out into the path. If your cane hits a step, move to the right."
+   }
+  },
+  {
+   "id": "pfeiler-infotafel",
+   "t": {
+    "IMG_3137": 4.0,
+    "IMG_3138": 7.0
+   },
+   "heading_deg": 190,
+   "turn": "straight",
+   "landmark": {
+    "de": "Rechts an der letzten Stufe vorbei, an einem Steinpfeiler mit weißer Infotafel (Gropius Ensemble, roter Balken unten). Dahinter ein Hof mit Kopfsteinpflaster, ein gelber Backsteinbau mit roter Ziegelwand im Erdgeschoss, geparkte weiße Lieferwagen.",
+    "en": "Past the last step on the right, at a stone pillar with a white information board (Gropius Ensemble, red bar at the bottom). Beyond it a cobbled courtyard, a yellow brick building with a red brick ground floor, parked white vans."
+   },
+   "instruction": {
+    "de": "Rechts um die Stufen herum, am Pfeiler mit der Infotafel vorbei, etwa 4 Meter.",
+    "en": "Go right around the steps, past the pillar with the information board, about 4 metres."
+   },
+   "hazards": [
+    "Stufenkante links",
+    "Steinpfeiler"
+   ],
+   "wheelchair_ok": true,
+   "blind_hint": {
+    "de": "Die Stufen sind jetzt links von dir, der Pfeiler rechts. Du gehst zwischen beiden durch.",
+    "en": "The steps are now on your left and the pillar on your right. Walk between them."
+   }
+  },
+  {
+   "id": "wand-links",
+   "t": {
+    "IMG_3137": 6.0,
+    "IMG_3138": 9.0
+   },
+   "heading_deg": 107,
+   "turn": "left",
+   "landmark": {
+    "de": "Helle Natursteinwand links, sie führt direkt auf die rote Ziegelwand mit der Tür zu. Rechts parken Lieferwagen an der gelben Backsteinfassade, im Pflaster ein Gullydeckel.",
+    "en": "Light stone wall on the left, leading straight to the red brick wall with the door. Vans park on the right along the yellow brick facade, a drain cover in the cobbles."
+   },
+   "instruction": {
+    "de": "Links halten und der Steinwand links folgen. Die Tür ist am Ende der Wand, etwa 4 Meter.",
+    "en": "Keep left and follow the stone wall on your left. The door is at the end of the wall, about 4 metres."
+   },
+   "hazards": [
+    "geparkte Lieferwagen rechts (Außenspiegel)",
+    "Gullydeckel im Pflaster",
+    "Kopfsteinpflaster uneben"
+   ],
+   "wheelchair_ok": true,
+   "blind_hint": {
+    "de": "Die Wand links ist eine gute Leitlinie. Rechts stehen oft Fahrzeuge.",
+    "en": "The wall on your left is a good guide line. Vehicles are often parked on the right."
+   }
+  },
+  {
+   "id": "ecke-fallrohr",
+   "t": {
+    "IMG_3137": 10.0,
+    "IMG_3138": 10.5
+   },
+   "heading_deg": 107,
+   "turn": "straight",
+   "landmark": {
+    "de": "An der Ecke links ein graues Fallrohr mit einem Stein davor. Dann die rote Ziegelwand: ein Stahlkasten mit der Aufschrift FSD und darunter ein schwarzer Kartenleser, rechts daneben die dunkelgrüne Tür.",
+    "en": "At the corner on the left a grey drainpipe with a stone at its foot. Then the red brick wall: a steel box marked FSD with a black card reader below it, and to its right the dark green door."
+   },
+   "instruction": {
+    "de": "Die Tür ist direkt vor dir in der roten Ziegelwand. Vorsicht: links an der Ecke ein Fallrohr mit einem Stein davor.",
+    "en": "The door is straight ahead in the red brick wall. Careful: a drainpipe with a stone at its foot on the left corner."
+   },
+   "hazards": [
+    "Fallrohr mit Stein am Boden an der Ecke",
+    "Stahlkasten FSD ragt etwas aus der Wand"
+   ],
+   "wheelchair_ok": true,
+   "blind_hint": {
+    "de": "Nicht an der Wand entlang bis in die Ecke gehen, sondern einen halben Schritt nach rechts, dann gerade auf die Tür zu.",
+    "en": "Do not follow the wall into the corner; step half a pace to the right, then walk straight to the door."
+   }
+  },
+  {
+   "id": "tuer",
+   "t": {
+    "IMG_3137": 13.0,
+    "IMG_3138": 12.5
+   },
+   "heading_deg": 107,
+   "turn": "arrived",
+   "landmark": {
+    "de": "Dunkelgrüne Holztür ohne Glas in einer Nische der roten Ziegelwand. Auf Augenhöhe zwei Schilder: oben rot umrandet \"BMZ\", darunter \"Barrierefreier Zugang\" mit Rollstuhlsymbol. Runder Knauf und Schloss links am Türrand, etwa auf Hüfthöhe. Oben rechts eine Kamera. Vor der Tür ein Ablaufgitter quer über die ganze Breite.",
+    "en": "Dark green wooden door without glass in a niche of the red brick wall. Two signs at eye level: a red-framed \"BMZ\" and below it \"Barrierefreier Zugang\" with a wheelchair symbol. Round knob and lock on the left edge, about hip height. A camera at the top right. A drainage grate across the full width in front of the door."
+   },
+   "instruction": {
+    "de": "Du bist am barrierefreien Zugang. Der Knauf ist links am Türrand auf Hüfthöhe. Kurz vor der Tür liegt ein Gitter im Boden.",
+    "en": "You are at the accessible entrance. The knob is on the left edge of the door at hip height. Just before the door there is a grate in the ground."
+   },
+   "hazards": [
+    "Ablaufgitter vor der Tür (Stockspitze und kleine Räder)",
+    "Tür vermutlich verschlossen, Kartenleser links",
+    "keine Klingel und kein Türöffner-Knopf gesehen"
+   ],
+   "wheelchair_ok": true,
+   "blind_hint": {
+    "de": "Links neben der Tür an der Wand ist ein schwarzer Kartenleser, etwas tiefer als der Knauf, darüber der Stahlkasten. Eine Klingel war nicht zu sehen: vorher beim Empfang anrufen, damit jemand öffnet.",
+    "en": "Left of the door on the wall is a black card reader, a little lower than the knob, with the steel box above it. No bell was visible: call reception beforehand so someone opens the door."
+   }
+  }
+ ]
+}

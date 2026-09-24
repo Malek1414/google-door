@@ -11,10 +11,10 @@
   ],
   "counts": {
    "buildings": 106,
-   "entrances": 3061,
-   "tier1": 297,
-   "described": 296,
-   "withBearing": 148
+   "entrances": 3062,
+   "tier1": 298,
+   "described": 297,
+   "withBearing": 149
   }
  },
  "buildings": [
@@ -54745,17 +54745,39 @@
    "name": "Google Berlin, Haupteingang Tucholskystra\u00dfe 2",
    "kind": "main",
    "level": 0,
-   "stepFree": null,
+   "stepFree": false,
    "tier": 1,
-   "confidence": "unknown",
+   "confidence": "surveyed",
    "door": "hinged",
    "automatic": false,
    "approachBearing": 109.6,
-   "description": "Haupteingang unter dem Vordach an der Tucholskystra\u00dfe, T\u00fcr nach Osten. Stufen noch nicht gepr\u00fcft.",
-   "warnings": [],
+   "description": "Haupteingang unter dem Vordach an der Tucholskystra\u00dfe: doppelte Glast\u00fcr hinter drei gerundeten Steinstufen mit Handlauf in der Mitte, nicht stufenlos. Der barrierefreie Zugang liegt etwa 6 m weiter rechts, ein Schild am Pfeiler rechts neben der T\u00fcr zeigt dorthin.",
+   "warnings": [
+    "steps"
+   ],
    "source": "osm",
    "demo": true,
-   "verify": "vor Ort best\u00e4tigen: stepFree (Stufen/Schwelle), T\u00fcrbreite, automatische T\u00fcr, Klingel, Lage der T\u00fcr unter dem Vordach"
+   "verify": "Stufen per Video vom 24.09.2026 belegt (drei sichtbare Stufen, OSM step_count 4). Noch offen: T\u00fcrbreite, automatische T\u00fcr, Klingel"
+  },
+  {
+   "id": "demo/google-accessible",
+   "buildingId": null,
+   "lat": 52.523073,
+   "lon": 13.392169,
+   "name": "Google Berlin, barrierefreier Zugang Tucholskystra\u00dfe 2",
+   "kind": "secondary",
+   "level": 0,
+   "stepFree": true,
+   "tier": 1,
+   "confidence": "surveyed",
+   "door": "hinged",
+   "automatic": false,
+   "approachBearing": 107.2,
+   "description": "Dunkelgr\u00fcne Holzt\u00fcr mit den Schildern \u201eBMZ\u201c und \u201eBarrierefreier Zugang\u201c (Rollstuhlsymbol) in einer roten Ziegelwand, etwa 6 m rechts vom Haupteingang am Pfeiler mit der wei\u00dfen Infotafel vorbei. Ebener Weg \u00fcber Kopfsteinpflaster ohne Stufe, kurz vor der T\u00fcr ein Ablaufgitter quer \u00fcber die ganze Breite.",
+   "warnings": [],
+   "source": "survey",
+   "demo": true,
+   "verify": "vor Ort best\u00e4tigen: Koordinate (aus Video und OSM-Umriss gesch\u00e4tzt, etwa \u00b15 m), Schwellenh\u00f6he (im Video unter 2 cm), T\u00fcrbreite (gesch\u00e4tzt 1,2 m), wie die T\u00fcr ge\u00f6ffnet wird (Kartenleser links an der Wand, keine Klingel und kein T\u00fcr\u00f6ffner-Knopf gesehen)"
   },
   {
    "id": "node/8725363670",

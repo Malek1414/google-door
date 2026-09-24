@@ -128,13 +128,15 @@ async function requestFix(
   base: string,
   frame: string,
   headingDeg: number,
+  doorId: string,
   ctl: AbortController,
 ): Promise<VisionReply | 'rate-limited' | null> {
   try {
     const r = await deps.fetch(`${base}/api/door-fix`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ frame, headingDeg }),
+      // doorId lets the server add the door's surveyed look (data/demo/*/route.json).
+      body: JSON.stringify({ frame, headingDeg, doorId }),
       signal: ctl.signal,
     })
     if (r.status === 429) return 'rate-limited'
@@ -267,7 +269,7 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
       lastRequestAt = now
       const mine = ++reqSeq
       ctl = new AbortController()
-      void requestFix(deps, io.apiBase, frame, at.heading, ctl).then((got) => {
+      void requestFix(deps, io.apiBase, frame, at.heading, io.door.id, ctl).then((got) => {
         if (mine !== reqSeq) return // timed out and abandoned
         inFlight = false
         ctl = null

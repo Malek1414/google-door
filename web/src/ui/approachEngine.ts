@@ -353,8 +353,11 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
             }
           }
         }
-        // A map bearing gives a direction, never a distance.
-        if (st.speakDistanceM !== null && p.source !== 'osm-fallback') lines.push(metresLine(st.speakDistanceM, L))
+        // A map bearing gives a direction, never a distance. At the threshold the door
+        // line already says where it is; a metres line would replace it within a tick.
+        if (st.speakDistanceM !== null && p.source !== 'osm-fallback' && st.phase !== 'threshold') {
+          lines.push(metresLine(st.speakDistanceM, L))
+        }
       } else if (st.lostFix) {
         // Stop speaking confidently the moment the anchor is stale; the next band is
         // said again once a fix is back.

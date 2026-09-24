@@ -252,7 +252,7 @@ async function reachApproach(page, directParam) {
     return `?approach=${directParam}`
   }
   await page.goto(`${BASE}?sim=1&speed=20`, { waitUntil: 'domcontentloaded', timeout: 30000 })
-  const trigger = page.locator('button.apr-trigger', { hasText: 'Zum Eingang führen' }).first()
+  const trigger = page.locator('button.apr-trigger:visible', { hasText: 'Zum Eingang führen' }).first()
   const deadline = Date.now() + 90000
   let clicks = 0
   while (Date.now() < deadline) {

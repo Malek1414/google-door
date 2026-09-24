@@ -113,6 +113,21 @@ describe('the real engine, driven through ApproachIO', () => {
     expect(spoken.join(' ')).toContain(thresholdLine('de'))
   })
 
+  it('at the threshold the door line stays: no metres line replaces it on later ticks', async () => {
+    let r!: ReturnType<typeof rig>
+    r = rig(door(100, 9, () => r.stepsTaken))
+    r.heading(100)
+    for (let i = 0; i < 4; i++) await r.tick(200)
+    for (let i = 0; i < 14; i++) { r.step(); await r.tick() }
+    expect(r.views.at(-1)!.phase).toBe('threshold')
+    for (let i = 0; i < 6; i++) await r.tick(300)
+    const at = r.views.findIndex((v) => v.phase === 'threshold')
+    for (const v of r.views.slice(at)) {
+      expect(v.instruction).toContain(thresholdLine('de'))
+      expect(v.instruction).not.toMatch(/Meter/)
+    }
+  })
+
   it('says each distance once and counts down', async () => {
     let r!: ReturnType<typeof rig>
     r = rig(door(100, 11, () => r.stepsTaken))

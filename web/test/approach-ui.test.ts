@@ -133,6 +133,12 @@ describe('guide screen: through, no direction, safety line', () => {
     for (const phase of ['orienting', 'walking', 'threshold'] as const) expect(guideLayout(view({ phase })).outsideButton).toBe(false)
     expect(guideLayout(view({ phase: 'through', relBearingDeg: null, instruction: throughLine('de') })).outsideButton).toBe(true)
   })
+  it('the metres are shown once: the words under the big distance drop a repeat of it', () => {
+    expect(guideLayout(view({ distanceM: 5, instruction: '5 Meter' }), 'de').instruction).toBe('')
+    expect(guideLayout(view({ distanceM: 5, instruction: 'Leicht links 5 Meter' }), 'de').instruction).toBe('Leicht links')
+    expect(guideLayout(view({ distanceM: 1, instruction: 'Die Tür ist direkt vor dir.' }), 'de').instruction).toBe('Die Tür ist direkt vor dir.')
+    expect(guideLayout(view({ distanceM: null, instruction: 'Geradeaus' }), 'de').instruction).toBe('Geradeaus')
+  })
   it('no direction after the start: no arrow, the engine line is the text', () => {
     const v = view({ relBearingDeg: null, source: null, distanceM: null, instruction: noDirectionLine('de') })
     const lay = guideLayout(v, 'de')

@@ -88,3 +88,11 @@
 .gm-navnear[hidden] { display: none; }
 .gm[data-nav='on'][data-sheet='route'] { --sheet-h: 104px; }
 .gm[data-nav='on'][data-sheet='route']:has(.gm-navnear:not([hidden])) { --sheet-h: 156px; }
+
+/* Route preview mode tabs (Auto, ÖPNV, Zu Fuß, Fahrrad), walk selected. */
+.gm-modetabs { display: flex; gap: 4px; margin: 0 -4px 6px; border-bottom: 1px solid rgb(255 255 255 / 0.12); overflow-x: auto; scrollbar-width: none; }
+.gm-modetab { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px; font-size: 14px; color: var(--fg2); opacity: 0.6; white-space: nowrap; border-bottom: 3px solid transparent; }
+.gm-modetab .ms { font-size: 20px; }
+.gm-modetab.is-on { color: var(--teal); opacity: 1; border-bottom-color: var(--teal); font-weight: 500; }
+.gm[data-sheet='route']:not([data-nav='on']) { --sheet-h: 206px; }
+.gm[data-sheet='route']:not([data-nav='on']):has(.gm-route-why) { --sheet-h: 276px; }

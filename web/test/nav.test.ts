@@ -97,3 +97,18 @@ describe('streetOf', () => {
     expect(streetOf(null)).toBeNull()
   })
 })
+
+import { viaStreets } from '../src/core/nav'
+describe('viaStreets', () => {
+  it('names the first two streets turned onto', () => {
+    const r: Route = { ...route, steps: [
+      { distanceM: 50, maneuver: 'DEPART', text: 'Nach Süden auf Weserstraße', endLat: null, endLon: null },
+      { distanceM: 50, maneuver: 'TURN_LEFT', text: 'Links abbiegen auf Ganghoferstraße', endLat: null, endLon: null },
+      { distanceM: 50, maneuver: 'TURN_RIGHT', text: 'Rechts abbiegen auf Karl-Marx-Straße\nZiel rechts', endLat: null, endLon: null },
+      { distanceM: 50, maneuver: 'TURN_RIGHT', text: 'Rechts abbiegen auf Karl-Marx-Straße', endLat: null, endLon: null },
+    ] }
+    expect(viaStreets(r)).toBe('über Ganghoferstraße und Karl-Marx-Straße')
+    expect(viaStreets(route)).toBe('über X-Straße')
+    expect(viaStreets({ ...route, steps: [] })).toBeNull()
+  })
+})

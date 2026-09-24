@@ -10,7 +10,7 @@
 
 import { haversineM, type LatLon } from '../core/geo'
 import { CONNECTOR_MIN_M, connected, instructionLine, tailLength, walkMinutes, type Route } from '../core/route'
-import { navSheetLines, navState, roundNavM, secondsLeft, startEnabled, thenGlyph } from '../core/nav'
+import { arrivalClock, navSheetLines, navState, roundNavM, secondsLeft, startEnabled, thenGlyph, viaStreets } from '../core/nav'
 import { isMuted, setMuted } from './voiceCalm'
 import { NEAR_TRIGGER_M } from './LiveView'
 import { computeRoute, D, formatDistance, routeSubline, startBlockedReason, stepsList, type RouteOutcome } from './Directions'
@@ -453,6 +453,14 @@ export function MapView(opts: {
     else clearRoute()
   }
 
+  /** "Ankunft 09:25 · über Ganghoferstraße und Karl-Marx-Straße", or the old subline. */
+  function previewSub(r: Route, label: string | null): string {
+    const secs = secondsLeft(r, r.distanceM ?? 0)
+    const via = viaStreets(r, lang === 'de')
+    const arrive = `${lang === 'de' ? 'Ankunft' : 'Arrive'} ${arrivalClock(new Date(), secs)}`
+    return via ? `${arrive} · ${via}` : `${arrive} · ${routeSubline(label)}`
+  }
+
   function showRoutePreview(summary: string, label: string | null, out: RouteOutcome, retry: () => void, crowM: number) {
     routePreview = true
     morePill.hidden = true
@@ -504,13 +512,23 @@ export function MapView(opts: {
     liveThumb.hidden = !guidable || !e
     liveThumb.onclick = () => e && void beginGuidance(e)
     const whyLine = why ? [h('p', { id: 'route-start-why', class: 'gm-route-why' }, icon('info'), why)] : []
+    // Mode tabs as in Maps. Doorway guides on foot; the others are shown, not offered.
+    const modeTab = (ic: string, text: string, on = false) =>
+      h('span', { class: `gm-modetab${on ? ' is-on' : ''}`, 'aria-disabled': String(!on), ...(on ? { 'aria-current': 'true' } : {}) }, icon(ic, on), text)
+    const modeTabs = h('div', { class: 'gm-modetabs', role: 'group', 'aria-label': lang === 'de' ? 'Verkehrsmittel' : 'Travel mode' },
+      modeTab('directions_car', lang === 'de' ? 'Auto' : 'Car'),
+      modeTab('directions_transit', lang === 'de' ? 'ÖPNV' : 'Transit'),
+      modeTab('directions_walk', lang === 'de' ? 'Zu Fuß' : 'Walk', true),
+      modeTab('directions_bike', lang === 'de' ? 'Fahrrad' : 'Bike'),
+    )
     sheetBody.replaceChildren(
+      modeTabs,
       h(
         'div',
         { class: 'gm-routehead' },
         h('span', { class: 'gm-routehead-ic', 'aria-hidden': 'true' }, icon(r ? 'directions_walk' : 'wrong_location', true)),
         h('h2', { id: 'sheet-title', class: 'gm-routehead-t', tabindex: '-1' }, summary),
-        h('span', { class: 'gm-routehead-sub' }, r ? routeSubline(label) : label ?? ''),
+        h('span', { class: 'gm-routehead-sub' }, r ? previewSub(r, label) : label ?? ''),
         h('div', { class: 'gm-routehead-btns' },
           e ? h('button', { class: 'gm-round-s', type: 'button', 'aria-label': t.share, onclick: () => void share(e) }, icon('ios_share')) : null,
           h('button', { class: 'gm-round-s', type: 'button', 'aria-label': t.clearRoute, onclick: () => clearRoute() }, icon('close')),

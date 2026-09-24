@@ -11,7 +11,7 @@ import { BeaconAudio } from '../audio'
 import { apiBase } from '../config'
 import { beaconFor } from '../core/beacon'
 import { startHeading } from '../core/heading'
-import { safetyLine } from '../core/instruct'
+import { metresLine, safetyLine } from '../core/instruct'
 import type { OutputConfig } from '../core/profile'
 import type { Entrance } from '../core/types'
 import { announce, session, speak } from '../session'
@@ -63,6 +63,29 @@ export class Narrator {
     if (!v.instruction || v.instruction === this.lastInstruction) return null
     this.lastInstruction = v.instruction
     return { text: v.instruction, interrupt: v.instruction.startsWith(safetyLine(this.language)) }
+  }
+
+  /** After "Noch draußen": the engine's next line is spoken even if it repeats an earlier one. */
+  reset(): void {
+    this.lastInstruction = ''
+  }
+}
+
+/**
+ * Pure. What the guide screen shows for a view: no decisions of its own, only which
+ * parts of the engine's view are drawn. The arrow exists only while the engine has a
+ * bearing; with none (vision lost, no surveyed bearing) there is no fake arrow, just the
+ * engine's words. "Noch draußen" exists only in `through`.
+ */
+export function guideLayout(v: ApproachView, language: string = lang) {
+  return {
+    arrow: v.relBearingDeg !== null,
+    noDirection: v.relBearingDeg === null && v.source === null,
+    outsideButton: v.phase === 'through',
+    fromMap: v.source === 'osm-fallback',
+    distance: v.distanceM === null ? '' : metresLine(v.distanceM, language),
+    // The disclaimer stays readable for the whole approach, except while it IS the instruction.
+    safety: !v.instruction.startsWith(safetyLine(language)),
   }
 }
 
@@ -130,9 +153,10 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
   const distEl = h('p', { class: 'apr-dist' }, '')
   const instrEl = h('p', { class: 'apr-instr' }, '')
   const srcEl = h('p', { class: 'apr-src', hidden: true }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'map'), AP.fromMap)
-  const outsideBtn = h('button', { class: 'apr-big', type: 'button', hidden: true }, AP.stillOutside)
+  const outsideBtn = h('button', { class: 'apr-big apr-outside', type: 'button', hidden: true }, AP.stillOutside)
+  const safetyEl = h('p', { class: 'apr-safety', hidden: true }, safetyLine(lang))
   const dirEl = h('div', { class: 'apr-dir' }, arrow, angleEl)
-  root.append(h('div', { class: 'apr-panel' }, dirEl, distEl, instrEl, srcEl, outsideBtn))
+  root.append(h('div', { class: 'apr-panel' }, dirEl, distEl, instrEl, srcEl, outsideBtn, safetyEl))
   mount(root)
 
   const narrator = new Narrator()
@@ -140,18 +164,26 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
   let beaconOn = false
 
   const render = (v: ApproachView) => {
+    const lay = guideLayout(v)
+    const enteringThrough = lay.outsideButton && outsideBtn.hidden
     root.dataset.phase = v.phase
     root.classList.toggle('apr-unsure', v.unsure)
+    root.classList.toggle('apr-nodir', lay.noDirection)
     // Draw exactly the numbers the engine returns; rounding is display, not guidance.
-    dirEl.hidden = v.relBearingDeg === null
+    dirEl.hidden = !lay.arrow
     if (v.relBearingDeg !== null) {
       arrow.style.transform = `rotate(${v.relBearingDeg.toFixed(1)}deg)`
       angleEl.textContent = `${Math.abs(Math.round(v.relBearingDeg))}°`
+    } else {
+      angleEl.textContent = ''
     }
-    distEl.textContent = v.distanceM === null ? '' : t.metres(v.distanceM)
+    distEl.textContent = lay.distance
     instrEl.textContent = v.instruction
-    srcEl.hidden = v.source !== 'osm-fallback'
-    outsideBtn.hidden = v.phase !== 'through'
+    srcEl.hidden = !lay.fromMap
+    outsideBtn.hidden = !lay.outsideButton
+    safetyEl.hidden = !lay.safety
+    // VoiceOver: land on the only thing there is to do in `through`.
+    if (enteringThrough) outsideBtn.focus()
 
     const say = narrator.next(v)
     if (say) {
@@ -190,7 +222,12 @@ function GuideScreen(opts: { door: Entrance; config: OutputConfig; onExit: () =>
     apiBase: apiBase(),
   })
   const unsubscribe = run.subscribe(render)
-  outsideBtn.addEventListener('click', () => run.stillOutside())
+  outsideBtn.addEventListener('click', () => {
+    // Hide at once so a double tap cannot fire twice; the engine's next view redraws.
+    outsideBtn.hidden = true
+    narrator.reset()
+    run.stillOutside()
+  })
 
   let done = false
   function teardown() {

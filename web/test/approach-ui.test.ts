@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { describe, expect, it } from 'vitest'
-import { fallbackLine, safetyLine } from '../src/core/instruct'
-import { Narrator } from '../src/ui/Approach'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fallbackLine, noDirectionLine, safetyLine, thresholdLine, throughLine } from '../src/core/instruct'
+import { guideLayout, Narrator } from '../src/ui/Approach'
 import { approachModeFor, type ApproachView } from '../src/ui/approachPort'
-import { DEMO_SCRIPT } from '../src/ui/approachDemo'
+import { DEMO_SCRIPT, startDemoApproach } from '../src/ui/approachDemo'
 import { groundPlane, stackTransform } from '../src/ui/ar'
+import { lang } from '../src/strings'
 
 const view = (o: Partial<ApproachView> = {}): ApproachView => ({
   phase: 'orienting', relBearingDeg: -20, distanceM: 7, instruction: 'Leicht links', source: 'gemini-live', unsure: false, ...o,
@@ -108,5 +109,56 @@ describe('boundaries', () => {
   })
   it('the demo script covers every phase', () => {
     expect(new Set(DEMO_SCRIPT.map((v) => v.phase))).toEqual(new Set(['orienting', 'walking', 'threshold', 'through']))
+  })
+})
+
+describe('guide screen: through, no direction, safety line', () => {
+  it('"Noch draußen" exists only in through', () => {
+    for (const phase of ['orienting', 'walking', 'threshold'] as const) expect(guideLayout(view({ phase })).outsideButton).toBe(false)
+    expect(guideLayout(view({ phase: 'through', relBearingDeg: null, instruction: throughLine('de') })).outsideButton).toBe(true)
+  })
+  it('no direction after the start: no arrow, the engine line is the text', () => {
+    const v = view({ relBearingDeg: null, source: null, distanceM: null, instruction: noDirectionLine('de') })
+    const lay = guideLayout(v, 'de')
+    expect(lay.arrow).toBe(false)
+    expect(lay.noDirection).toBe(true)
+    expect(lay.distance).toBe('')
+    expect(guideLayout(view()).arrow).toBe(true)
+  })
+  it('the safety line stays on screen once the engine moves on', () => {
+    expect(guideLayout(view({ instruction: safetyLine('de') }), 'de').safety).toBe(false)
+    expect(guideLayout(view(), 'de').safety).toBe(true)
+  })
+  it('after stillOutside the next threshold line is spoken again', () => {
+    const n = new Narrator('de')
+    expect(n.next(view({ phase: 'threshold', instruction: thresholdLine('de') }))).not.toBeNull()
+    n.next(view({ phase: 'through', instruction: throughLine('de') }))
+    n.reset()
+    expect(n.next(view({ phase: 'through', instruction: throughLine('de') }))?.text).toBe(throughLine('de'))
+  })
+  it('the screen builds no wording or pitch of its own', () => {
+    const src = readFileSync(resolve(__dirname, '../src/ui/Approach.ts'), 'utf8')
+    expect(src).not.toMatch(/pitchFor|Math\.pow|\*\s*closeness|Die Tür ist|Du müsstest|t\.metres/)
+  })
+})
+
+describe('demo adapter: through, stillOutside, no direction', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+  it('script has a no-direction moment and ends in through', () => {
+    expect(DEMO_SCRIPT.some((v) => v.relBearingDeg === null && v.source === null && v.instruction === noDirectionLine(lang))).toBe(true)
+    expect(DEMO_SCRIPT.at(-1)?.phase).toBe('through')
+  })
+  it('stillOutside returns to threshold, then through is proposed again', () => {
+    const run = startDemoApproach({} as never)
+    const seen: ApproachView[] = []
+    run.subscribe((v) => seen.push(v))
+    vi.advanceTimersByTime(2500 * DEMO_SCRIPT.length)
+    expect(seen.at(-1)?.phase).toBe('through')
+    run.stillOutside()
+    expect(seen.at(-1)?.phase).toBe('threshold')
+    vi.advanceTimersByTime(4000)
+    expect(seen.at(-1)?.phase).toBe('through')
+    run.stop()
   })
 })

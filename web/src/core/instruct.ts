@@ -141,6 +141,11 @@ export function noCompassLine(lang = 'de'): string {
     : 'No compass. I cannot give you a direction.'
 }
 
+/** Spoken once when the camera delivers no picture, so vision cannot even try. */
+export function noCameraLine(lang = 'de'): string {
+  return lang.startsWith('de') ? 'Ich bekomme kein Kamerabild.' : "I'm not getting a camera picture."
+}
+
 /** Spoken when the user should be inside. Vision proposes; the user can take it back. */
 export function throughLine(lang = 'de'): string {
   return lang.startsWith('de') ? 'Du müsstest jetzt drin sein.' : 'You should be inside now.'
@@ -174,7 +179,7 @@ export function metresLine(m: number, lang = 'de'): string {
 export type ApproachLine =
   | { kind: 'band'; band: Band }
   | { kind: 'metres'; m: number }
-  | { kind: 'safety' | 'fallback' | 'unsure' | 'threshold' | 'through' | 'noDirection' | 'noCompass' }
+  | { kind: 'safety' | 'fallback' | 'unsure' | 'threshold' | 'through' | 'noDirection' | 'noCompass' | 'noCamera' }
 
 export function clipKeyFor(line: ApproachLine): string | null {
   switch (line.kind) {
@@ -201,6 +206,7 @@ export function approachClipBank(lang = 'de'): { key: string; text: string }[] {
     { key: 'approach_through', text: throughLine(lang) },
     { key: 'approach_noDirection', text: noDirectionLine(lang) },
     { key: 'approach_noCompass', text: noCompassLine(lang) },
+    { key: 'approach_noCamera', text: noCameraLine(lang) },
   ]
   for (let n = 1; n <= 10; n++) out.push({ key: `m_${n}`, text: metresLine(n, lang) })
   return out

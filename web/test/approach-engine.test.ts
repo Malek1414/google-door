@@ -6,7 +6,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { STEP_M } from '../src/core/anchor'
 import { STILL_MS } from '../src/core/approach'
-import { bandText, fallbackLine, noCompassLine, noDirectionLine, pitchFor, safetyLine, thresholdLine, throughLine, unsureLine } from '../src/core/instruct'
+import { bandText, fallbackLine, noCameraLine, noCompassLine, noDirectionLine, pitchFor, safetyLine, thresholdLine, throughLine, unsureLine } from '../src/core/instruct'
 import { angleDelta } from '../src/core/stability'
 import type { Entrance } from '../src/core/types'
 import { createApproachEngine, FALLBACK_AFTER, INSIDE_MIN_CONFIDENCE, parseDoorFix, saysInside } from '../src/ui/approachEngine'
@@ -23,7 +23,7 @@ const DOOR: Entrance = {
 type Reply = unknown | Promise<unknown>
 
 /** A phone in a fake world: compass, accelerometer, camera, network, clock. */
-function rig(world: (req: { frame: string; headingDeg: number }) => Reply, door: Partial<Entrance> = {}) {
+function rig(world: (req: { frame: string; headingDeg: number }) => Reply, door: Partial<Entrance> = {}, frame: () => string | null = () => 'JPEGBASE64') {
   let t = 1000
   let tickFn: () => void = () => {}
   let headingCb: (h: CompassReading) => void = () => {}
@@ -49,7 +49,7 @@ function rig(world: (req: { frame: string; headingDeg: number }) => Reply, door:
     lang: 'de',
   })({
     door: { ...DOOR, ...door },
-    frame: () => 'JPEGBASE64',
+    frame,
     onHeading: (cb) => ((headingCb = cb), () => {}),
     onMotion: (cb) => ((motionCb = cb), () => {}),
     apiBase: 'https://api.test',
@@ -398,6 +398,20 @@ describe('no compass', () => {
     for (let i = 0; i < 100; i++) await r.tick()
     expect(r.spoken()).toEqual([safetyLine('de'), noCompassLine('de')])
     expect(r.calls).toHaveLength(0) // still no heading, so still no request
+  })
+})
+
+describe('no camera frame', () => {
+  it('counts as a failed attempt: falls back to the surveyed bearing and says why, once', async () => {
+    const r = rig(() => ({ found: false }), { approachBearing: 120 }, () => null)
+    r.heading(100)
+    for (let i = 0; i < 16 * FALLBACK_AFTER; i++) await r.tick()
+    expect(r.calls).toHaveLength(0)
+    expect(r.views.at(-1)!.source).toBe('osm-fallback')
+    for (let i = 0; i < 100; i++) await r.tick()
+    const said = r.spoken().join(' ')
+    expect(said.split(fallbackLine('de'))).toHaveLength(2)
+    expect(said.split(noCameraLine('de'))).toHaveLength(2)
   })
 })
 

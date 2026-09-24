@@ -19,6 +19,7 @@ import {
   bandText,
   fallbackLine,
   metresLine,
+  noCameraLine,
   noCompassLine,
   noDirectionLine,
   pitchFor,
@@ -158,6 +159,9 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     let pendingNoDirection = false
     let saidNoDirection = false
     let saidNoCompass = false
+    let noFrames = 0
+    let pendingNoCamera = false
+    let saidNoCamera = false
     const startedAt = deps.now()
 
     // The safety line is the first thing the session ever says, and it is said once.
@@ -190,13 +194,41 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     /** Is the current anchor still young enough to speak from? (Read-only: no tick.) */
     const anchorFresh = () => anchor !== null && deps.now() - anchor.ts <= MAX_AGE_MS
 
+    /** One attempt without a trusted fix; enough of them hand over to the map bearing. */
+    const miss = () => {
+      failures += 1
+      // Never at the threshold: losing the door there is expected (the user is AT
+      // it), and a map anchor would demote them to walking with a wrong direction.
+      if (failures >= FALLBACK_AFTER && !anchorFresh() && approach.currentPhase !== 'threshold') {
+        const fb = fallbackAnchor()
+        if (fb) {
+          anchor = fb
+          approach.setAnchor(fb)
+          failures = 0
+        } else if (!saidNoDirection) {
+          // Vision failed and the door has no surveyed bearing: nothing to point at.
+          // Never dead-reckon, but say so: silence reads as a crash.
+          pendingNoDirection = true
+        }
+      }
+    }
+
     const maybeRequest = (st: ApproachState) => {
       if (inFlight || heading === null || approach.currentPhase === 'through') return
       const now = deps.now()
       const due = guard.mode === 'live' ? now - lastRequestAt >= LIVE_EVERY_MS : st.needsFix && now - lastRequestAt >= ONDEMAND_MIN_GAP_MS
       if (!due) return
       const frame = io.frame()
-      if (!frame) return
+      if (!frame) {
+        // No picture is a failed attempt like any other, or the map bearing never
+        // takes over for a phone whose camera never started.
+        lastRequestAt = now
+        noFrames += 1
+        if (noFrames >= FALLBACK_AFTER && !saidNoCamera) pendingNoCamera = true
+        miss()
+        return
+      }
+      noFrames = 0
       // The fix is the truth at the moment of the frame: anchor it to the heading,
       // steps and time of the frame, not of the answer.
       const at = { heading, steps, ts: now }
@@ -213,21 +245,7 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
           anchor = { bearingDeg: fix.bearingDeg, distanceM: fix.distanceM, headingDeg: at.heading, steps: at.steps, ts: at.ts, source: fix.source }
           approach.setAnchor(anchor)
         } else {
-          failures += 1
-          // Never at the threshold: losing the door there is expected (the user is AT
-          // it), and a map anchor would demote them to walking with a wrong direction.
-          if (failures >= FALLBACK_AFTER && !anchorFresh() && approach.currentPhase !== 'threshold') {
-            const fb = fallbackAnchor()
-            if (fb) {
-              anchor = fb
-              approach.setAnchor(fb)
-              failures = 0
-            } else if (!saidNoDirection) {
-              // Vision failed and the door has no surveyed bearing: nothing to point at.
-              // Never dead-reckon, but say so: silence reads as a crash.
-              pendingNoDirection = true
-            }
-          }
+          miss()
         }
         // Interior proposes "through". Only from a reply the guard did not reject: a
         // found fix must be trusted; a found:false reply (entrance behind the camera,
@@ -265,6 +283,11 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
         saidUnsure = true
         pendingUnsure = false
         lines.push(unsureLine(L))
+      }
+      if (pendingNoCamera && !saidNoCamera) {
+        saidNoCamera = true
+        pendingNoCamera = false
+        lines.push(noCameraLine(L))
       }
       if (pendingNoDirection && !saidNoDirection) {
         saidNoDirection = true

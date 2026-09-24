@@ -9,14 +9,16 @@
 //   tier 0 / 3            no marker; surfaced as text in the detail sheet
 
 import { haversineM, type LatLon } from '../core/geo'
-import { CONNECTOR_MIN_M, instructionLine, walkMinutes, type Route } from '../core/route'
+import { CONNECTOR_MIN_M, connected, instructionLine, tailLength, walkMinutes, type Route } from '../core/route'
+import { arrivalClock, navState, roundNavM, secondsLeft } from '../core/nav'
+import { NEAR_TRIGGER_M } from './LiveView'
 import { computeRoute, D, formatDistance, routeSubline, startBlockedReason, stepsList, type RouteOutcome } from './Directions'
 import type { Profile } from '../core/profile'
 import { guidanceFor, markerKind, type ArrowTarget } from '../core/target'
 import type { Building, Entrance } from '../core/types'
 import { mapsKey } from '../config'
 import { bboxAround, fetchEntrances, fetchLived, findEntrance, type BBox } from '../data'
-import { announce } from '../session'
+import { announce, primeSpeech, speak } from '../session'
 import { unlockAll } from './Start'
 import type { FeatureCtx, Panel } from './ctx'
 import { businessPanel } from './Business'
@@ -284,9 +286,116 @@ export function MapView(opts: {
   /** The place card currently (or last) open, so a place route can return to it. */
   let lastPlace: PlaceHit | null = null
 
+  // ---- navigation mode (after Start) ----
+  // Measured off Maps: Start does not jump into the camera. It turns the map into a
+  // navigation screen (green manoeuvre banner on top, "4 Min. · 260 m · Ankunft 09:24"
+  // below, round X to end). The square Live View tile bottom-left switches to the
+  // camera on the same route, from the preview and from navigation alike.
+  const NV = lang === 'de'
+    ? { live: 'Live View', end: 'Navigation beenden', arrive: 'Ankunft', dest: 'Ziel erreichen', inM: (m: number) => `In ${m} m`, you: 'Dein Standort', started: 'Navigation gestartet', near: 'Zum Eingang führen', nearSay: 'Du bist fast da. Zum Eingang führen?' }
+    : { live: 'Live View', end: 'End navigation', arrive: 'Arrival', dest: 'Arrive at destination', inM: (m: number) => `In ${m} m`, you: 'Your location', started: 'Navigation started', near: 'Guide me to the entrance', nearSay: 'You are almost there. Guide you to the entrance?' }
+  let navOn = false
+  let navRoute: Route | null = null
+  let navDoor: Entrance | null = null
+  let navFollow: [number, number][] = []
+  let navTail = 0
+  let navSpoken = -1
+  let navNearSaid = false
+  const liveThumb = h('button', { class: 'gm-livethumb', type: 'button', hidden: true, 'aria-label': NV.live, title: NV.live },
+    h('span', { class: 'gm-livethumb-img', 'aria-hidden': 'true' }, icon('photo_camera')))
+  const routeTopTo = h('span', { class: 'gm-routetop-t' }, '')
+  const routeTop = h('div', { class: 'gm-routetop', hidden: true },
+    h('div', { class: 'gm-routetop-row' }, h('span', { class: 'gm-routetop-dot', 'aria-hidden': 'true' }), h('span', { class: 'gm-routetop-me' }, NV.you)),
+    h('div', { class: 'gm-routetop-row' }, h('span', { class: 'gm-routetop-pin', 'aria-hidden': 'true' }, icon('location_on', true)), routeTopTo),
+  )
+  const navIc = h('span', { class: 'gm-navbanner-ic', 'aria-hidden': 'true' })
+  const navDist = h('span', { class: 'gm-navbanner-m' }, '')
+  const navText = h('span', { class: 'gm-navbanner-t' }, '')
+  const navBanner = h('div', { class: 'gm-navbanner', hidden: true }, navIc, h('div', { class: 'gm-navbanner-txt' }, navDist, navText))
+  const navSummary = h('h2', { id: 'sheet-title', class: 'gm-navsheet-t', tabindex: '-1' }, '')
+  const navSub = h('span', { class: 'gm-navsheet-sub' }, '')
+  const navNearBtn = h('button', { class: 'gm-pill gm-pill-primary gm-navnear', type: 'button', hidden: true }, icon('door_front', true), NV.near)
+
+  function startNav(e: Entrance, r: Route) {
+    primeSpeech()
+    navOn = true
+    navRoute = r
+    navDoor = e
+    const from = origin()
+    navFollow = connected(from, r.path, { lat: e.lat, lon: e.lon })
+    navTail = tailLength(r.path, navFollow)
+    navSpoken = -1
+    navNearSaid = false
+    root.dataset.nav = 'on'
+    navBanner.hidden = false
+    routeTop.hidden = true
+    navNearBtn.hidden = true
+    navNearBtn.onclick = () => void beginGuidance(e)
+    sheetBody.replaceChildren(
+      h('div', { class: 'gm-navsheet' },
+        h('div', { class: 'gm-navsheet-txt' }, navSummary, navSub),
+        h('button', { class: 'gm-navend', type: 'button', 'aria-label': NV.end, onclick: () => endNav() }, icon('close')),
+      ),
+      navNearBtn,
+    )
+    setSheet('route')
+    if (map) {
+      map.setZoom(19)
+      map.panTo({ lat: from.lat, lng: from.lon })
+    }
+    announce(NV.started)
+    updateNav()
+  }
+
+  function updateNav() {
+    if (!navOn || !navRoute || !navDoor) return
+    const pos = origin()
+    const st = navState(pos, navRoute, navFollow, navTail)
+    const m = roundNavM(st.toManeuverM)
+    navIc.replaceChildren(icon(st.glyph, true))
+    navDist.textContent = NV.inM(m)
+    navText.textContent = st.text ?? `${NV.dest}: ${pathDoorName(navDoor)}`
+    const secs = secondsLeft(navRoute, st.remainingM)
+    navSummary.textContent = `${t.walkMin(Math.max(1, Math.round(secs / 60)))} · ${formatDistance(st.remainingM)}`
+    navSub.textContent = `${NV.arrive} ${arrivalClock(new Date(), secs)}`
+    if (st.walking !== navSpoken) {
+      navSpoken = st.walking
+      const line = `${NV.inM(m)} ${st.text ?? NV.dest}`
+      announce(line)
+      speak(line, { interrupt: true })
+    }
+    const near = haversineM(pos, { lat: navDoor.lat, lon: navDoor.lon }) <= NEAR_TRIGGER_M
+    navNearBtn.hidden = !near
+    if (near && !navNearSaid) {
+      navNearSaid = true
+      announce(NV.nearSay)
+      speak(NV.nearSay, { interrupt: true })
+    }
+    map?.panTo({ lat: pos.lat, lng: pos.lon })
+  }
+
+  function stopNav() {
+    if (!navOn) return
+    navOn = false
+    navRoute = null
+    delete root.dataset.nav
+    navBanner.hidden = true
+  }
+
+  /** X in navigation: back to the route preview, as in Maps. */
+  function endNav() {
+    const e = navDoor
+    stopNav()
+    if (e) drawRouteToEntrance(e)
+    else clearRoute()
+  }
+
   function showRoutePreview(summary: string, label: string | null, out: RouteOutcome, retry: () => void, crowM: number) {
     routePreview = true
     morePill.hidden = true
+    root.dataset.route = 'on'
+    routeTopTo.textContent = label ?? D.destination
+    routeTop.hidden = false
     const e = routeTarget
     const g = e ? guidanceFor(e, opts.profile) : null
     const r = out.ok ? out.route : null
@@ -306,7 +415,11 @@ export function MapView(opts: {
         disabled: blocked,
         'aria-disabled': String(blocked),
         ...(why ? { 'aria-describedby': 'route-start-why' } : {}),
-        onclick: () => e && void beginGuidance(e),
+        onclick: () => {
+          if (!e) return
+          if (r) startNav(e, r)
+          else void beginGuidance(e)
+        },
       },
       icon(blocked ? 'block' : 'navigation', true),
       t.startGuidance,
@@ -324,6 +437,8 @@ export function MapView(opts: {
           h('p', {}, out.ok ? '' : out.message, h('small', {}, D.crow(t.metresShort(crowM)))),
         )
 
+    liveThumb.hidden = blocked || !e
+    liveThumb.onclick = () => e && void beginGuidance(e)
     const whyLine = why ? [h('p', { id: 'route-start-why', class: 'gm-route-why' }, icon('info'), why)] : []
     sheetBody.replaceChildren(
       h(
@@ -420,6 +535,9 @@ export function MapView(opts: {
     h('div', { class: 'gm-top' }, search, chips, morePill, status),
     layersBtn,
     rightCol,
+    liveThumb,
+    routeTop,
+    navBanner,
     sheet,
     nav,
     // Last in the DOM, first on screen (absolute, under every z-indexed overlay): Tab
@@ -930,6 +1048,10 @@ export function MapView(opts: {
    */
   function clearRoute(restore = true) {
     routeSeq++
+    stopNav()
+    liveThumb.hidden = true
+    routeTop.hidden = true
+    delete root.dataset.route
     routeLine?.setMap(null)
     routeCasing?.setMap(null)
     routeTail?.setMap(null)
@@ -1537,6 +1659,7 @@ export function MapView(opts: {
         const first = !me
         me = { lat: p.coords.latitude, lon: p.coords.longitude }
         drawMe()
+        if (navOn) updateNav()
         if (first) {
           if (!opts.openDoor) map?.setCenter({ lat: me.lat, lng: me.lon })
           if (!map) void load(bboxAround(me.lat, me.lon, 500))

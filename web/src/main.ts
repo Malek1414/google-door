@@ -22,6 +22,7 @@ import './ui/fix-sheet.css'
 import './ui/fix-card.css'
 import './ui/fix-buttons.css'
 import './ui/fix-live.css'
+import './ui/fix-nav.css'
 
 // Fail-safe: an error in one feature must never leave a blank screen on stage.
 // Log it and show a short note; the current screen stays usable.

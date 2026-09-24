@@ -10,7 +10,7 @@
 
 import { haversineM, type LatLon } from '../core/geo'
 import { CONNECTOR_MIN_M, connected, instructionLine, tailLength, walkMinutes, type Route } from '../core/route'
-import { arrivalClock, navSheetLines, navState, roundNavM, secondsLeft, startEnabled, thenGlyph, viaStreets } from '../core/nav'
+import { liveViewMode, arrivalClock, navSheetLines, navState, roundNavM, secondsLeft, startEnabled, thenGlyph, viaStreets } from '../core/nav'
 import { isMuted, setMuted } from './voiceCalm'
 import { NEAR_TRIGGER_M } from './LiveView'
 import { computeRoute, D, formatDistance, routeSubline, startBlockedReason, stepsList, type RouteOutcome } from './Directions'
@@ -38,6 +38,7 @@ import { exploreFeed } from './ExploreFeed'
 import { t } from '../strings'
 import { h, mount, s } from './dom'
 import { pathDoorName } from './doorName'
+import type { LivePlace } from './LiveView'
 import { approachModeFor, type ApproachMode } from './approachPort'
 
 const DEFAULT_CENTER: LatLon = { lat: 52.5251, lon: 13.3694 } // Berlin Hauptbahnhof
@@ -167,6 +168,14 @@ function pinLogo(): SVGElement {
   )
 }
 
+/** Where nav mode resumes after Live View, and what Live View is opened on. */
+export interface NavResume {
+  lat: number
+  lon: number
+  name: string
+  door: Entrance | null
+}
+
 export function MapView(opts: {
   profile: Profile
   openDoor?: string | null
@@ -175,7 +184,9 @@ export function MapView(opts: {
   /** Nav mode's "Zum Eingang führen": straight into the last-10-m approach. */
   onApproach?: (door: Entrance, mode: ApproachMode) => void
   /** Back from a Live View that was opened in nav mode: navigate to this door again. */
-  resumeNav?: Entrance | null
+  resumeNav?: NavResume | null
+  /** Live View to a destination that is not a guidable door (Maps-style, no handover). */
+  onLivePlace?: (place: LivePlace, fromNav: boolean) => void
   onSettings: () => void
   onContribute: () => void
 }): () => void {
@@ -334,7 +345,7 @@ export function MapView(opts: {
   // mute, route options.
   const navRound = (ic: string, label: string, on: () => void) =>
     h('button', { class: 'gm-navbtn', type: 'button', 'aria-label': label, title: label, onclick: on }, icon(ic))
-  const navLiveBtn = navRound('center_focus_weak', NV.live, () => navDest?.door && void beginGuidance(navDest.door, true))
+  const navLiveBtn = navRound('center_focus_weak', NV.live, () => navDest && void beginLive(navDest, true))
   navLiveBtn.classList.add('gm-navbtn-live')
   navLiveBtn.replaceChildren(h('span', { class: 'gm-navbtn-live-ic', 'aria-hidden': 'true' }, icon('center_focus_weak'), icon('photo_camera', true)))
   const muteBtn = navRound('volume_up', NV.mute, () => {
@@ -386,7 +397,7 @@ export function MapView(opts: {
     navNearBtn.onclick = () => e && void beginApproach(e)
     liveThumb.hidden = true
     navCol.hidden = false
-    navLiveBtn.hidden = !e
+    navLiveBtn.hidden = false
     paintMute()
     navStepsEl.hidden = true
     navStepsEl.replaceChildren(stepsList(r, dest.name))
@@ -512,8 +523,12 @@ export function MapView(opts: {
           h('p', {}, out.ok ? '' : out.message, h('small', {}, D.crow(t.metresShort(crowM)))),
         )
 
-    liveThumb.hidden = !guidable || !e
-    liveThumb.onclick = () => e && void beginGuidance(e)
+    // Live View works for every route, as in Maps; only a guidable door adds our handover.
+    liveThumb.hidden = !r || !routeTo
+    liveThumb.onclick = () => {
+      const to = routeTo
+      if (to) void beginLive({ lat: to.lat, lon: to.lon, name: label ?? D.destination, door: e }, false)
+    }
     const whyLine = why ? [h('p', { id: 'route-start-why', class: 'gm-route-why' }, icon('info'), why)] : []
     // Mode tabs as in Maps. Doorway guides on foot; the others are shown, not offered.
     const modeTab = (ic: string, text: string, on = false) =>
@@ -553,6 +568,21 @@ export function MapView(opts: {
   /** The one gesture that unlocks compass, camera and sound. Must await first. */
   // A double tap on Start must open one Live View, not two stacked ones.
   let guiding = false
+  /** Live View to any destination: a guidable door gets the full view, anything else the Maps one. */
+  async function beginLive(dest: NavResume, fromNav: boolean) {
+    if (liveViewMode(dest.door, opts.profile) === 'door' && dest.door) return beginGuidance(dest.door, fromNav)
+    if (guiding || !opts.onLivePlace) return
+    guiding = true
+    try {
+      await unlockAll({ camera: true })
+    } catch (err) {
+      guiding = false
+      throw err
+    }
+    teardown()
+    opts.onLivePlace({ lat: dest.lat, lon: dest.lon, name: dest.name }, fromNav)
+  }
+
   async function beginGuidance(e: Entrance, fromNav = false) {
     if (guiding) return
     const g = guidanceFor(e, opts.profile)
@@ -1859,12 +1889,13 @@ export function MapView(opts: {
   /** Live View closed from nav mode: straight back into nav on the same door. */
   let resumed = !opts.resumeNav
   function resumeNav() {
-    const e = opts.resumeNav
-    if (resumed || !e || !map || !me) return
+    const d = opts.resumeNav
+    if (resumed || !d || !map || !me) return
     resumed = true
-    const name = pathDoorName(e)
-    void drawRoute({ lat: e.lat, lon: e.lon }, name, e).then((r) => {
-      if (r && !gone) startNav({ lat: e.lat, lon: e.lon, name, door: e }, r, () => drawRouteToEntrance(e))
+    const to = { lat: d.lat, lon: d.lon }
+    const again = () => void drawRoute(to, d.name, d.door)
+    void drawRoute(to, d.name, d.door).then((r) => {
+      if (r && !gone) startNav({ ...to, name: d.name, door: d.door && liveViewMode(d.door, opts.profile) === 'door' ? d.door : null }, r, again)
     })
   }
 

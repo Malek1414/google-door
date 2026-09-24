@@ -2,6 +2,9 @@
 // Turns a position on a followed route into what the Maps nav banner and sheet show.
 
 import { haversineM, type LatLon } from './geo'
+import { guidanceFor } from './target'
+import type { Entrance } from './types'
+import type { Profile } from './profile'
 import { durationSeconds, instructionLine, maneuverGlyph, nextManeuver, progressAlong, type Route } from './route'
 
 export interface NavState {
@@ -104,4 +107,13 @@ export function viaStreets(route: Route, de = true): string | null {
   }
   if (!names.length) return null
   return `${de ? 'über' : 'via'} ${names.join(de ? ' und ' : ' and ')}`
+}
+
+/**
+ * Which Live View a route destination gets. 'door': a door that may carry guidance —
+ * the full Live View with our last-10-m handover. 'place': everything else (a place, an
+ * address, a door without tier-1 data) — Maps-style Live View only, no door arrow.
+ */
+export function liveViewMode(door: Entrance | null, profile: Pick<Profile, 'stepFreeRequired'>): 'door' | 'place' {
+  return door && guidanceFor(door, profile).kind === 'arrow' ? 'door' : 'place'
 }

@@ -4,7 +4,7 @@
 // Everything in the hot path is arithmetic. /api/look is called ONLY from the button.
 
 import { arrowPulseHz, ARRIVE_M, beaconFor, cuePan, hapticFor, HAPTIC_ARRIVED, ON_BEARING_DEG, shouldAnnounceApproach, shouldSpeakArrival } from '../core/beacon'
-import { bearingDeg, haversineM, relativeBearing } from '../core/geo'
+import { bearingDeg, haversineM, relativeBearing, type LatLon } from '../core/geo'
 import { distanceKey, stopSpeech } from '../core/speech'
 import { SteadyAngle } from './arrowSteady'
 import { CalmWord, isMuted, LineGate, muteButton } from './voiceCalm'
@@ -172,6 +172,7 @@ const ARR = {
     noGuide: 'Für diesen Eingang haben wir noch keine genaue Führung.',
     stay: 'Hier bleiben',
     toMap: 'Zur Karte',
+    done: 'Fertig',
     backIn: (s: number) => `Zurück zur Karte in ${s} Sekunden.`,
     staying: 'Du bleibst hier. Zur Karte kommst du mit dem Knopf unten.',
     gpsLost: 'Kein GPS-Signal. Die Richtung ist gerade nicht sicher. Bleib kurz stehen.',
@@ -189,6 +190,7 @@ const ARR = {
     noGuide: 'We have no exact guidance for this entrance yet.',
     stay: 'Stay here',
     toMap: 'Back to map',
+    done: 'Done',
     backIn: (s: number) => `Back to the map in ${s} seconds.`,
     staying: 'You stay here. The button below takes you back to the map.',
     gpsLost: 'No GPS signal. The direction is not reliable right now. Stop for a moment.',
@@ -265,8 +267,7 @@ function compassWord(deg: number): string {
   return t.compass[Math.round(deg / 45) % 8]
 }
 
-function lookTargetText(target: ArrowTarget): string {
-  const e = target.entrance
+function lookTargetText(e: Entrance): string {
   const parts: string[] = []
   parts.push(e.stepFree === true ? 'step-free entrance' : 'entrance')
   if (e.door) parts.push(t.door[e.door]?.toLowerCase() ?? 'door')
@@ -289,8 +290,32 @@ export function grabFrame(el: HTMLVideoElement | HTMLImageElement | null): strin
   return c.toDataURL('image/jpeg', 0.7).split(',')[1] ?? null
 }
 
+/**
+ * A destination that is not one of our guidable doors (a place, an address, a door
+ * without tier-1 data). Maps-style Live View only: route, chevrons, turn card, pin,
+ * "Du bist angekommen". Never an arrow to a door, never the approach, no door warnings.
+ * Deliberately NOT an ArrowTarget: that type stays tier-1 only (core/target.ts).
+ */
+export interface LivePlace {
+  lat: number
+  lon: number
+  name: string
+}
+
+/** Pure. The stand-in door for a place: tier 0, so no approach offer and no warnings. */
+export function placeEntrance(p: LivePlace): Entrance {
+  return {
+    id: `place:${p.lat.toFixed(6)},${p.lon.toFixed(6)}`, buildingId: null, lat: p.lat, lon: p.lon, name: p.name,
+    kind: 'main', level: null, stepFree: null, tier: 0, confidence: 'unknown', door: null, automatic: false,
+    approachBearing: null, description: null, warnings: [], source: 'places',
+  }
+}
+
 export function LiveView(opts: {
-  target: ArrowTarget
+  /** A guidable door (tier 1). Exactly one of `target` and `place` is given. */
+  target?: ArrowTarget
+  /** Any other destination: Maps-style Live View without the door handover. */
+  place?: LivePlace
   /** Distinguishable door name from the map (doorName); never "Eingang ohne Namen". */
   name?: string
   sensors: Sensors
@@ -302,10 +327,14 @@ export function LiveView(opts: {
   /** Opens the last-10-metres screen. LiveView tears itself down first. */
   onApproach?: (mode: ApproachMode) => void
 }): () => void {
-  const { target, config: cfg } = opts
-  const e = target.entrance
+  const { config: cfg } = opts
+  if (!opts.target && !opts.place) throw new Error('LiveView needs a target or a place')
+  const isPlace = !opts.target
+  // Where the route, chevrons and pin go. For a door it is the ArrowTarget itself.
+  const target: LatLon = opts.target ?? { lat: opts.place!.lat, lon: opts.place!.lon }
+  const e: Entrance = opts.target ? opts.target.entrance : placeEntrance(opts.place!)
   applyContrast(cfg.contrast)
-  const name = opts.name ?? pathDoorName(e)
+  const name = opts.name ?? opts.place?.name ?? pathDoorName(e)
 
   // ---- DOM ----
   let mediaEl: HTMLVideoElement | HTMLImageElement | null = null
@@ -383,7 +412,7 @@ export function LiveView(opts: {
   const lookBtn = h('button', { class: 'ar-look', type: 'button' }, ms('visibility'), t.look)
   // The last 10 metres, offered as soon as the door is close, not only after GPS says
   // "arrived". An ordinary button: VoiceOver's own double-tap activates it.
-  const approachMode = opts.onApproach ? approachModeFor(opts.profile) : null
+  const approachMode = opts.onApproach && !isPlace ? approachModeFor(opts.profile) : null
   const nearBtn = approachMode
     ? h('button', { class: 'apr-trigger ar-near', type: 'button', hidden: true }, ms('door_front'), APPROACH_TRIGGER)
     : null
@@ -670,17 +699,20 @@ export function LiveView(opts: {
     const warns = e.warnings.map((w) => t.warning[w] ?? w)
     // Google Maps style: "Du bist angekommen", then one question. Only a tier-1 door gets
     // the guide button; the question is asked for every profile there.
-    promptMode = arrivalPrompt(e, opts.profile, !!opts.onApproach).mode
+    promptMode = arrivalPrompt(e, opts.profile, !!opts.onApproach).mode // a place is tier 0: never asked
     const plan = arrivalPlan(promptMode)
     const secsEl = h('p', { class: 'arrival-count', hidden: plan.exitAfterS === null }, plan.exitAfterS === null ? '' : ARR.backIn(plan.exitAfterS))
     // An ordinary button: VoiceOver's own double-tap activates it; a custom double-tap
     // handler would be swallowed by VoiceOver.
     const approachBtn = promptMode ? h('button', { class: 'arrival-yes', type: 'button' }, promptMode === 'check' ? ARR.yesCheck : ARR.yes) : null
     const noBtn = promptMode ? h('button', { class: 'arrival-no', type: 'button' }, ARR.no) : null
-    const stayBtn = promptMode ? null : h('button', { class: 'gm-pill gm-pill-primary', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'pan_tool'), ARR.stay)
-    const mapBtn = promptMode ? null : h('button', { class: 'gm-pill', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'map'), ARR.toMap)
+    const stayBtn = promptMode || isPlace ? null : h('button', { class: 'gm-pill gm-pill-primary', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'pan_tool'), ARR.stay)
+    // A place ends on "Fertig": arrived, the name, back to nav/map. No door question.
+    const mapBtn = promptMode ? null : isPlace
+      ? h('button', { class: 'gm-pill gm-pill-primary', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'check'), ARR.done)
+      : h('button', { class: 'gm-pill', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'map'), ARR.toMap)
     const meta = [doorType, face].filter(Boolean).join(' · ')
-    const question = promptMode ? ARR.ask : ARR.noGuide
+    const question = promptMode ? ARR.ask : isPlace ? '' : ARR.noGuide
     cardEl = h(
       'div',
       { class: 'arrival-scrim' },
@@ -696,13 +728,13 @@ export function LiveView(opts: {
         approachBtn,
         noBtn,
         secsEl,
-        mapBtn && stayBtn ? h('div', { class: 'nav-row' }, mapBtn, stayBtn) : null,
+        mapBtn && stayBtn ? h('div', { class: 'nav-row' }, mapBtn, stayBtn) : isPlace && mapBtn ? h('div', { class: 'nav-row' }, mapBtn) : null,
       ),
     )
     root.classList.add('is-arrived') // camera and overlay leave the screen
     root.append(cardEl)
     if (plan.focus === 'approach' && approachBtn) approachBtn.focus({ preventScroll: true })
-    else stayBtn?.focus({ preventScroll: true })
+    else (stayBtn ?? mapBtn)?.focus({ preventScroll: true })
 
     // Spoken once, when the sheet opens; nothing repeats it. Warnings and the facing line
     // were already said by the early arrival line when that one ran.
@@ -1088,7 +1120,7 @@ export function LiveView(opts: {
     lookBtn.setAttribute('aria-busy', 'true')
     lookOut.textContent = t.lookBusy
     try {
-      const say = await postLook({ frame: frame64, heading: heading?.deg ?? 0, distanceM: Number.isFinite(dist) ? dist : 0, target: lookTargetText(target) })
+      const say = await postLook({ frame: frame64, heading: heading?.deg ?? 0, distanceM: Number.isFinite(dist) ? dist : 0, target: isPlace ? `place named ${name}` : lookTargetText(e) })
       if (closed) return
       lookOut.textContent = say
       // Unpredictable text: worth waiting a little longer for the network voice.

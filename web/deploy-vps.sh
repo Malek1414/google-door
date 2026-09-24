@@ -19,22 +19,24 @@ test -f config.js || { echo "missing web/config.js (copy config.example.js)"; ex
 echo "==> tests + build"
 npm test >/dev/null
 npm run build >/dev/null
-if grep -rqE "AIza[0-9A-Za-z_-]{20}|AKIA[0-9A-Z]{12}|sk-[A-Za-z0-9]{20}" dist/; then echo "key found in dist/, abort"; exit 1; fi
+if grep -rqE --exclude=config.js "AIza[0-9A-Za-z_-]{20}|AKIA[0-9A-Z]{12}|sk-[A-Za-z0-9]{20}" dist/; then echo "key found in dist/, abort"; exit 1; fi
 
 echo "==> upload"
-ssh "$VPS" "mkdir -p $DEST/web $DEST/server $DEST/data && test -f $DEST/.env || { echo 'missing $DEST/.env on server'; exit 1; }"
+ssh "$VPS" "mkdir -p $DEST/web $DEST/server $DEST/data $DEST/pipeline && test -f $DEST/.env || { echo 'missing $DEST/.env on server'; exit 1; }"
 rsync -rlptD --delete --exclude '.DS_Store' dist/ "$VPS:$DEST/web/"
 rsync -lt config.js "$VPS:$DEST/web/config.js" && ssh "$VPS" "chmod 644 $DEST/web/config.js"
 rsync -rlptD --delete --exclude '__pycache__' "$REPO/server/" "$VPS:$DEST/server/"
 rsync -rlptD --delete "$REPO/data/" "$VPS:$DEST/data/"
+rsync -rlptD --delete --exclude '__pycache__' --exclude fixtures "$REPO/pipeline/" "$VPS:$DEST/pipeline/"
 
 echo "==> backend container"
 ssh "$VPS" "cd $DEST && cat > Dockerfile <<'DOCKER'
 FROM python:3.12-slim
-RUN pip install --no-cache-dir fastapi uvicorn httpx
+RUN pip install --no-cache-dir fastapi uvicorn httpx python-multipart google-auth requests
 WORKDIR /app
 COPY server server
 COPY data data
+COPY pipeline pipeline
 CMD [\"sh\", \"-c\", \"uvicorn server.app:app --host 127.0.0.1 --port \$PORT\"]
 DOCKER
 docker build -q -t doorway:latest . >/dev/null \

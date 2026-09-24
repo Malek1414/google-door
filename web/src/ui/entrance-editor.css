@@ -25,3 +25,8 @@
 .ee-error:empty { display: none; }
 .ee-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .ee-btn { min-height: 46px; }
+
+/* Pin without dragging (a11y #12) */
+.ee-pin-tools { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 12px; }
+.ee-nudge { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.ee-nudge .ee-nudge-btn { min-width: 0; width: 100%; min-height: 44px; padding: 0 4px; justify-content: center; font-size: 14px; }

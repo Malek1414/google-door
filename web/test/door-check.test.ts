@@ -128,7 +128,7 @@ describe('door check: aim first, then check; retry on request', () => {
     expect(AIM_DELAY_MS).toBeGreaterThanOrEqual(1500)
     expect(['Kamera auf die Tür halten.', 'Hold the camera on the door.']).toContain(AP.aim)
     const aim = screen.slice(screen.indexOf('const aimThenCheck'))
-    expect(aim.indexOf('say(AP.aim)')).toBeGreaterThan(-1)
+    expect(aim).toMatch(/say\(AP\.aim\b/)
     expect(aim).toMatch(/setTimeout\([\s\S]*check\(\)[\s\S]*AIM_DELAY_MS\)/)
   })
   it('offers "Nochmal prüfen" as a real button; one request per tap, no loop', () => {

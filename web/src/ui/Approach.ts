@@ -14,10 +14,10 @@ import { startHeading } from '../core/heading'
 import { metresLine, safetyLine } from '../core/instruct'
 import type { OutputConfig } from '../core/profile'
 import type { Entrance } from '../core/types'
-import { announce, keepScreenOn, session, speak } from '../session'
+import { announce, keepScreenOn, session } from '../session'
 import { lang, t } from '../strings'
 import { engine, type ApproachMode, type ApproachView } from './approachPort'
-import { playInstruction, preloadClips, reportMissingClips, stopLines } from './clips'
+import { playInstruction, playLine, preloadClips, reportMissingClips, stopLines } from './clips'
 import { checkDoor, runDoorCheckOnce, verdictNote, verdictRows } from './doorCheck'
 import { h, mount, s } from './dom'
 import { grabFrame } from './LiveView'
@@ -319,8 +319,11 @@ function DoorCheckScreen(opts: { door: Entrance; config: OutputConfig; onExit: (
   let timer = 0
   let run = 0
 
-  const say = (text: string, interrupt = true) => {
-    if (opts.config.speak) speak(text, { interrupt })
+  // Device voice, like the guide: no /api/speak (quota, 2 s timeout, and a newer line
+  // voided the pending one, so the aim prompt was often never heard). Only a line from a
+  // user's tap interrupts; the rest queue behind what is sounding.
+  const say = (text: string, interrupt = false) => {
+    if (opts.config.speak) playLine(text, null, { interrupt, lang })
     announce(text)
   }
 
@@ -356,10 +359,12 @@ function DoorCheckScreen(opts: { door: Entrance; config: OutputConfig; onExit: (
 
   // The phone is still pointed at the button that opened this screen: ask the user to
   // aim first, and take the frame only after a pause.
-  const aimThenCheck = () => {
+  // The first prompt interrupts nothing: the tap's speech primer may still be pending,
+  // and WebKit drops a line spoken right after cancel(). "Nochmal prüfen" cuts the verdict.
+  const aimThenCheck = (interrupt = false) => {
     status.textContent = AP.aim
     status.hidden = false
-    say(AP.aim)
+    say(AP.aim, interrupt)
     window.clearTimeout(timer)
     timer = window.setTimeout(() => {
       if (!closed) check()
@@ -369,13 +374,15 @@ function DoorCheckScreen(opts: { door: Entrance; config: OutputConfig; onExit: (
     // Disabled, not hidden: VoiceOver focus stays on the button for the next tap.
     if (again.disabled) return
     again.disabled = true
-    aimThenCheck()
+    aimThenCheck(true)
   })
   aimThenCheck()
 
   function teardown() {
     closed = true
     window.clearTimeout(timer)
+    // Drops the queued verdict too, so it never plays on the map after exit.
+    stopLines(lang)
     try {
       speechSynthesis?.cancel()
     } catch {

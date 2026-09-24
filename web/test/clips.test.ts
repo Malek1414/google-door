@@ -200,3 +200,35 @@ describe('missingClipKeys', () => {
     expect(missing).not.toContain('turn_left')
   })
 })
+
+describe('door check voice (wheelchair): device voice at once, never /api/speak', () => {
+  it('the aim prompt goes to speechSynthesis synchronously, with no fetch', async () => {
+    const { vi } = await import('vitest')
+    const g = globalThis as Record<string, unknown>
+    const saved = { window: g.window, speechSynthesis: g.speechSynthesis, SpeechSynthesisUtterance: g.SpeechSynthesisUtterance, fetch: g.fetch }
+    const spoken: string[] = []
+    const synth = { speaking: false, pending: false, speak: vi.fn((u: { text: string }) => spoken.push(u.text)), cancel: vi.fn() }
+    const fetchSpy = vi.fn(() => new Promise(() => {}))
+    g.speechSynthesis = synth
+    g.window = { setTimeout: () => 0 }
+    g.SpeechSynthesisUtterance = class { lang = ''; rate = 1; onend: unknown; onerror: unknown; constructor(public text: string) {} }
+    g.fetch = fetchSpy
+    try {
+      const { playLine, stopLines } = await import('../src/ui/clips')
+      playLine('Richte das Handy auf die Tür.', null, { lang: 'de' })
+      expect(spoken).toEqual(['Richte das Handy auf die Tür.'])
+      expect(synth.cancel).not.toHaveBeenCalled() // first prompt: nothing to cut, primer survives
+      expect(fetchSpy).not.toHaveBeenCalled()
+      stopLines('de')
+    } finally {
+      Object.assign(g, saved)
+    }
+  })
+  it('DoorCheckScreen speaks through the clip player and stops it on exit', () => {
+    const src = readFileSync(resolve(__dirname, '../src/ui/Approach.ts'), 'utf8')
+    const check = src.slice(src.indexOf('function DoorCheckScreen'))
+    expect(check).toMatch(/playLine\(text, null, \{ interrupt, lang \}\)/)
+    expect(check).not.toMatch(/\bspeak\(/)
+    expect(check).toMatch(/function teardown\(\) \{[\s\S]*?stopLines\(lang\)/)
+  })
+})

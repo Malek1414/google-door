@@ -14,7 +14,7 @@ import { navSheetLines, navState, roundNavM, secondsLeft, startEnabled, thenGlyp
 import { isMuted, setMuted } from './voiceCalm'
 import { NEAR_TRIGGER_M } from './LiveView'
 import { computeRoute, D, formatDistance, routeSubline, startBlockedReason, stepsList, type RouteOutcome } from './Directions'
-import type { Profile } from '../core/profile'
+import { outputFor, type Profile } from '../core/profile'
 import { guidanceFor, markerKind, type ArrowTarget } from '../core/target'
 import type { Building, Entrance } from '../core/types'
 import { mapsKey } from '../config'
@@ -300,6 +300,8 @@ export function MapView(opts: {
     ? { live: 'Live View', end: 'Navigation beenden', exit: 'Beenden', then: 'Dann', compass: 'Kompass, nach Norden ausrichten', mute: 'Ton aus', options: 'Routenoptionen und Schritte', arrive: 'Ankunft', dest: 'Ziel erreichen', inM: (m: number) => `In ${m} m`, you: 'Dein Standort', started: 'Navigation gestartet', near: 'Zum Eingang führen', nearSay: 'Du bist fast da. Zum Eingang führen?' }
     : { live: 'Live View', end: 'End navigation', exit: 'Exit', then: 'Then', compass: 'Compass, north up', mute: 'Mute', options: 'Route options and steps', arrive: 'Arrival', dest: 'Arrive at destination', inM: (m: number) => `In ${m} m`, you: 'Your location', started: 'Navigation started', near: 'Guide me to the entrance', nearSay: 'You are almost there. Guide you to the entrance?' }
   let navOn = false
+  /** Nav speaks only when the profile speaks and nobody muted it (voiceCalm, shared with Live View). */
+  const voiceOn = () => outputFor(opts.profile).speak && !isMuted()
   let navRoute: Route | null = null
   /** Where nav mode is going. `door` is set only for a door that may carry guidance:
    *  the Live View button and the last-10-m handover need it; places navigate without. */
@@ -421,7 +423,7 @@ export function MapView(opts: {
       navSpoken = st.walking
       const line = `${NV.inM(m)} ${st.text ?? NV.dest}`
       announce(line)
-      speak(line, { interrupt: true })
+      if (voiceOn()) speak(line, { interrupt: true })
     }
     // The last-10-m handover is ours only for a door that may carry guidance.
     const near = !!navDest.door && haversineM(pos, { lat: navDest.lat, lon: navDest.lon }) <= NEAR_TRIGGER_M
@@ -429,7 +431,7 @@ export function MapView(opts: {
     if (near && !navNearSaid) {
       navNearSaid = true
       announce(NV.nearSay)
-      speak(NV.nearSay, { interrupt: true })
+      if (voiceOn()) speak(NV.nearSay, { interrupt: true })
     }
     map?.panTo({ lat: pos.lat, lng: pos.lon })
   }

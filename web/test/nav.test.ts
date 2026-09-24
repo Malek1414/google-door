@@ -85,3 +85,15 @@ describe('startEnabled', () => {
     expect(startEnabled(false, false)).toBe(false)
   })
 })
+
+import { streetOf } from '../src/core/nav'
+describe('streetOf', () => {
+  it('pulls the street out of an instruction line', () => {
+    expect(streetOf('Links abbiegen auf Werbellinstraße')).toBe('Werbellinstraße')
+    expect(streetOf('Rechts abbiegen in die Karl-Marx-Straße')).toBe('Karl-Marx-Straße')
+    expect(streetOf('Turn right onto Werbellinstraße')).toBe('Werbellinstraße')
+    expect(streetOf('Richtung Norden')).toBe('Norden')
+    expect(streetOf('Geradeaus weiter')).toBe('Geradeaus weiter')
+    expect(streetOf(null)).toBeNull()
+  })
+})

@@ -10,6 +10,7 @@ import { SteadyAngle } from './arrowSteady'
 import { CalmWord, isMuted, LineGate, muteButton } from './voiceCalm'
 import { connected, tailLength, instructionLine, maneuverGlyph, nextManeuver, progressAlong, type Route } from '../core/route'
 import { cachedRoute, computeRoute, D } from './Directions'
+import { streetOf } from '../core/nav'
 import { chevronStack, destinationPin, stackTransform, type ArPhase } from './ar'
 import './ar.css'
 import { startHeading, startPitch, type Heading } from '../core/heading'
@@ -324,10 +325,15 @@ export function LiveView(opts: {
 
   // scanning
   const scanText = h('p', { class: 'ar-scan-text' }, t.arScan ?? 'Richte die Kamera auf Gebäude, Geschäfte und Schilder um dich herum.')
-  const scanArt = s('svg', { class: 'ar-scan-art', viewBox: '0 0 120 120', 'aria-hidden': 'true' },
-    s('rect', { x: '44', y: '18', width: '32', height: '58', rx: '6', fill: 'none', stroke: '#a8c7fa', 'stroke-width': '4' }),
-    s('rect', { x: '50', y: '26', width: '20', height: '38', rx: '2', fill: '#a8c7fa', opacity: '0.35' }),
-    s('path', { d: 'M28 92 q32 -16 64 0', fill: 'none', stroke: '#a8c7fa', 'stroke-width': '4', 'stroke-linecap': 'round' }),
+  // Phone in a hand, as in the Maps Live View intro: blue hand, white phone, a dot on screen.
+  const scanArt = s('svg', { class: 'ar-scan-art', viewBox: '0 0 160 200', 'aria-hidden': 'true' },
+    s('path', { d: 'M18 196 L40 120 q6 -18 24 -18 L96 102 L96 196 Z', fill: '#2c5bd8' }),
+    s('rect', { x: '46', y: '8', width: '76', height: '150', rx: '14', fill: '#e8eaed', transform: 'rotate(8 84 83)' }),
+    s('rect', { x: '52', y: '16', width: '64', height: '134', rx: '10', fill: '#ffffff', transform: 'rotate(8 84 83)' }),
+    s('circle', { cx: '84', cy: '80', r: '16', fill: '#d2e3fc' }),
+    s('circle', { cx: '84', cy: '80', r: '7', fill: '#1a73e8' }),
+    s('path', { d: 'M120 60 q16 4 14 20 q14 4 10 20 q12 6 6 22 q-6 14 -24 10', fill: '#4f7df0', stroke: '#2c5bd8', 'stroke-width': '3' }),
+    s('path', { d: 'M40 120 q-8 -26 10 -34', fill: 'none', stroke: '#2c5bd8', 'stroke-width': '10', 'stroke-linecap': 'round' }),
   ) as unknown as HTMLElement
   const pill = h('div', { class: 'ar-pill' }, t.arScanning ?? 'Scanning …')
   const follow = h('p', { class: 'ar-follow', hidden: true }, t.arFollow ?? 'Folge dem Pfeil')
@@ -335,9 +341,13 @@ export function LiveView(opts: {
   // destination strip
   const distEl = h('span', { class: 'ar-dest-m' }, '')
   const dirEl = h('span', { class: 'sr-only' }, t.waitingGps)
+  // Bottom card, as in the Maps recording: the next manoeuvre while on the route
+  // (turn glyph + metres left, street right), the door itself in the last stretch.
+  const destIc = ms('location_on')
+  const destName = h('span', { class: 'ar-dest-name' }, name)
   const destStrip = h('div', { class: 'ar-dest' },
-    h('div', { class: 'ar-dest-pin' }, ms('location_on'), distEl),
-    h('span', { class: 'ar-dest-name' }, name),
+    h('div', { class: 'ar-dest-pin' }, destIc, distEl),
+    destName,
   )
 
   // safety interstitial
@@ -434,6 +444,7 @@ export function LiveView(opts: {
   )
 
   mount(root)
+  root.dataset.phase = 'scanning'
 
   // ---- state ----
   let fix: Fix | null = null
@@ -466,6 +477,9 @@ export function LiveView(opts: {
   const SAFE_EVERY_MS = 45000
   const SAFE_SHOW_MS = 4000
   let arPhase: ArPhase = 'scanning'
+  const SCAN_MIN_MS = 2500
+  const scanUntil = performance.now() + SCAN_MIN_MS
+  let readyQueued = false
   // Device pitch (beta), low-passed. null until the first orientation event: then the
   // chevrons keep today's fixed screen placement.
   let pitch: number | null = null
@@ -531,6 +545,17 @@ export function LiveView(opts: {
   /** scanning -> ready -> guiding, then approach once the pin takes over. */
   function setPhase(next: ArPhase) {
     if (next === arPhase) return
+    // The scanning intro holds at least SCAN_MIN_MS, as in Maps, even with a fix at once.
+    if (next === 'ready' && arPhase === 'scanning') {
+      const wait = scanUntil - performance.now()
+      if (wait > 0) {
+        if (!readyQueued) {
+          readyQueued = true
+          timers.push(window.setTimeout(() => { if (!closed && arPhase === 'scanning') setPhase('ready') }, wait))
+        }
+        return
+      }
+    }
     arPhase = next
     root.dataset.phase = next
     const scanning = next === 'scanning'
@@ -546,7 +571,10 @@ export function LiveView(opts: {
     destStrip.hidden = scanning
     if (ready) {
       // "Ready" holds briefly, then the chevrons take the screen, as in the recording.
-      timers.push(window.setTimeout(() => setPhase('guiding'), 1400))
+      timers.push(window.setTimeout(() => {
+        setPhase('guiding')
+        if (!closed) update() // paint the guiding card now, not at the next sensor event
+      }, 1400))
     }
   }
 
@@ -765,6 +793,9 @@ export function LiveView(opts: {
     maybeSafety(now)
 
     distEl.textContent = t.metres(dist)
+    destIc.textContent = 'location_on'
+    destName.textContent = name
+    root.classList.remove('ar-turncard')
     // Good GPS needs no note; poor GPS is worth reading (fix-live.css: 16 px, 7:1).
     accEl.textContent = fix.accuracy !== null && fix.accuracy > 10 ? t.accuracy(fix.accuracy) : ''
 
@@ -792,6 +823,14 @@ export function LiveView(opts: {
         manBanner.hidden = false
       } else {
         manBanner.hidden = true
+      }
+      // Bottom card: next turn while one is ahead, otherwise the door.
+      const turnCard = !!(ahead?.step && aheadText && arPhase === 'guiding')
+      root.classList.toggle('ar-turncard', turnCard)
+      if (turnCard) {
+        destIc.textContent = glyph
+        distEl.textContent = `${Math.round(ahead!.toManeuverM)} m`
+        destName.textContent = streetOf(aheadText) ?? name
       }
     }
 

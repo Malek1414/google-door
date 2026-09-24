@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Approach, AIMED_DEG, LOST_AIM_DEG, THRESHOLD_M } from '../src/core/approach'
+import { Approach, AIMED_DEG, LOST_AIM_DEG, THRESHOLD_M, STILL_MS } from '../src/core/approach'
 import { MAX_AGE_MS, type Anchor } from '../src/core/anchor'
 
 const anchor = (over: Partial<Anchor> = {}): Anchor => ({
@@ -94,5 +94,80 @@ describe('Approach', () => {
     const a = new Approach()
     a.setAnchor(anchor({ source: 'osm-fallback' }))
     expect(a.tick({ headingDeg: 100, steps: 0, nowMs: 1100 }).projection!.source).toBe('osm-fallback')
+  })
+})
+
+describe('reaching "through" — the gap PR #5 found', () => {
+  // core had visionSaysInside() but nothing could call it honestly, and the spec's
+  // "the threshold phase ends when the user stops" was never implemented, so the
+  // phase was unreachable with the real engine.
+  const at = (over: Partial<Anchor> = {}): Anchor => ({
+    bearingDeg: 0, headingDeg: 100, distanceM: 1.2, steps: 10, ts: 1000, source: 'gemini-live', ...over,
+  })
+
+  /** Ticks at 200 ms until `through`, or gives up. Asserting on behaviour rather than
+   *  hardcoded timestamps: the stillness clock starts on the second tick, because the
+   *  first establishes the step baseline. */
+  function tickUntilThrough(a: Approach, steps = 10, limitMs = 15000): number | null {
+    let t = 1100
+    while (t < 1100 + limitMs) {
+      if (a.tick({ headingDeg: 100, steps, nowMs: t }).phase === 'through') return t - 1100
+      t += 200
+    }
+    return null
+  }
+
+  it('lands in threshold on the first tick when already aimed and close', () => {
+    const a = new Approach()
+    a.setAnchor(at())
+    expect(a.tick({ headingDeg: 100, steps: 10, nowMs: 1100 }).phase).toBe('threshold')
+  })
+
+  it('standing still at the threshold proposes through, after about STILL_MS', () => {
+    const a = new Approach()
+    a.setAnchor(at())
+    const elapsed = tickUntilThrough(a)
+    expect(elapsed).not.toBeNull()
+    expect(elapsed!).toBeGreaterThanOrEqual(STILL_MS)
+    expect(elapsed!).toBeLessThan(STILL_MS + 1500)
+  })
+
+  it('a pause while still walking does not propose it', () => {
+    const a = new Approach()
+    a.setAnchor(at({ distanceM: 6 }))
+    a.tick({ headingDeg: 100, steps: 10, nowMs: 1100 })          // walking
+    const st = a.tick({ headingDeg: 100, steps: 10, nowMs: 1100 + STILL_MS + 500 })
+    expect(st.phase).toBe('walking')  // stillness only counts at the threshold
+  })
+
+  it('taking a step resets the stillness clock', () => {
+    const a = new Approach()
+    a.setAnchor(at())
+    a.tick({ headingDeg: 100, steps: 10, nowMs: 1100 })
+    a.tick({ headingDeg: 100, steps: 10, nowMs: 1100 + STILL_MS - 200 })
+    a.tick({ headingDeg: 100, steps: 11, nowMs: 1100 + STILL_MS - 100 })  // moved
+    expect(a.tick({ headingDeg: 100, steps: 11, nowMs: 1100 + STILL_MS + 300 }).phase).toBe('threshold')
+  })
+
+  it('"Noch draußen" takes it back and does not immediately re-propose', () => {
+    const a = new Approach()
+    a.setAnchor(at())
+    const first = tickUntilThrough(a)
+    expect(first).not.toBeNull()
+    a.stillOutside()
+    let t = 1100 + first! + 200
+    // it must hold at threshold for at least another full still period
+    for (let i = 0; i < Math.floor(STILL_MS / 200); i++) {
+      expect(a.tick({ headingDeg: 100, steps: 10, nowMs: t }).phase).toBe('threshold')
+      t += 200
+    }
+  })
+
+  it('vision can still propose it directly, and immediately', () => {
+    const a = new Approach()
+    a.setAnchor(at())
+    a.tick({ headingDeg: 100, steps: 10, nowMs: 1100 })
+    a.visionSaysInside()
+    expect(a.tick({ headingDeg: 100, steps: 10, nowMs: 1200 }).phase).toBe('through')
   })
 })

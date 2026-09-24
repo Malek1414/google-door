@@ -331,6 +331,7 @@ that error bar. Nothing here may read a GPS fix for bearing, distance or arrival
   "confidence": 0.82,
   "kind": "sliding|hinged|revolving|opening|unknown",
   "note": "Glastür links neben der Treppe",
+  "inside": false,
   "ts": 1758750000000,
   "source": "gemini-live|gemini-frame|osm-fallback"
 }
@@ -342,6 +343,8 @@ that error bar. Nothing here may read a GPS fix for bearing, distance or arrival
 - `source` is never cosmetic. `osm-fallback` means vision failed and this is the
   surveyed door coordinate instead, and the UI must say so.
 - `confidence` below 0.5 is treated as `found: false`.
+- `inside` ends the guidance, so it needs an explicit true at confidence >= 0.6. A
+  wrong true abandons someone on the pavement.
 
 ### Stability — the hallucination guard
 
@@ -367,7 +370,14 @@ orienting → walking → threshold → through
   Discrete speech alone makes people overshoot, because the word arrives after the turn.
 - **walking** — on bearing, distance counting down.
 - **threshold** — under 1.5 m. "Die Tür ist direkt vor dir."
-- **through** — vision proposes, a large "Noch draußen" button overrides.
+- **through** — PROPOSED two ways, never decided by the app:
+  - `DoorFix.inside` is true (vision sees interior: ceiling, no sky, entrance behind).
+    Requires an explicit true at confidence >= 0.6; absent or hedged is "still outside".
+  - or the user stands still at the threshold for `STILL_MS` (4 s). Someone who has
+    walked through a door stops walking, and this is the path when vision never fires.
+
+  Either way a large "Noch draußen" button takes it back, and doing so restarts the
+  stillness clock so simply standing there does not re-propose what was just rejected.
 
 ### Instruction bands — fixed, short, never reworded
 

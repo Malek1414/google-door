@@ -26,6 +26,7 @@ import {
   throughLine,
   unsureLine,
 } from '../core/instruct'
+import { HeadingSmoother } from '../core/smooth'
 import { StabilityGuard, angleDelta } from '../core/stability'
 import { lang as appLang } from '../strings'
 import type { ApproachIO, ApproachSession, ApproachView, DoorFixSource, StartApproach } from './approachPort'
@@ -41,6 +42,11 @@ export const FALLBACK_AFTER = 3
  *  direction, not a distance, and GPS is not allowed to supply one. */
 export const FALLBACK_ASSUMED_M = 10
 export const TICK_MS = 100
+/** A new band must hold this long before it is spoken: compass jitter across a band
+ *  edge otherwise speaks a line per tick. The beacon still follows every tick. */
+export const BAND_HOLD_MS = 700
+/** And band lines are at least this far apart. */
+export const BAND_GAP_MS = 1500
 /** CONTRACT "DoorFix": `inside` ends the guidance, so it needs an explicit true at
  *  this confidence or above. A wrong true abandons someone on the pavement. */
 export const INSIDE_MIN_CONFIDENCE = 0.6
@@ -128,7 +134,10 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     const guard = new StabilityGuard()
     const subs = new Set<(v: ApproachView) => void>()
 
+    // Raw compass as it arrives; `heading` is the smoothed value every tick works from.
+    let rawHeading: number | null = null
     let heading: number | null = null
+    const smoother = new HeadingSmoother({ tau: 0.2, deadbandDeg: 1.5 })
     let steps = 0
     let anchor: Anchor | null = null
     let inFlight = false
@@ -136,6 +145,9 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     let failures = 0
     let saidUnsure = false
     let lastBand: Band | null = null
+    let candidateBand: Band | null = null
+    let candidateSince = 0
+    let lastBandAt = -Infinity
     let lastPhase = approach.currentPhase
     let lastSourceSpoken: DoorFixSource | null = null
     let stopped = false
@@ -222,7 +234,9 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
     }
 
     const tick = () => {
-      if (stopped || heading === null) return
+      if (stopped || rawHeading === null) return
+      const now = deps.now()
+      heading = smoother.push(rawHeading, now)
       // A map anchor that has aged out is simply re-minted: the surveyed bearing does
       // not go stale, and letting it lapse drops the beacon every MAX_AGE_MS.
       if (anchor?.source === 'osm-fallback' && !anchorFresh() && approach.currentPhase !== 'threshold') {
@@ -256,9 +270,21 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
         if (st.phase !== 'through') {
           if (st.phase === 'threshold' && lastPhase !== 'threshold' && p.source !== 'osm-fallback') {
             lines.push(thresholdLine(L))
-          } else if (st.band !== lastBand) {
-            lines.push(bandText(st.band, L))
-            lastBand = st.band
+          } else if (st.band === lastBand) {
+            candidateBand = null
+          } else {
+            if (st.band !== candidateBand) {
+              candidateBand = st.band
+              candidateSince = now
+            }
+            // The first band after a (re)gained fix is said at once; a CHANGE of band
+            // must hold BAND_HOLD_MS and wait out BAND_GAP_MS since the last band line.
+            if (lastBand === null || (now - candidateSince >= BAND_HOLD_MS && now - lastBandAt >= BAND_GAP_MS)) {
+              lines.push(bandText(st.band, L))
+              lastBand = st.band
+              lastBandAt = now
+              candidateBand = null
+            }
           }
         }
         // A map bearing gives a direction, never a distance.
@@ -289,7 +315,7 @@ export function createApproachEngine(overrides: Partial<EngineDeps> = {}): Start
 
     const offHeading = io.onHeading((h) => {
       if (!Number.isFinite(h.deg)) return
-      heading = h.deg
+      rawHeading = h.deg
     })
     const offSteps = countSteps(io.onMotion, (n) => (steps = n), deps.now)
     const offTimer = deps.every(TICK_MS, tick)

@@ -6,7 +6,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { STEP_M } from '../src/core/anchor'
 import { STILL_MS } from '../src/core/approach'
-import { fallbackLine, noDirectionLine, pitchFor, safetyLine, thresholdLine, throughLine, unsureLine } from '../src/core/instruct'
+import { bandText, fallbackLine, noDirectionLine, pitchFor, safetyLine, thresholdLine, throughLine, unsureLine } from '../src/core/instruct'
 import { angleDelta } from '../src/core/stability'
 import type { Entrance } from '../src/core/types'
 import { createApproachEngine, FALLBACK_AFTER, INSIDE_MIN_CONFIDENCE, parseDoorFix, saysInside } from '../src/ui/approachEngine'
@@ -369,6 +369,24 @@ describe('vision lost at the door (rule 2: no map anchor, no dead reckoning)', (
     const from = r.views.length
     for (let i = 0; i < 300; i++) await r.tick() // 30 s
     expect(r.views.slice(from).every((v) => v.beaconPitch !== undefined)).toBe(true)
+  })
+})
+
+describe('band speech does not chatter on compass jitter', () => {
+  it('±3° jitter on a band edge speaks at most 2 band lines in 5 s, while the beacon keeps moving', async () => {
+    const BANDS = ['straight', 'slight-left', 'slight-right', 'left', 'right', 'sharp-left', 'sharp-right', 'turn-around'] as const
+    const bandLines = new Set(BANDS.map((b) => bandText(b, 'de')))
+    const r = rig(door(108, 8, () => 0)) // door 8° right of 100: the straight/slight-right edge
+    let seed = 7
+    const jitter = () => ((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31) * 6 - 3
+    r.heading(100)
+    await r.tick()
+    await r.tick()
+    const from = r.views.length
+    for (let i = 0; i < 50; i++) { r.heading(100 + jitter()); await r.tick() }
+    const said = r.views.slice(from).map((v) => v.instruction).filter((x, i, a) => i === 0 || x !== a[i - 1])
+    expect(said.filter((x) => bandLines.has(x)).length).toBeLessThanOrEqual(2)
+    expect(new Set(r.views.slice(from).map((v) => v.beaconPitch)).size).toBeGreaterThan(1)
   })
 })
 

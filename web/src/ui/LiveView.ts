@@ -166,6 +166,7 @@ const ARR = {
     sheetTitle: 'Du bist angekommen',
     ask: 'Sollen wir dir zeigen, wo du reinkommst?',
     yes: 'Ja, zeig mir den Eingang',
+    yesCheck: 'Ja, Tür prüfen',
     no: 'Nein, danke',
     noGuide: 'Für diesen Eingang haben wir noch keine genaue Führung.',
     stay: 'Hier bleiben',
@@ -182,6 +183,7 @@ const ARR = {
     sheetTitle: 'You have arrived',
     ask: 'Shall we show you where to get in?',
     yes: 'Yes, show me the entrance',
+    yesCheck: 'Yes, check the door',
     no: 'No, thanks',
     noGuide: 'We have no exact guidance for this entrance yet.',
     stay: 'Stay here',
@@ -491,7 +493,10 @@ export function LiveView(opts: {
   const SAFE_SHOW_MS = 4000
   let arPhase: ArPhase = 'scanning'
   const SCAN_MIN_MS = 2500
-  const scanUntil = performance.now() + SCAN_MIN_MS
+  const openedAt = performance.now()
+  const scanUntil = openedAt + SCAN_MIN_MS
+  /** The first compass event can take a moment (permission, sensor start): no "Kein Kompass" before this. */
+  const NO_COMPASS_GRACE_MS = 2000
   let readyQueued = false
   // Device pitch (beta), low-passed. null until the first orientation event: then the
   // chevrons keep today's fixed screen placement.
@@ -669,7 +674,7 @@ export function LiveView(opts: {
     const secsEl = h('p', { class: 'arrival-count', hidden: plan.exitAfterS === null }, plan.exitAfterS === null ? '' : ARR.backIn(plan.exitAfterS))
     // An ordinary button: VoiceOver's own double-tap activates it; a custom double-tap
     // handler would be swallowed by VoiceOver.
-    const approachBtn = promptMode ? h('button', { class: 'arrival-yes', type: 'button' }, ARR.yes) : null
+    const approachBtn = promptMode ? h('button', { class: 'arrival-yes', type: 'button' }, promptMode === 'check' ? ARR.yesCheck : ARR.yes) : null
     const noBtn = promptMode ? h('button', { class: 'arrival-no', type: 'button' }, ARR.no) : null
     const stayBtn = promptMode ? null : h('button', { class: 'gm-pill gm-pill-primary', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'pan_tool'), ARR.stay)
     const mapBtn = promptMode ? null : h('button', { class: 'gm-pill', type: 'button' }, h('span', { class: 'ms', 'aria-hidden': 'true' }, 'map'), ARR.toMap)
@@ -858,7 +863,7 @@ export function LiveView(opts: {
     if (!hasHeading) {
       // No compass: the route still says what to do and how far away it is.
       dirEl.textContent = aheadText ? `${t.inMetres(ahead!.toManeuverM)}. ${aheadText}` : t.noCompass
-      if (!aheadText && !saidNoCompass) {
+      if (!aheadText && !saidNoCompass && now - openedAt > NO_COMPASS_GRACE_MS) {
         // Without a compass and without a route there is nothing to point with: say
         // so once instead of leaving the user in silence.
         saidNoCompass = true
@@ -959,7 +964,9 @@ export function LiveView(opts: {
     }
 
     // Spoken arrival line fires 2.5 m early to hide speech latency.
-    if (!spokeArrival && shouldSpeakArrival(dist)) {
+    // Not while "Zum Eingang führen" or the arrival sheet is up: they speak for the door,
+    // and the sheet always carries the warnings.
+    if (!spokeArrival && shouldSpeakArrival(dist) && !nearShown && !cardEl) {
       spokeArrival = true
       const parts = [t.arrivingSoon]
       if (e.approachBearing !== null) parts.push(t.faceToEnter(compassWord(e.approachBearing)))

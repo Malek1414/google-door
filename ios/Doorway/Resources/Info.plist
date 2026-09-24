@@ -34,6 +34,16 @@
   <string>Doorway zeigt den Weg zum stufenlosen Eingang in der Kameraansicht.</string>
   <key>NSLocationWhenInUseUsageDescription</key>
   <string>Doorway braucht deinen Standort, um dich zum richtigen Eingang zu führen.</string>
+  <!-- The native Live View (ARCore Geospatial) needs precise location; asked for once per
+       walk when the user has only allowed approximate location. -->
+  <key>NSLocationTemporaryUsageDescriptionDictionary</key>
+  <dict>
+    <key>DoorwayLiveView</key>
+    <string>Die Live View braucht deinen genauen Standort, um die Pfeile richtig auf die Straße zu setzen.</string>
+  </dict>
+  <!-- Secondary ARCore auth: from the gitignored ios/Secrets.xcconfig, empty otherwise.
+       The primary path is a short-lived token from our server (GET /api/arcore-token). -->
+  <key>ARCoreAPIKey</key><string>$(ARCORE_API_KEY)</string>
   <key>NSMotionUsageDescription</key>
   <string>Doorway nutzt den Kompass, um den Pfeil in die richtige Richtung zu drehen.</string>
   <key>NSMicrophoneUsageDescription</key>

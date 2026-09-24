@@ -1,0 +1,9 @@
+// Build settings for every configuration. Committed; holds no secrets.
+//
+// ARCORE_API_KEY is the SECONDARY auth path of the native Live View, used only when the
+// server has no service account (GET /api/arcore-token answers 503). Put a real key in
+// ios/Secrets.xcconfig (gitignored, copy Secrets.example.xcconfig), never here.
+// Info.plist reads it as ARCoreAPIKey.
+ARCORE_API_KEY =
+
+#include? "Secrets.xcconfig"

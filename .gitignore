@@ -13,3 +13,5 @@ ios/Doorway.xcodeproj/
 ios/build/
 # e2e screenshots are regenerated on every run
 web/e2e/out/approach-*.png
+# ARCore API key for the native Live View, never committed; see ios/Secrets.example.xcconfig
+ios/Secrets.xcconfig

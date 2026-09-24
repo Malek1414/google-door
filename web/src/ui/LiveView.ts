@@ -3,14 +3,15 @@
 // Accepts only an ArrowTarget (core/target.ts), which can only be minted for tier 1.
 // Everything in the hot path is arithmetic. /api/look is called ONLY from the button.
 
-import { arrowPulseHz, ARRIVE_M, beaconFor, cuePan, hapticFor, HAPTIC_ARRIVED, ON_BEARING_DEG, shouldAnnounceApproach, shouldSpeakArrival } from '../core/beacon'
+import { ARRIVE_M, beaconFor, cuePan, hapticFor, HAPTIC_ARRIVED, ON_BEARING_DEG, shouldAnnounceApproach, shouldSpeakArrival } from '../core/beacon'
 import { bearingDeg, haversineM, relativeBearing } from '../core/geo'
 import { distanceKey, stopSpeech } from '../core/speech'
 import { SteadyAngle } from './arrowSteady'
 import { CalmWord, isMuted, LineGate, muteButton } from './voiceCalm'
 import { connected, tailLength, instructionLine, maneuverGlyph, nextManeuver, progressAlong, type Route } from '../core/route'
 import { cachedRoute, computeRoute, D } from './Directions'
-import { chevronStack, destinationPin, stackTransform, type ArPhase } from './ar'
+import { destinationPin, stackTransform, type ArPhase } from './ar'
+import { arrow3d, calibCard, CALIB_TIMEOUT_MS, doorLabel, doorLabelX, etaParts, LV, MINI_H, MINI_W, miniMap, shortDistance, shortName, sketchPath, tiltedDown, turnAroundShown, turnPrompt } from './liveGoogle'
 import './ar.css'
 import { startHeading, startPitch, type Heading } from '../core/heading'
 import { snapToGraph } from '../core/match'
@@ -26,6 +27,7 @@ import { h, mount, s } from './dom'
 import './arrival.css'
 import { APPROACH_TRIGGER, approachModeFor, type ApproachMode } from './approachPort'
 import './approach.css'
+import './live-google.css'
 import { pathDoorName } from './doorName'
 
 export interface Fix {
@@ -384,52 +386,69 @@ export function LiveView(opts: {
     mediaEl = h('img', { class: 'cam', src: opts.sensors.media.url, alt: '', 'aria-hidden': 'true' }) as HTMLImageElement
   }
 
-  // ── Live View, Google Maps calm: one arrow (or the pin), one sentence, one card ──
-  // Everything mounts at once in its final place; only its text changes afterwards.
-  // Fixed layout, top to bottom (also the VoiceOver order): close, sound, the instruction
-  // line, the one-line status strip, the door card. The centre holds the arrow OR the pin.
-  const stack = chevronStack()
-  const stackG = s('g', { class: 'ar-stack-wrap' }, stack)
+  // ── Live View, the Google Maps look ──
+  // Everything mounts at once in its final place; only text, attributes and visibility
+  // change afterwards. Top to bottom (also the VoiceOver order): the white manoeuvre card,
+  // the sound button, the status strip, the centre (calibration card, 3D arrow, "Dreh dich
+  // um" or the pin), the door label, the mini map, the white ETA bar.
   const pinG = s('g', { class: 'ar-pin-wrap' }, destinationPin())
   pinG.setAttribute('transform', stackTransform(0, 393, 760).replace(/ rotate\([^)]*\)/, ''))
   const coneG = s('g', { class: 'cone' })
-  // The outer groups carry the cross-fade (CSS opacity); stackG keeps its own opacity for poor GPS.
   const svg = s('svg', { class: 'ar-svg', viewBox: '0 0 393 760', preserveAspectRatio: 'xMidYMid slice', 'aria-hidden': 'true' },
-    coneG, s('g', { class: 'ar-mark ar-mark-arrow' }, stackG), s('g', { class: 'ar-mark ar-mark-pin' }, pinG))
+    coneG, s('g', { class: 'ar-mark ar-mark-pin' }, pinG))
+  const arrow = arrow3d()
+  const turnEl = turnPrompt()
+  const calib = calibCard()
+  const door = doorLabel()
+  const mini = miniMap()
+  const doorLabelName = shortName(name)
 
   const ms = (n: string) => h('span', { class: 'ms', 'aria-hidden': 'true' }, n)
 
-  // The one instruction line ("Geradeaus · 8 m"), at the top under the bar. dirEl is its
-  // text and what VoiceOver reads there; changes are spoken through announce(), not here.
+  // The manoeuvre card: big blue turn icon, the distance in large type, the instruction.
+  // The visible card is not a live region (its metres change every step); srStep is, and
+  // it changes only when the step does, so VoiceOver reads the card once per step.
   const instrGlyph = h('span', { class: 'ms ar-instr-ic', 'aria-hidden': 'true' }, 'explore')
+  const instrDist = h('span', { class: 'ar-instr-d' }, '')
   const dirEl = h('span', { class: 'ar-instr-t' }, t.waitingGps)
-  const instrEl = h('p', { class: 'ar-instr' }, instrGlyph, dirEl)
-  const setLine = (text: string, glyph: string) => {
+  const srStep = h('p', { class: 'sr-only', role: 'status', 'aria-live': 'polite' }, '')
+  const instrEl = h('div', { class: 'ar-instr' }, h('div', { class: 'ar-instr-lead' }, instrGlyph, instrDist), dirEl)
+  const setLine = (text: string, glyph: string, distText = '') => {
     if (dirEl.textContent !== text) dirEl.textContent = text
     if (instrGlyph.textContent !== glyph) instrGlyph.textContent = glyph
+    if (instrDist.textContent !== distText) instrDist.textContent = distText
+    instrEl.classList.toggle('no-dist', !distText)
+  }
+  let lastStepSaid = ''
+  /** The status on a step change: said once per step, by VoiceOver, never on a timer. */
+  const stepStatus = (text: string) => {
+    if (text === lastStepSaid) return
+    lastStepSaid = text
+    srStep.textContent = text
   }
 
-  // The door card: full name (wraps), distance, and the camera question as an eye button.
+  // The ETA bar: round X, "5 Min." in green, "340 m · Ankunft 11:12", the eye button.
   const distEl = h('span', { class: 'ar-dest-m' }, '')
+  const etaMinEl = h('span', { class: 'ar-eta-min' }, '')
   const accEl = h('span', { class: 'ar-meta' }, '')
   const lookBtn = h('button', { class: 'ar-look', type: 'button', 'aria-label': t.look }, ms('visibility'))
   // Only when no arrival sheet can offer it (a real walk whose GPS may never reach the
-  // 3 m arrival): a quiet text button inside the card. The demo and ?sim replays always
+  // 3 m arrival): a quiet text button inside the bar. The demo and ?sim replays always
   // reach the sheet, and "Ja, zeig mir den Eingang" there is the single way in.
   const approachMode = opts.onApproach ? approachModeFor(opts.profile) : null
   const nearBtn = approachMode && !opts.sensors.replay
     ? h('button', { class: 'apr-trigger ar-near', type: 'button', hidden: true }, APPROACH_TRIGGER)
     : null
   const endRow = h('div', { class: 'ar-endrow' })
+  const stopBtn = h('button', { class: 'ar-round ar-stop', type: 'button', 'aria-label': t.stop }, ms('close'))
   const destStrip = h('div', { class: 'ar-dest' },
-    h('div', { class: 'ar-dest-pin' }, ms('location_on'), distEl),
-    h('div', { class: 'ar-dest-body' }, h('span', { class: 'ar-dest-name' }, name), accEl),
+    stopBtn,
+    h('div', { class: 'ar-eta' }, etaMinEl, h('span', { class: 'ar-eta-sub' }, distEl, accEl)),
     lookBtn,
     nearBtn,
     endRow,
   )
 
-  const stopBtn = h('button', { class: 'ar-round', type: 'button', 'aria-label': t.stop }, ms('close'))
   const muteBtn = muteButton((m) => {
     if (!m) return
     beacon?.stop()
@@ -467,22 +486,29 @@ export function LiveView(opts: {
   })
   const safeEl = h('p', { class: 'ar-safe', hidden: true, role: 'note' }, t.arSafeSub ?? 'Achte beim Gehen auf deine Umgebung.')
   const lookOut = h('p', { class: 'ar-look-out', 'aria-live': 'polite' }, '')
+  const calibNote = h('p', { class: 'ar-safe ar-calib-fallback', hidden: true, role: 'note' }, LV.calibFallback)
   const warnEl =
     e.warnings.length > 0
       ? h('div', { class: 'warning', role: 'note' }, ...e.warnings.map((w) => h('p', {}, h('strong', {}, `${t.warningPrefix}: `), t.warning[w] ?? w)))
       : null
-  const statusEl = h('div', { class: 'ar-status' }, noRouteEl, warnEl, safeEl, lookOut)
+  const statusEl = h('div', { class: 'ar-status' }, noRouteEl, warnEl, safeEl, calibNote, lookOut)
 
   const root = h(
     'section',
-    { class: `ar${cfg.dimScreen ? ' dim' : ''}`, 'aria-labelledby': 'live-title', 'data-mark': 'none' },
+    { class: `ar${cfg.dimScreen ? ' dim' : ''}`, 'aria-labelledby': 'live-title', 'data-mark': 'none', 'data-calib': 'on', 'data-mini': 'off' },
     h('h1', { id: 'live-title', class: 'sr-only' }, `${t.liveTitle}: ${name}`),
     mediaEl,
     svg,
-    h('div', { class: 'ar-top' }, stopBtn, muteBtn),
+    arrow.el,
+    turnEl,
+    door.el,
     instrEl,
+    srStep,
+    h('div', { class: 'ar-top' }, muteBtn),
     statusEl,
+    calib.el,
     opts.sensors.banner ? h('p', { class: 'banner sr-only' }, opts.sensors.banner) : null,
+    mini.el,
     destStrip,
   )
 
@@ -492,6 +518,8 @@ export function LiveView(opts: {
   let fix: Fix | null = null
   let heading: Heading | null = null
   let rel = 0
+  /** The arrow's rendered angle: steadied and unwrapped (arrowSteady.ts). */
+  let shownDeg = 0
   let dist = NaN
   let arrived = false
   let spokeArrival = false
@@ -525,9 +553,36 @@ export function LiveView(opts: {
   let pitch: number | null = null
   let lastSafe = 0
   /** What the centre shows. One at a time; CSS cross-fades 200 ms (none with reduced motion). */
-  const setMark = (m: 'arrow' | 'pin' | 'none') => {
+  const setMark = (m: 'arrow' | 'pin' | 'none' | 'turn') => {
     if (root.dataset.mark !== m) root.dataset.mark = m
   }
+  /** "Dreh dich um" instead of the arrow while the way is behind the user. */
+  let turnShown = false
+  /** Phone lowered toward the ground: the mini map comes up. */
+  let tilted = false
+  /** Localising: the calibration card until a heading and a position exist; after
+   *  CALIB_TIMEOUT_MS without them, a fallback line and the mini map instead. */
+  let calibTimedOut = false
+  let saidCalibFallback = false
+  const setCalib = (c: 'on' | 'fallback' | 'off') => {
+    if (root.dataset.calib === c) return
+    root.dataset.calib = c
+    calibNote.hidden = c !== 'fallback'
+    if (c === 'fallback') {
+      calib.fallback()
+      if (!saidCalibFallback) {
+        saidCalibFallback = true
+        announce(LV.calibFallback)
+      }
+    }
+  }
+  const setMini = (on: boolean) => {
+    const v = on ? 'on' : 'off'
+    if (root.dataset.mini !== v) root.dataset.mini = v
+  }
+  const noCamera = opts.sensors.media.kind === 'none'
+  /** The door's own direction (crow-flight), smoothed like the arrow, for the door label. */
+  const steadyDoor = new SteadyAngle()
 
   // Walking route to the door. Until it arrives (or if none exists) guidance falls
   // back to a straight-line bearing, which points through buildings — so the UI says
@@ -743,6 +798,20 @@ export function LiveView(opts: {
     announce(ARR.resumed)
   }
 
+  /** The rest of the path from the vertex nearest to `pos`, for the mini map. */
+  function aheadPath(pos: { lat: number; lon: number }): [number, number][] {
+    let best = 0
+    let bestM = Infinity
+    followPath.forEach(([la, lo], i) => {
+      const m = haversineM(pos, { lat: la, lon: lo })
+      if (m < bestM) {
+        bestM = m
+        best = i
+      }
+    })
+    return followPath.slice(best + 1)
+  }
+
   function update() {
     if (closed || hidden || !fix) return
     // CONTRACT v1 has no footway graph: snapToGraph passes the fix through (see core/match.ts).
@@ -788,8 +857,9 @@ export function LiveView(opts: {
     const hasHeading = heading !== null && heading.source !== 'none'
     // GPS gone: freeze the arrow where it is rather than let a stale fix steer it.
     if (hasHeading && !gpsLost) {
-      steady.push(relativeBearing(toDoor, heading!.deg), performance.now())
+      shownDeg = steady.push(relativeBearing(toDoor, heading!.deg), performance.now())
       rel = steady.rel
+      steadyDoor.push(relativeBearing(bearingDeg(pos, target), heading!.deg), performance.now())
     } else if (!hasHeading) rel = 0
     // "Roughly this way" is for poor GPS only, and only when there is no route to follow.
     const cone = (fix.accuracy ?? 0) > CONE_ACCURACY_M
@@ -802,8 +872,18 @@ export function LiveView(opts: {
     else if (arPhase === 'approach' && dist > APPROACH_PIN_M * 1.3) setPhase('guiding')
     maybeSafety(now)
 
-    distEl.textContent = t.metres(dist)
+    const eta = etaParts(dist, new Date())
+    if (distEl.textContent !== eta.sub) distEl.textContent = eta.sub
+    if (etaMinEl.textContent !== eta.min) etaMinEl.textContent = eta.min
     const mShort = (m: number) => t.metresShort(m)
+    // Localising until a heading and a position exist; the map below after 10 s.
+    if (hasHeading) setCalib('off')
+    else setCalib(calibTimedOut ? 'fallback' : 'on')
+    calib.setSteps(true, hasHeading)
+    tilted = tiltedDown(pitch, tilted)
+    const miniOn = tilted || noCamera || root.dataset.calib === 'fallback'
+    setMini(miniOn)
+    if (miniOn) mini.draw(sketchPath(pos, onRoute ? aheadPath(pos) : [], target, MINI_W, MINI_H), hasHeading ? heading!.deg : null)
     // Good GPS needs no note; poor GPS is worth reading (fix-live.css: 16 px, 7:1).
     accEl.textContent = fix.accuracy !== null && fix.accuracy > 10 ? `± ${mShort(fix.accuracy)}` : ''
     accEl.setAttribute('aria-label', accEl.textContent ? t.accuracy(fix.accuracy!) : '')
@@ -824,9 +904,11 @@ export function LiveView(opts: {
     // the line keeps the last direction instead of claiming a stale next turn.
     const lineFor = (glyph: string, word: string) => {
       if (gpsLost) return
-      if (ahead && aheadText) setLine(`${aheadText} · ${mShort(ahead.toManeuverM)}`, ahead.step ? glyph : 'location_on')
-      else setLine(`${word} · ${mShort(dist)}`, glyph)
+      if (ahead && aheadText) setLine(aheadText, ahead.step ? glyph : 'location_on', shortDistance(ahead.toManeuverM))
+      else setLine(word, glyph, shortDistance(dist))
     }
+    // The door label: only while the door itself is in the camera's view.
+    const labelX = hasHeading && !gpsLost ? doorLabelX(steadyDoor.rel) : null
 
     if (!hasHeading) {
       // No compass: the route still says what to do and how far away it is.
@@ -845,11 +927,13 @@ export function LiveView(opts: {
         lastWord = aheadText
         const line = `${t.inMetres(ahead!.toManeuverM)}. ${aheadText}`
         if (voiceOn()) speak(line)
-        else announce(line)
+        stepStatus(line)
       }
-      // Nothing to point with: no arrow. The pin still marks the last metres.
+      // Nothing to point with: no arrow (the calibration card or the map holds the
+      // screen). The pin still marks the last metres.
       pinShown = centreMark(dist, pinShown) === 'pin'
       setMark(pinShown ? 'pin' : 'none')
+      door.set('', null)
       coneG.replaceChildren()
       beacon?.update(beaconFor(dist, 0))
     } else {
@@ -863,23 +947,20 @@ export function LiveView(opts: {
       // Off route it would be inventing turns, and inventing turns is the one thing
       // a blind user cannot check.
       lineFor(glyph, word)
-      // Chevrons foreshorten as they swing away, the way an extruded plate would.
-      // Attribute rather than CSS transform: the group lives in the SVG user space.
-      stackG.setAttribute('transform', stackTransform(rel, 393, 760, pitch))
-      if (cone || softHeading) {
-        // Poor localisation dims the chevrons rather than hiding them: Google keeps
-        // guidance on screen and softens the wording, and an empty screen tells a
-        // partially-sighted user nothing at all.
-        coneG.replaceChildren()
-        stackG.setAttribute('opacity', '0.88')
-      } else {
-        coneG.replaceChildren()
-        stackG.setAttribute('opacity', '1')
-      }
+      // The 3D arrow turns in its tilted plane toward the next route point. The angle is
+      // the steadied, unwrapped one, so the CSS transition always takes the short way.
+      const rot = `rotate(${shownDeg.toFixed(1)}deg)`
+      if (arrow.rot.style.transform !== rot) arrow.rot.style.transform = rot
+      // Poor localisation dims the arrow rather than hiding it: Google keeps guidance on
+      // screen and softens the wording, and an empty screen tells a partially-sighted
+      // user nothing at all.
+      arrow.el.classList.toggle('is-soft', cone || softHeading)
       // The pin replaces the arrow in the last metres, in the arrow's own place and size.
-      // Never both: the centre shows one thing.
+      // Never both: the centre shows one thing. The way behind: "Dreh dich um".
       pinShown = centreMark(dist, pinShown) === 'pin'
-      setMark(pinShown ? 'pin' : 'arrow')
+      turnShown = !pinShown && turnAroundShown(rel, turnShown)
+      setMark(pinShown ? 'pin' : turnShown ? 'turn' : 'arrow')
+      door.set(`${doorLabelName} · ${shortDistance(dist)}`, pinShown ? null : labelX)
 
       if (beacon && !gpsLost && !isMuted()) {
         if (!beaconOn) {
@@ -902,7 +983,7 @@ export function LiveView(opts: {
         if (aheadText) {
           const line = `${t.inMetres(ahead!.toManeuverM)}. ${aheadText}`
           if (voiceOn()) speak(line)
-          else announce(line)
+          stepStatus(line)
         } else if (voiceOn()) speak(word, { key: turnKey(rel) })
         else announce(word)
       }
@@ -934,23 +1015,8 @@ export function LiveView(opts: {
     }
   }
 
-  // Continuous pulse: rate rises as |rel| falls. Render loop does arithmetic only.
-  let phase = 0
-  const calmMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
-  let last = performance.now()
-  let raf = 0
-  const frame = (now: number) => {
-    const dt = (now - last) / 1000
-    last = now
-    // A breath, not a throb: at 4 Hz and 12 % the chevrons read as shaking. Still faster
-    // the better the aim, but at most ~1.2 Hz and 4 %; none with reduced motion.
-    phase = (phase + dt * arrowPulseHz(rel) * 0.3) % 1
-    const k = calmMotion ? 1 : 1 + 0.04 * Math.sin(phase * Math.PI * 2) ** 2
-    stack.setAttribute('transform', `scale(${k.toFixed(3)})`)
-    coneG.setAttribute('opacity', (0.65 + 0.35 * Math.sin(phase * Math.PI) ** 2).toFixed(2))
-    raf = requestAnimationFrame(frame)
-  }
-  raf = requestAnimationFrame(frame)
+  // The arrow's float and the phone-pan illustration are CSS animations (none with
+  // reduced motion); nothing redraws per frame.
 
   // The safety line is the first thing said, on speech and on the live region alike.
   if (voiceOn()) speak(openingLine(name), { interrupt: true })
@@ -994,8 +1060,20 @@ export function LiveView(opts: {
   // Ground plane: re-project the chevrons as the phone tilts. Transform only, no redraw.
   const stopPitch = startPitch((b) => {
     pitch = pitch === null ? b : pitch + 0.25 * (b - pitch)
-    if (heading && heading.source !== 'none') stackG.setAttribute('transform', stackTransform(rel, 393, 760, pitch))
+    const was = tilted
+    tilted = tiltedDown(pitch, tilted)
+    if (tilted !== was) update()
   })
+  // Localising has a limit: after 10 s without a compass the map takes over.
+  const calibTimer = window.setTimeout(() => {
+    if (closed) return
+    calibTimedOut = true
+    if (root.dataset.calib === 'on') {
+      setCalib('fallback')
+      update()
+      if (!fix) setMini(true)
+    }
+  }, CALIB_TIMEOUT_MS)
 
   const stopSensors = opts.sensors.start(
     (f) => {
@@ -1103,8 +1181,8 @@ export function LiveView(opts: {
     clearTimeout(noteTimer)
     document.removeEventListener('visibilitychange', onVisibility)
     clearInterval(gpsWatch)
+    clearTimeout(calibTimer)
     clearTimers()
-    cancelAnimationFrame(raf)
     stopSensors()
     stopPitch()
     beacon?.stop()

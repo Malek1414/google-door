@@ -1,0 +1,106 @@
+/* Live View in the look of Google Maps Live View (walking): white cards over the camera,
+   a big blue 3D arrow at eye level, a red door pin with a white label, a white ETA bar.
+   Loaded after ar.css; `section.ar` outranks the older `.ar` rules in ar.css and fix-live.css.
+   Contrast on white: #202124 16:1, #5f6368 6.3:1, #188038 4.9:1, #1557b0 6.9:1. */
+
+section.ar { --lv-top: max(12px, env(safe-area-inset-top)); --lv-blue: #1a73e8; --lv-ink: #202124; --lv-grey: #5f6368;
+  --lv-card-shadow: 0 1px 3px rgb(0 0 0 / 0.22), 0 6px 20px rgb(0 0 0 / 0.26); }
+
+/* ── manoeuvre card: white, big blue turn icon with the distance under it, bold instruction ── */
+section.ar .ar-instr { top: var(--lv-top); left: 12px; right: 12px; min-height: 104px; padding: 12px 18px 12px 12px;
+  border-radius: 16px; background: #fff; color: var(--lv-ink); box-shadow: var(--lv-card-shadow);
+  display: flex; align-items: center; gap: 12px; font: 700 22px/1.25 'Google Sans Flex', Roboto, -apple-system, sans-serif; }
+section.ar .ar-instr-lead { flex: none; min-width: 76px; display: flex; flex-direction: column; align-items: center; gap: 0; }
+section.ar .ar-instr-ic { font-size: 52px; line-height: 1; color: var(--lv-blue); font-variation-settings: 'wght' 700; }
+section.ar .ar-instr-d { font: 500 26px/1.1 'Google Sans Flex', Roboto, -apple-system, sans-serif; color: var(--lv-ink);
+  font-variant-numeric: tabular-nums; white-space: nowrap; letter-spacing: -0.3px; }
+section.ar .ar-instr-d:empty { display: none; }
+section.ar .ar-instr-t { color: var(--lv-ink); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+section.ar.dim .ar-instr, html[data-contrast='high'] section.ar .ar-instr { font-size: 24px; }
+
+/* ── sound button and status strip under the card ── */
+section.ar .ar-top { top: calc(var(--lv-top) + 116px); left: auto; right: 12px; }
+section.ar .ar-top .mute-btn { background: #fff; color: var(--lv-ink); box-shadow: var(--lv-card-shadow); }
+section.ar .ar-top .mute-btn[aria-pressed='true'] { background: var(--lv-ink); color: #fff; }
+section.ar .ar-status { top: calc(var(--lv-top) + 116px); right: 72px; left: 12px; }
+section.ar .ar-status > .ar-safe, section.ar .ar-status > .ar-look-out { background: #fff; color: var(--lv-ink); box-shadow: var(--lv-card-shadow); }
+
+/* ── the centre ── */
+.ar3d { position: absolute; left: 50%; top: 52%; width: 240px; height: 240px; margin: -120px 0 0 -120px; z-index: 2;
+  pointer-events: none; transition: opacity 200ms ease;
+  /* The side of the solid (dark blue, straight down) and its shadow on the ground. */
+  filter: drop-shadow(0 9px 0 #174ea6) drop-shadow(0 20px 16px rgb(0 0 0 / 0.38)); }
+.ar3d-plane { width: 100%; height: 100%; display: grid; place-items: center;
+  transform: perspective(560px) rotateX(50deg); animation: lv-float 3s ease-in-out infinite; }
+.ar3d-rot { width: 210px; height: 210px; display: grid; place-items: center; transition: transform 220ms ease-out; }
+.ar3d-rot svg { width: 210px; height: 210px; overflow: visible; }
+.ar3d.is-soft { opacity: 0.85; }
+@keyframes lv-float { 0%, 100% { translate: 0 0 } 50% { translate: 0 -8px } }
+
+.ar-turn { position: absolute; left: 50%; top: 50%; z-index: 2; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 14px; pointer-events: none; transition: opacity 200ms ease; }
+.ar-turn-ic { filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.35)); }
+.ar-turn-ic svg { width: 132px; height: 132px; }
+.ar-turn-t { margin: 0; padding: 10px 22px; border-radius: 24px; background: #fff; color: var(--lv-ink);
+  font: 700 22px/1.2 'Google Sans Flex', Roboto, -apple-system, sans-serif; box-shadow: var(--lv-card-shadow); }
+
+section.ar[data-mark='none'] .ar-mark,
+section.ar[data-mark='arrow'] .ar-mark-turn, section.ar[data-mark='pin'] .ar-mark-turn,
+section.ar[data-mark='turn'] .ar-mark-arrow, section.ar[data-mark='turn'] .ar-mark-pin { opacity: 0; }
+
+/* ── door label: red pin under a white label, placed by the door's bearing ── */
+.ar-door { position: absolute; top: 25%; z-index: 3; transform: translateX(-50%); display: flex; flex-direction: column;
+  align-items: center; gap: 2px; pointer-events: none; transition: left 250ms ease-out; }
+.ar-door[hidden] { display: none; }
+.ar-door-b { padding: 8px 14px; border-radius: 18px; background: #fff; color: var(--lv-ink); white-space: nowrap;
+  font: 600 17px/1.2 'Google Sans Flex', Roboto, -apple-system, sans-serif; box-shadow: var(--lv-card-shadow); }
+.ar-door svg { filter: drop-shadow(0 3px 4px rgb(0 0 0 / 0.35)); }
+
+/* ── calibration card ── */
+.ar-calib { position: absolute; left: 16px; right: 16px; top: 50%; transform: translateY(-46%); z-index: 4;
+  display: none; flex-direction: column; align-items: center; gap: 12px; padding: 20px 20px 18px;
+  border-radius: 20px; background: #fff; color: var(--lv-ink); box-shadow: var(--lv-card-shadow); text-align: center; }
+section.ar[data-calib='on'] .ar-calib { display: flex; }
+.ar-calib-art { width: 200px; height: 96px; overflow: hidden; }
+.ar-calib-phone { animation: lv-pan 2.6s ease-in-out infinite; }
+@keyframes lv-pan { 0%, 100% { transform: translateX(-46px) } 50% { transform: translateX(46px) } }
+.ar-calib-t { margin: 0; font: 700 20px/1.3 'Google Sans Flex', Roboto, -apple-system, sans-serif; }
+.ar-calib-steps { list-style: none; margin: 0; padding: 0; display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; }
+.ar-calib-step { display: flex; align-items: center; gap: 6px; font: 500 16px/1.2 'Google Sans Flex', Roboto, sans-serif; color: var(--lv-grey); }
+.ar-calib-l { color: var(--lv-ink); font-weight: 600; }
+.ar-calib-ic { font-size: 22px; color: var(--lv-blue); animation: lv-spin 1.2s linear infinite; }
+.ar-calib-step.is-ok .ar-calib-ic { color: #188038; animation: none; }
+@keyframes lv-spin { to { transform: rotate(360deg) } }
+.ar-calib-note { margin: 0; color: var(--lv-grey); font-size: 16px; }
+.ar-calib-note[hidden] { display: none; }
+
+/* ── mini map (phone lowered, no camera, or no compass yet) ── */
+.ar-mini { position: absolute; left: 12px; right: 12px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 98px); z-index: 4;
+  height: 180px; border-radius: 18px; overflow: hidden; background: #eef1f4; border: 3px solid #fff;
+  box-shadow: var(--lv-card-shadow); display: none; }
+section.ar[data-mini='on'] .ar-mini { display: block; }
+.ar-mini svg { width: 100%; height: 100%; display: block; }
+
+/* ── bottom bar: round X, green minutes, distance and arrival time, eye button ── */
+section.ar .ar-dest { left: 8px; right: 8px; bottom: max(10px, env(safe-area-inset-bottom)); padding: 12px 14px;
+  grid-template-columns: auto 1fr auto; gap: 8px 14px; border-radius: 24px; background: #fff; color: var(--lv-ink);
+  box-shadow: 0 -1px 3px rgb(0 0 0 / 0.12), 0 6px 22px rgb(0 0 0 / 0.3); }
+section.ar .ar-dest .ar-stop { width: 52px; height: 52px; background: #f1f3f4; color: var(--lv-ink); box-shadow: none; }
+section.ar .ar-dest .ar-stop:active { background: #e8eaed; }
+section.ar .ar-eta { display: flex; flex-direction: column; min-width: 0; }
+section.ar .ar-eta-min { font: 500 26px/1.15 'Google Sans Flex', Roboto, -apple-system, sans-serif; color: #188038; font-variant-numeric: tabular-nums; }
+section.ar .ar-eta-sub { font: 400 16px/1.3 'Google Sans Flex', Roboto, -apple-system, sans-serif; color: var(--lv-grey); font-variant-numeric: tabular-nums; }
+section.ar .ar-dest .ar-dest-m { font-size: 16px; }
+section.ar .ar-dest .ar-meta { color: var(--lv-grey); margin-left: 6px; }
+section.ar .ar-dest .ar-look { border: 0; background: #e8f0fe; color: #1557b0; }
+section.ar .ar-dest .ar-near { color: #1557b0; }
+section.ar .ar-endrow .hint { color: #3c4043; }
+section.ar .ar-round:focus-visible, section.ar .ar-look:focus-visible { outline: 3px solid var(--lv-blue); outline-offset: 2px; box-shadow: 0 0 0 6px #fff; }
+
+/* The arrival sheet takes over. */
+section.ar.is-arrived .ar-door, section.ar.is-arrived .ar-calib, section.ar.is-arrived .ar-mini { visibility: hidden; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ar3d-plane, .ar-calib-phone, .ar-calib-ic { animation: none !important; }
+  .ar3d, .ar3d-rot, .ar-turn, .ar-door { transition: none !important; }
+}

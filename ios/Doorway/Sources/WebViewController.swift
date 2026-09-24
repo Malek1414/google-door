@@ -61,6 +61,7 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
         cfg.defaultWebpagePreferences.allowsContentJavaScript = true
         cfg.ignoresViewportScaleLimits = true                // pinch zoom always allowed (WCAG 1.4.4)
         GeoBridge.install(on: cfg.userContentController, handler: self)
+        ArBridge.install(on: cfg.userContentController, handler: self)
 
         webView = WKWebView(frame: .zero, configuration: cfg)
         webView.uiDelegate = self
@@ -283,6 +284,7 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
             return
         }
         #endif
+        if message.name == ArBridge.name { return openLiveView(message) }
         guard message.name == GeoBridge.name, message.frameInfo.isMainFrame,
               Origins.isTrusted(message.frameInfo.securityOrigin) else {
             Self.log.error("geolocation refused for \(message.frameInfo.securityOrigin.host, privacy: .public)")
@@ -308,6 +310,26 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
         default:
             break
         }
+    }
+
+    // MARK: - Native AR Live View (see ArBridge)
+
+    private weak var liveView: ArLiveViewController?
+
+    private func openLiveView(_ message: WKScriptMessage) {
+        guard message.frameInfo.isMainFrame, Origins.isTrusted(message.frameInfo.securityOrigin) else {
+            Self.log.error("AR Live View refused for \(message.frameInfo.securityOrigin.host, privacy: .public)")
+            return
+        }
+        guard let body = message.body as? [String: Any], body["op"] as? String == "open" else { return }
+        guard ArLiveViewController.isSupported else { return ArBridge.send(webView, .error("unsupported")) }
+        guard let route = ArRoute(message: body) else { return ArBridge.send(webView, .error("bad-route")) }
+        guard liveView == nil, presentedViewController == nil else { return ArBridge.send(webView, .error("busy")) }
+        let vc = ArLiveViewController(route: route, page: webView.url) { [weak self] event in
+            ArBridge.send(self?.webView, event)
+        }
+        liveView = vc
+        present(vc, animated: true)
     }
 
     /// distanceFilter keeps CoreLocation quiet while standing; the page still wants about one

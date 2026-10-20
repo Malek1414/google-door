@@ -1,0 +1,86 @@
+{
+  "_generator": "https://github.com/Malek1414/Malek1414/blob/main/tools/readme_art.py",
+  "title": "Doorway",
+  "tagline": "Guides you to the right door, not just the building.",
+  "chips": [
+    "3,061 Berlin entrances",
+    "*arrows only to surveyed doors",
+    "speech · beacon · haptics",
+    "Gemini"
+  ],
+  "footer_left": "Malek Hassan · Berlin · 2026",
+  "footer_right": "TypeScript · FastAPI · Gemini · OpenStreetMap",
+  "alt": "Doorway: a pixel map pin with a face hopping down to the flat threshold of an arched doorway",
+  "accent": "frame",
+  "colors": {
+    "frame": [
+      "#6c9ef8",
+      "#1a5fd0"
+    ],
+    "way": [
+      "#3fbf6b",
+      "#1e8e3e"
+    ],
+    "pin": [
+      "#f2665c",
+      "#c5221f"
+    ],
+    "step": [
+      "#fbc531",
+      "#c28f00"
+    ],
+    "ink": [
+      "#0d1117",
+      "#1f2328"
+    ]
+  },
+  "legend": {
+    "F": [
+      "frame",
+      "frame"
+    ],
+    "G": [
+      "way",
+      "way"
+    ],
+    "Y": [
+      "step",
+      "step"
+    ],
+    "R": [
+      "pin",
+      "pin"
+    ],
+    "E": [
+      "ink",
+      "pin"
+    ]
+  },
+  "motions": {
+    "pin": "bounce",
+    "way": "glow"
+  },
+  "sprite": [
+    "........FFFFFFFF........",
+    "......FFFFFFFFFFFF......",
+    ".....FFFFFFFFFFFFFF.....",
+    "....FFFFFGGGGGGFFFFF....",
+    "...FFFFFGGGGGGGGFFFFF...",
+    "...FFFFGGGGGGGGGGFFFF...",
+    "..FFFFGGGGRRRRGGGGFFFF..",
+    "..FFFFGGGRRRRRRGGGFFFF..",
+    "..FFFGGGRRERRERRGGGFFF..",
+    "..FFFGGGRRERRERRGGGFFF..",
+    "..FFFGGGRRRRRRRRGGGFFF..",
+    "..FFFGGGGRRRRRRGGGGFFF..",
+    "..FFFGGGGGRRRRGGGGGFFF..",
+    "..FFFGGGGGGRRGGGGGGFFF..",
+    "..FFFGGGGGGRRGGGGGGFFF..",
+    "..FFFGGGGGGGGGGGGGGFFF..",
+    "..FFFGGGGGGGGGGGGGGFFF..",
+    "..FFFGGGGGGGGGGGGGGFFF..",
+    "..FFFGGGGGGGGGGGGGGFFF..",
+    "YYYYYYYYYYYYYYYYYYYYYYYY",
+    "YYYYYYYYYYYYYYYYYYYYYYYY"
+  ]
+}
